@@ -1,0 +1,11 @@
+= Netty HTTP client
+Jörg Prante
+Version 4.1.9.0
+:sectnums:
+:toc: preamble
+:toclevels: 4
+:!toc-title: Content
+:experimental:
+:description: asynchronous Netty HTTP client for Java
+:keywords: Java, Netty, HTTP, client
+:icons: font

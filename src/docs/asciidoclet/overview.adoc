@@ -1,0 +1,4 @@
+= Netty HTTP client
+Jörg Prante
+Version 4.1.9.0
+

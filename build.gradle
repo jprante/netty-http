@@ -1,0 +1,121 @@
+
+plugins {
+    id "org.sonarqube" version "2.2"
+    id "org.xbib.gradle.plugin.asciidoctor" version "1.5.4.1.0"
+    id "io.codearte.nexus-staging" version "0.7.0"
+}
+
+printf "Host: %s\nOS: %s %s %s\nJVM: %s %s %s %s\nGroovy: %s\nGradle: %s\n" +
+        "Build: group: ${project.group} name: ${project.name} version: ${project.version}\n",
+        InetAddress.getLocalHost(),
+        System.getProperty("os.name"),
+        System.getProperty("os.arch"),
+        System.getProperty("os.version"),
+        System.getProperty("java.version"),
+        System.getProperty("java.vm.version"),
+        System.getProperty("java.vm.vendor"),
+        System.getProperty("java.vm.name"),
+        GroovySystem.getVersion(),
+        gradle.gradleVersion
+
+apply plugin: 'java'
+apply plugin: 'maven'
+apply plugin: 'signing'
+apply plugin: 'findbugs'
+apply plugin: 'pmd'
+apply plugin: 'checkstyle'
+apply plugin: "jacoco"
+apply plugin: 'org.xbib.gradle.plugin.asciidoctor'
+apply plugin: "io.codearte.nexus-staging"
+
+
+repositories {
+    mavenCentral()
+}
+
+configurations {
+    alpnagent
+    asciidoclet
+    wagon
+}
+
+dependencies {
+    compile "io.netty:netty-codec-http2:${project.property('netty.version')}"
+    compile "io.netty:netty-handler-proxy:${project.property('netty.version')}"
+    compile "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
+    alpnagent "org.mortbay.jetty.alpn:jetty-alpn-agent:${project.property('alpnagent.version')}"
+    testCompile "junit:junit:${project.property('junit.version')}"
+    asciidoclet "org.asciidoctor:asciidoclet:${project.property('asciidoclet.version')}"
+    wagon "org.apache.maven.wagon:wagon-ssh:${project.property('wagon.version')}"
+}
+
+sourceCompatibility = JavaVersion.VERSION_1_8
+targetCompatibility = JavaVersion.VERSION_1_8
+
+[compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
+tasks.withType(JavaCompile) {
+    options.compilerArgs << "-Xlint:all"
+}
+
+jar {
+    manifest {
+        attributes('Implementation-Version': project.version)
+    }
+}
+
+test {
+    jvmArgs "-javaagent:" + configurations.alpnagent.asPath
+    //include 'org/xbib/netty/http/client/test/Http2Test*'
+    testLogging {
+        showStandardStreams = false
+        exceptionFormat = 'full'
+    }
+}
+
+asciidoctor {
+    backends 'html5'
+    separateOutputDirs = false
+    attributes 'source-highlighter': 'coderay',
+            toc                 : '',
+            idprefix            : '',
+            idseparator         : '-',
+            stylesheet: "${projectDir}/src/docs/asciidoc/css/foundation.css"
+}
+
+javadoc {
+    options.docletpath = configurations.asciidoclet.files.asType(List)
+    options.doclet = 'org.asciidoctor.Asciidoclet'
+    options.overview = "src/docs/asciidoclet/overview.adoc"
+    options.addStringOption "-base-dir", "${projectDir}"
+    options.addStringOption "-attribute",
+            "name=${project.name},version=${project.version},title-link=https://github.com/jprante/${project.name}"
+    configure(options) {
+        noTimestamp = true
+    }
+}
+
+task javadocJar(type: Jar, dependsOn: classes) {
+    from javadoc
+    into "build/tmp"
+    classifier 'javadoc'
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+    from sourceSets.main.allSource
+    into "build/tmp"
+    classifier 'sources'
+}
+
+artifacts {
+    archives javadocJar, sourcesJar
+}
+
+if (project.hasProperty('signing.keyId')) {
+    signing {
+        sign configurations.archives
+    }
+}
+
+apply from: 'gradle/ext.gradle'
+apply from: 'gradle/publish.gradle'
+apply from: 'gradle/sonarqube.gradle'
