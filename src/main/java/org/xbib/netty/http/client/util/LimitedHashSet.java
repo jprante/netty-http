@@ -20,6 +20,7 @@ import java.util.LinkedHashSet;
 
 /**
  * A {@link java.util.Set} with limited size. If the size is exceeded, an exception is thrown.
+ * @param <E> the element type
  */
 public final class LimitedHashSet<E> extends LinkedHashSet<E> {
 

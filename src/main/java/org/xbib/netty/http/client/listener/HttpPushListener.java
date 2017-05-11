@@ -19,7 +19,7 @@ import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http2.Http2Headers;
 
 /**
- * This listener can forward HTTP push
+ * This listener can forward HTTP push.
  *
  */
 @FunctionalInterface

@@ -206,11 +206,14 @@ public class NetworkUtils {
     public static boolean matchesNetwork(NetworkClass given, NetworkClass expected) {
         switch (expected) {
             case ANY:
-                return EnumSet.of(NetworkClass.LOOPBACK, NetworkClass.LOCAL, NetworkClass.PUBLIC, NetworkClass.ANY).contains(given);
+                return EnumSet.of(NetworkClass.LOOPBACK, NetworkClass.LOCAL, NetworkClass.PUBLIC, NetworkClass.ANY)
+                        .contains(given);
             case PUBLIC:
-                return EnumSet.of(NetworkClass.LOOPBACK, NetworkClass.LOCAL, NetworkClass.PUBLIC).contains(given);
+                return EnumSet.of(NetworkClass.LOOPBACK, NetworkClass.LOCAL, NetworkClass.PUBLIC)
+                        .contains(given);
             case LOCAL:
-                return EnumSet.of(NetworkClass.LOOPBACK, NetworkClass.LOCAL).contains(given);
+                return EnumSet.of(NetworkClass.LOOPBACK, NetworkClass.LOCAL)
+                        .contains(given);
             case LOOPBACK:
                 return NetworkClass.LOOPBACK == given;
         }
@@ -509,8 +512,12 @@ public class NetworkUtils {
                     .append(" prefixlen:").append(interfaceAddress.getNetworkPrefixLength());
         } else {
             int netmask = 0xFFFFFFFF << (32 - interfaceAddress.getNetworkPrefixLength());
-            byte[] b = new byte[] { (byte)(netmask >>> 24), (byte)(netmask >>> 16 & 0xFF),
-                    (byte)(netmask >>> 8 & 0xFF), (byte)(netmask & 0xFF) };
+            byte[] b = new byte[] {
+                    (byte) (netmask >>> 24),
+                    (byte) (netmask >>> 16 & 0xFF),
+                    (byte) (netmask >>> 8 & 0xFF),
+                    (byte) (netmask & 0xFF)
+            };
             sb.append("inet ").append(format(address));
             try {
                 sb.append(" netmask:").append(format(InetAddress.getByAddress(b)));

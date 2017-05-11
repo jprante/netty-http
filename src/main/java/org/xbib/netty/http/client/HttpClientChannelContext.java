@@ -24,13 +24,13 @@ import io.netty.handler.ssl.SslProvider;
 import io.netty.util.AttributeKey;
 import org.xbib.netty.http.client.listener.CookieListener;
 import org.xbib.netty.http.client.listener.ExceptionListener;
-import org.xbib.netty.http.client.listener.HttpPushListener;
 import org.xbib.netty.http.client.listener.HttpHeadersListener;
+import org.xbib.netty.http.client.listener.HttpPushListener;
 import org.xbib.netty.http.client.listener.HttpResponseListener;
 import org.xbib.netty.http.client.util.ClientAuthMode;
 
-import java.io.InputStream;
 import javax.net.ssl.TrustManagerFactory;
+import java.io.InputStream;
 
 /**
  */

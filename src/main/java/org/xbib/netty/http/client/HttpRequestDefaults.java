@@ -21,8 +21,6 @@ import io.netty.handler.codec.http.HttpVersion;
  */
 public interface HttpRequestDefaults {
 
-    int DEFAULT_TIMEOUT_MILLIS = 5000;
-
     HttpVersion DEFAULT_HTTP_VERSION = HttpVersion.HTTP_1_1;
 
     String DEFAULT_USER_AGENT = HttpClientUserAgent.getUserAgent();
@@ -30,6 +28,8 @@ public interface HttpRequestDefaults {
     boolean DEFAULT_GZIP = true;
 
     boolean DEFAULT_FOLLOW_REDIRECT = true;
+
+    int DEFAULT_TIMEOUT_MILLIS = 5000;
 
     int DEFAULT_MAX_REDIRECT = 10;
 }

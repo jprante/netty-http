@@ -41,10 +41,6 @@ import io.netty.handler.codec.http2.HttpConversionUtil;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static io.netty.handler.codec.http2.Http2Error.INTERNAL_ERROR;
-import static io.netty.handler.codec.http2.Http2Error.PROTOCOL_ERROR;
-import static io.netty.handler.codec.http2.Http2Exception.connectionError;
-
 /**
  * A HTTP/2 event adapter for a client.
  * This event adapter expects {@link Http2Settings} are sent from the server before the
@@ -80,7 +76,7 @@ public class Http2EventHandler extends Http2EventAdapter {
 
     /**
      * Handles an inbound {@code SETTINGS} frame.
-     * After frame is received, the reuqets is sent.
+     * After frame is received, the request is sent.
      *
      * @param ctx the context from the handler where the frame was read.
      * @param settings the settings received from the remote endpoint.
@@ -214,12 +210,13 @@ public class Http2EventHandler extends Http2EventAdapter {
         Http2Stream stream = connection.stream(streamId);
         FullHttpMessage msg = getMessage(stream);
         if (msg == null) {
-            throw connectionError(PROTOCOL_ERROR, "data frame received for unknown stream id %d", streamId);
+            throw Http2Exception.connectionError(Http2Error.PROTOCOL_ERROR,
+                    "data frame received for unknown stream id %d", streamId);
         }
         ByteBuf content = msg.content();
         final int dataReadableBytes = data.readableBytes();
         if (content.readableBytes() > maxContentLength - dataReadableBytes) {
-            throw connectionError(INTERNAL_ERROR,
+            throw Http2Exception.connectionError(Http2Error.INTERNAL_ERROR,
                     "content length exceeded maximum of %d for stream id %d", maxContentLength, streamId);
         }
         content.writeBytes(data, data.readerIndex(), dataReadableBytes);
@@ -349,7 +346,7 @@ public class Http2EventHandler extends Http2EventAdapter {
         }
     }
     /**
-     * The stream is out of scope for the HTTP message flow and will no longer be tracked
+     * The stream is out of scope for the HTTP message flow and will no longer be tracked.
      * @param stream The stream to remove associated state with
      * @param release {@code true} to call release on the value if it is present. {@code false} to not call release.
      */
@@ -361,7 +358,7 @@ public class Http2EventHandler extends Http2EventAdapter {
     }
 
     /**
-     * Set final headers and fire a channel read event
+     * Set final headers and fire a channel read event.
      *
      * @param ctx The context to fire the event on
      * @param msg The message to send
@@ -390,8 +387,7 @@ public class Http2EventHandler extends Http2EventAdapter {
         return msg;
     }
 
-    private void endHeader(ChannelHandlerContext ctx, Http2Stream stream, FullHttpMessage msg,
-                                   boolean endOfStream) {
+    private void endHeader(ChannelHandlerContext ctx, Http2Stream stream, FullHttpMessage msg, boolean endOfStream) {
         if (endOfStream) {
             fireChannelRead(ctx, msg, getMessage(stream) != msg, stream);
         } else {

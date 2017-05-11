@@ -35,12 +35,13 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import io.netty.handler.codec.http.cookie.Cookie;
+import io.netty.handler.ssl.OpenSsl;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.FutureListener;
 import org.xbib.netty.http.client.listener.CookieListener;
 import org.xbib.netty.http.client.listener.ExceptionListener;
-import org.xbib.netty.http.client.listener.HttpPushListener;
 import org.xbib.netty.http.client.listener.HttpHeadersListener;
+import org.xbib.netty.http.client.listener.HttpPushListener;
 import org.xbib.netty.http.client.listener.HttpResponseListener;
 import org.xbib.netty.http.client.util.InetAddressKey;
 import org.xbib.netty.http.client.util.NetworkUtils;
@@ -66,6 +67,8 @@ public final class HttpClient implements Closeable {
 
     private static final AtomicInteger streamId = new AtomicInteger(3);
 
+    private static final HttpClient INSTANCE = HttpClient.builder().build();
+
     private final ByteBufAllocator byteBufAllocator;
 
     private final EventLoopGroup eventLoopGroup;
@@ -83,9 +86,14 @@ public final class HttpClient implements Closeable {
         this.byteBufAllocator = byteBufAllocator;
         this.eventLoopGroup = eventLoopGroup;
         this.poolMap = new HttpClientChannelPoolMap(this, httpClientChannelContext, bootstrap, maxConnections);
+        logger.log(Level.FINE, () -> "OpenSSL ALPN support: " + OpenSsl.isAlpnSupported());
         NetworkUtils.extendSystemProperties();
         logger.log(Level.FINE, () -> "local host name = " + NetworkUtils.getLocalHostName("localhost"));
         logger.log(Level.FINE, NetworkUtils::displayNetworkInterfaces);
+    }
+
+    public static HttpClient getInstance() {
+        return INSTANCE;
     }
 
     /**
@@ -106,8 +114,12 @@ public final class HttpClient implements Closeable {
      *
      * @return a request builder
      */
-    public HttpClientRequestBuilder prepareGet() {
+    public HttpRequestBuilder prepareGet() {
         return prepareRequest(HttpMethod.GET);
+    }
+
+    public HttpRequestBuilder prepareGet(String url) {
+        return prepareRequest(HttpMethod.GET).setURL(url);
     }
 
     /**
@@ -115,8 +127,12 @@ public final class HttpClient implements Closeable {
      *
      * @return a request builder
      */
-    public HttpClientRequestBuilder prepareHead() {
+    public HttpRequestBuilder prepareHead() {
         return prepareRequest(HttpMethod.HEAD);
+    }
+
+    public HttpRequestBuilder prepareHead(String url) {
+        return prepareRequest(HttpMethod.HEAD).setURL(url);
     }
 
     /**
@@ -124,8 +140,12 @@ public final class HttpClient implements Closeable {
      *
      * @return a request builder
      */
-    public HttpClientRequestBuilder preparePut() {
+    public HttpRequestBuilder preparePut() {
         return prepareRequest(HttpMethod.PUT);
+    }
+
+    public HttpRequestBuilder preparePut(String url) {
+        return prepareRequest(HttpMethod.PUT).setURL(url);
     }
 
     /**
@@ -133,8 +153,12 @@ public final class HttpClient implements Closeable {
      *
      * @return a request builder
      */
-    public HttpClientRequestBuilder preparePost() {
+    public HttpRequestBuilder preparePost() {
         return prepareRequest(HttpMethod.POST);
+    }
+
+    public HttpRequestBuilder preparePost(String url) {
+        return prepareRequest(HttpMethod.POST).setURL(url);
     }
 
     /**
@@ -142,8 +166,12 @@ public final class HttpClient implements Closeable {
      *
      * @return a request builder
      */
-    public HttpClientRequestBuilder prepareDelete() {
+    public HttpRequestBuilder prepareDelete() {
         return prepareRequest(HttpMethod.DELETE);
+    }
+
+    public HttpRequestBuilder prepareDelete(String url) {
+        return prepareRequest(HttpMethod.DELETE).setURL(url);
     }
 
     /**
@@ -151,8 +179,12 @@ public final class HttpClient implements Closeable {
      *
      * @return a request builder
      */
-    public HttpClientRequestBuilder prepareOptions() {
+    public HttpRequestBuilder prepareOptions() {
         return prepareRequest(HttpMethod.OPTIONS);
+    }
+
+    public HttpRequestBuilder prepareOptions(String url) {
+        return prepareRequest(HttpMethod.OPTIONS).setURL(url);
     }
 
     /**
@@ -160,8 +192,12 @@ public final class HttpClient implements Closeable {
      *
      * @return a request builder
      */
-    public HttpClientRequestBuilder preparePatch() {
+    public HttpRequestBuilder preparePatch() {
         return prepareRequest(HttpMethod.PATCH);
+    }
+
+    public HttpRequestBuilder preparePatch(String url) {
+        return prepareRequest(HttpMethod.PATCH).setURL(url);
     }
 
     /**
@@ -169,8 +205,12 @@ public final class HttpClient implements Closeable {
      *
      * @return a request builder
      */
-    public HttpClientRequestBuilder prepareTrace() {
+    public HttpRequestBuilder prepareTrace() {
         return prepareRequest(HttpMethod.TRACE);
+    }
+
+    public HttpRequestBuilder prepareTrace(String url) {
+        return prepareRequest(HttpMethod.TRACE).setURL(url);
     }
 
     public HttpClientChannelPoolMap poolMap() {
@@ -258,7 +298,8 @@ public final class HttpClient implements Closeable {
                 } else if (httpRequest.protocolVersion().majorVersion() == 2) {
                     logger.log(Level.FINE, () -> "waiting for HTTP/2 settings");
                     settingsPromise.await(httpRequestContext.getTimeout(), TimeUnit.MILLISECONDS);
-                    logger.log(Level.FINE, () -> "waiting for HTTP/2 responses = " + httpRequestContext.getStreamIdPromiseMap().size());
+                    logger.log(Level.FINE, () -> "waiting for HTTP/2 responses = " +
+                            httpRequestContext.getStreamIdPromiseMap().size());
                     int timeout = httpRequestContext.getTimeout();
                     for (Map.Entry<Integer, Map.Entry<ChannelFuture, ChannelPromise>> entry :
                             httpRequestContext.getStreamIdPromiseMap().entrySet()) {
@@ -267,12 +308,13 @@ public final class HttpClient implements Closeable {
                             logger.log(Level.FINE, "waiting for channel, stream ID = " + entry.getKey());
                             if (!channelFuture.awaitUninterruptibly(timeout, TimeUnit.MILLISECONDS)) {
                                 IllegalStateException illegalStateException =
-                                        new IllegalStateException("time out while waiting to write for stream id " + entry.getKey());
+                                        new IllegalStateException("time out while waiting to write for stream id " +
+                                                entry.getKey());
                                 if (exceptionListener != null) {
                                     exceptionListener.onException(illegalStateException);
                                     httpRequestContext.fail(illegalStateException.getMessage());
-                                    final ChannelPool channelPool =
-                                            channelFuture.channel().attr(HttpClientChannelContext.CHANNEL_POOL_ATTRIBUTE_KEY).get();
+                                    final ChannelPool channelPool = channelFuture.channel()
+                                                    .attr(HttpClientChannelContext.CHANNEL_POOL_ATTRIBUTE_KEY).get();
                                     channelPool.release(channelFuture.channel());
                                 }
                                 throw illegalStateException;
@@ -285,13 +327,14 @@ public final class HttpClient implements Closeable {
                         logger.log(Level.FINE, "waiting for promise of stream ID = " + entry.getKey());
                         if (!promise.awaitUninterruptibly(timeout, TimeUnit.MILLISECONDS)) {
                             IllegalStateException illegalStateException =
-                                    new IllegalStateException("time out while waiting for response on stream id " + entry.getKey());
+                                    new IllegalStateException("time out while waiting for response on stream id " +
+                                            entry.getKey());
                             if (exceptionListener != null) {
                                 exceptionListener.onException(illegalStateException);
                                 httpRequestContext.fail(illegalStateException.getMessage());
                                 if (channelFuture != null) {
-                                    final ChannelPool channelPool =
-                                            channelFuture.channel().attr(HttpClientChannelContext.CHANNEL_POOL_ATTRIBUTE_KEY).get();
+                                    final ChannelPool channelPool = channelFuture.channel()
+                                                    .attr(HttpClientChannelContext.CHANNEL_POOL_ATTRIBUTE_KEY).get();
                                     channelPool.release(channelFuture.channel());
                                 }
                             }
@@ -303,8 +346,8 @@ public final class HttpClient implements Closeable {
                                 exceptionListener.onException(runtimeException);
                                 httpRequestContext.fail(runtimeException.getMessage());
                                 if (channelFuture != null) {
-                                    final ChannelPool channelPool =
-                                            channelFuture.channel().attr(HttpClientChannelContext.CHANNEL_POOL_ATTRIBUTE_KEY).get();
+                                    final ChannelPool channelPool = channelFuture.channel()
+                                            .attr(HttpClientChannelContext.CHANNEL_POOL_ATTRIBUTE_KEY).get();
                                     channelPool.release(channelFuture.channel());
                                 }
                             }

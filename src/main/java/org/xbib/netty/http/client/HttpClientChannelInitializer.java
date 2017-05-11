@@ -50,15 +50,15 @@ import io.netty.handler.timeout.ReadTimeoutHandler;
 import org.xbib.netty.http.client.listener.ExceptionListener;
 import org.xbib.netty.http.client.util.InetAddressKey;
 
-import java.util.Arrays;
-import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.net.ssl.SNIHostName;
 import javax.net.ssl.SNIServerName;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLParameters;
+import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Netty HTTP client channel initializer.
@@ -259,7 +259,7 @@ class HttpClientChannelInitializer extends ChannelInitializer<SocketChannel> {
     }
 
     @Sharable
-    private class UpgradeRequestHandler extends ChannelInboundHandlerAdapter {
+    private static class UpgradeRequestHandler extends ChannelInboundHandlerAdapter {
 
         /**
          * Send an upgrade request if channel becomes active.
@@ -299,7 +299,7 @@ class HttpClientChannelInitializer extends ChannelInitializer<SocketChannel> {
      * A Netty handler that logs user events and find expetced ones.
      */
     @Sharable
-    private class UserEventLogger extends ChannelInboundHandlerAdapter {
+    private static class UserEventLogger extends ChannelInboundHandlerAdapter {
 
         @Override
         public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
@@ -319,7 +319,7 @@ class HttpClientChannelInitializer extends ChannelInitializer<SocketChannel> {
      * A Netty handler that logs the I/O traffic of a connection.
      */
     @Sharable
-    private final class TrafficLoggingHandler extends LoggingHandler {
+    private static class TrafficLoggingHandler extends LoggingHandler {
 
         TrafficLoggingHandler() {
             super("client", LogLevel.TRACE);

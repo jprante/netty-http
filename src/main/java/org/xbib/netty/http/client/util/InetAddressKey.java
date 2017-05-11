@@ -66,7 +66,7 @@ public class InetAddressKey {
                 host.equals(((InetAddressKey) object).host) &&
                 port == ((InetAddressKey) object).port &&
                 version.equals(((InetAddressKey) object).version) &&
-                secure == ((InetAddressKey) object).secure;
+                secure.equals(((InetAddressKey) object).secure);
     }
 
     @Override

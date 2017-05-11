@@ -21,8 +21,8 @@ import io.netty.handler.ssl.OpenSsl;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
-import org.xbib.netty.http.client.util.InetAddressKey;
 import org.xbib.netty.http.client.util.ClientAuthMode;
+import org.xbib.netty.http.client.util.InetAddressKey;
 
 import javax.net.ssl.TrustManagerFactory;
 

@@ -56,10 +56,10 @@ page at http://checkstyle.sourceforge.net/config.html -->
             <!-- Checks for out of order import statements. -->
 
             <property name="severity" value="warning"/>
-            <property name="groups" value="com,io,junit,net,org,java,javax"/>
+            <property name="groups" value="com,io,junit,net,org,javax,java"/>
             <!-- This ensures that static imports go last. -->
             <property name="option" value="under"/>
-            <property name="tokens" value="STATIC_IMPORT, IMPORT"/>
+            <property name="tokens" value="IMPORT, STATIC_IMPORT"/>
         </module>
 
         <!--

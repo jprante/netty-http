@@ -24,8 +24,8 @@ import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.util.internal.PlatformDependent;
 import org.xbib.netty.http.client.listener.CookieListener;
 import org.xbib.netty.http.client.listener.ExceptionListener;
-import org.xbib.netty.http.client.listener.HttpPushListener;
 import org.xbib.netty.http.client.listener.HttpHeadersListener;
+import org.xbib.netty.http.client.listener.HttpPushListener;
 import org.xbib.netty.http.client.listener.HttpResponseListener;
 import org.xbib.netty.http.client.util.LimitedHashSet;
 
@@ -90,6 +90,8 @@ public final class HttpRequestContext implements HttpResponseListener, HttpReque
     private Collection<Cookie> cookies;
 
     private Map<Integer, FullHttpResponse> httpResponses;
+
+    private boolean hastimeout;
 
     private Long stopTime;
 
@@ -233,11 +235,7 @@ public final class HttpRequestContext implements HttpResponseListener, HttpReque
             return false;
         }
         boolean secure = "https".equals(uri.getScheme());
-        boolean secureMatch = (secure && cookie.isSecure()) || (!secure && !cookie.isSecure());
-        if (!secureMatch) {
-            return false;
-        }
-        return true;
+        return (secure && cookie.isSecure()) || (!secure && !cookie.isSecure());
     }
 
     public int getTimeout() {
@@ -293,9 +291,13 @@ public final class HttpRequestContext implements HttpResponseListener, HttpReque
     }
 
     public HttpRequestContext waitFor(long value, TimeUnit timeUnit) throws InterruptedException {
-        latch.await(value, timeUnit);
+        this.hastimeout = latch.await(value, timeUnit);
         stopTime = System.currentTimeMillis();
         return this;
+    }
+
+    public boolean isTimeout() {
+        return hastimeout;
     }
 
     public void success(String reason) {

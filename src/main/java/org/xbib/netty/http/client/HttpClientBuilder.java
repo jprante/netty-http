@@ -30,9 +30,9 @@ import io.netty.handler.ssl.CipherSuiteFilter;
 import io.netty.handler.ssl.SslProvider;
 import org.xbib.netty.http.client.util.ClientAuthMode;
 
+import javax.net.ssl.TrustManagerFactory;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
-import javax.net.ssl.TrustManagerFactory;
 
 /**
  *

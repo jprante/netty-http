@@ -2,6 +2,7 @@ package org.xbib.netty.http.client;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.DefaultHttpRequest;
@@ -19,8 +20,8 @@ import io.netty.util.AsciiString;
 import io.netty.util.CharsetUtil;
 import org.xbib.netty.http.client.listener.CookieListener;
 import org.xbib.netty.http.client.listener.ExceptionListener;
-import org.xbib.netty.http.client.listener.HttpPushListener;
 import org.xbib.netty.http.client.listener.HttpHeadersListener;
+import org.xbib.netty.http.client.listener.HttpPushListener;
 import org.xbib.netty.http.client.listener.HttpResponseListener;
 
 import java.io.IOException;
@@ -49,6 +50,8 @@ import java.util.logging.Logger;
 public class HttpClientRequestBuilder implements HttpRequestBuilder, HttpRequestDefaults {
 
     private static final Logger logger = Logger.getLogger(HttpClientRequestBuilder.class.getName());
+
+    private static final HttpVersion HTTP_2_0 = HttpVersion.valueOf("HTTP/2.0");
 
     private final HttpClient httpClient;
 
@@ -96,6 +99,11 @@ public class HttpClientRequestBuilder implements HttpRequestBuilder, HttpRequest
 
     private HttpPushListener httpPushListener;
 
+    HttpClientRequestBuilder(HttpMethod httpMethod,
+                             ByteBufAllocator byteBufAllocator, int streamId) {
+        this(null, httpMethod, byteBufAllocator, streamId);
+    }
+
     /**
      * Construct HTTP client request builder.
      *
@@ -112,6 +120,28 @@ public class HttpClientRequestBuilder implements HttpRequestBuilder, HttpRequest
         this.headers = new DefaultHttpHeaders();
         this.removeHeaders = new ArrayList<>();
         this.cookies = new HashSet<>();
+    }
+
+    public static HttpRequestBuilder builder(HttpMethod httpMethod) {
+        return new HttpClientRequestBuilder(httpMethod, UnpooledByteBufAllocator.DEFAULT, 3);
+    }
+
+    @Override
+    public HttpRequestBuilder setHttp1() {
+        this.httpVersion = HttpVersion.HTTP_1_1;
+        return this;
+    }
+
+    @Override
+    public HttpRequestBuilder setHttp2() {
+        this.httpVersion = HTTP_2_0;
+        return this;
+    }
+
+    @Override
+    public HttpRequestBuilder setVersion(String httpVersion) {
+        this.httpVersion = HttpVersion.valueOf(httpVersion);
+        return this;
     }
 
     @Override
@@ -168,12 +198,6 @@ public class HttpClientRequestBuilder implements HttpRequestBuilder, HttpRequest
     @Override
     public HttpRequestBuilder contentType(String contentType) {
         addHeader(HttpHeaderNames.CONTENT_TYPE, contentType);
-        return this;
-    }
-
-    @Override
-    public HttpRequestBuilder setVersion(String httpVersion) {
-        this.httpVersion = HttpVersion.valueOf(httpVersion);
         return this;
     }
 
@@ -314,6 +338,14 @@ public class HttpClientRequestBuilder implements HttpRequestBuilder, HttpRequest
 
     @Override
     public HttpRequestContext execute() {
+        return execute(httpClient);
+    }
+
+    @Override
+    public HttpRequestContext execute(HttpClient httpClient) {
+        if (httpClient == null) {
+            return null;
+        }
         if (httpRequest == null) {
             httpRequest = build();
         }
@@ -378,8 +410,7 @@ public class HttpClientRequestBuilder implements HttpRequestBuilder, HttpRequest
     }
 
     private void content(byte[] buf, AsciiString contentType) throws IOException {
-        ByteBuf buffer = byteBufAllocator.buffer(buf.length).writeBytes(buf);
-        content(buffer, contentType);
+        content(byteBufAllocator.buffer(buf.length).writeBytes(buf), contentType);
     }
 
     private void content(ByteBuf body, AsciiString contentType) throws IOException {

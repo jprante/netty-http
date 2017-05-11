@@ -21,8 +21,8 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.cookie.Cookie;
 import org.xbib.netty.http.client.listener.CookieListener;
 import org.xbib.netty.http.client.listener.ExceptionListener;
-import org.xbib.netty.http.client.listener.HttpPushListener;
 import org.xbib.netty.http.client.listener.HttpHeadersListener;
+import org.xbib.netty.http.client.listener.HttpPushListener;
 import org.xbib.netty.http.client.listener.HttpResponseListener;
 
 import java.io.IOException;
@@ -33,7 +33,9 @@ import java.util.function.Function;
  */
 public interface HttpRequestBuilder {
 
-    HttpRequestBuilder setTimeout(int timeout);
+    HttpRequestBuilder setHttp1();
+
+    HttpRequestBuilder setHttp2();
 
     HttpRequestBuilder setVersion(String httpVersion);
 
@@ -81,9 +83,13 @@ public interface HttpRequestBuilder {
 
     HttpRequestBuilder onPushReceived(HttpPushListener httpPushListener);
 
+    HttpRequestBuilder setTimeout(int timeout);
+
     HttpRequest build();
 
     HttpRequestContext execute();
+
+    HttpRequestContext execute(HttpClient httpClient);
 
     <T> CompletableFuture<T> execute(Function<FullHttpResponse, T> supplier);
 }
