@@ -11,40 +11,56 @@ import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.QueryStringDecoder;
+import io.netty.handler.codec.http.QueryStringEncoder;
+import io.netty.handler.codec.http.cookie.Cookie;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.util.AsciiString;
 import io.netty.util.CharsetUtil;
+import org.xbib.netty.http.client.listener.CookieListener;
+import org.xbib.netty.http.client.listener.ExceptionListener;
+import org.xbib.netty.http.client.listener.HttpPushListener;
+import org.xbib.netty.http.client.listener.HttpHeadersListener;
+import org.xbib.netty.http.client.listener.HttpResponseListener;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.net.MalformedURLException;
-import java.net.URL;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
  */
 public class HttpClientRequestBuilder implements HttpRequestBuilder, HttpRequestDefaults {
 
-    private static final AtomicInteger streamId = new AtomicInteger(3);
+    private static final Logger logger = Logger.getLogger(HttpClientRequestBuilder.class.getName());
 
     private final HttpClient httpClient;
 
     private final ByteBufAllocator byteBufAllocator;
 
+    private final AtomicInteger streamId;
+
     private final DefaultHttpHeaders headers;
 
     private final List<String> removeHeaders;
+
+    private final Set<Cookie> cookies;
 
     private final HttpMethod httpMethod;
 
@@ -60,9 +76,11 @@ public class HttpClientRequestBuilder implements HttpRequestBuilder, HttpRequest
 
     private int maxRedirects = DEFAULT_MAX_REDIRECT;
 
-    private URL url;
+    private URI uri;
 
-    private ByteBuf body;
+    private QueryStringEncoder queryStringEncoder;
+
+    private ByteBuf content;
 
     private HttpRequest httpRequest;
 
@@ -72,6 +90,12 @@ public class HttpClientRequestBuilder implements HttpRequestBuilder, HttpRequest
 
     private ExceptionListener exceptionListener;
 
+    private HttpHeadersListener httpHeadersListener;
+
+    private CookieListener cookieListener;
+
+    private HttpPushListener httpPushListener;
+
     /**
      * Construct HTTP client request builder.
      *
@@ -79,12 +103,15 @@ public class HttpClientRequestBuilder implements HttpRequestBuilder, HttpRequest
      * @param httpMethod HTTP method
      * @param byteBufAllocator byte buf allocator
      */
-    HttpClientRequestBuilder(HttpClient httpClient, HttpMethod httpMethod, ByteBufAllocator byteBufAllocator) {
+    HttpClientRequestBuilder(HttpClient httpClient, HttpMethod httpMethod,
+                             ByteBufAllocator byteBufAllocator, int streamId) {
         this.httpClient = httpClient;
         this.httpMethod = httpMethod;
         this.byteBufAllocator = byteBufAllocator;
+        this.streamId = new AtomicInteger(streamId);
         this.headers = new DefaultHttpHeaders();
         this.removeHeaders = new ArrayList<>();
+        this.cookies = new HashSet<>();
     }
 
     @Override
@@ -93,22 +120,17 @@ public class HttpClientRequestBuilder implements HttpRequestBuilder, HttpRequest
         return this;
     }
 
-    protected int getTimeout() {
-        return timeout;
-    }
-
     @Override
     public HttpRequestBuilder setURL(String url) {
-        try {
-            this.url = new URL(url);
-        } catch (MalformedURLException e) {
-            throw new UncheckedIOException(e);
+        this.uri = URI.create(url);
+        QueryStringDecoder queryStringDecoder = new QueryStringDecoder(uri, StandardCharsets.UTF_8);
+        this.queryStringEncoder = new QueryStringEncoder(queryStringDecoder.path());
+        for (Map.Entry<String, List<String>> entry : queryStringDecoder.parameters().entrySet()) {
+            for (String value : entry.getValue()) {
+                queryStringEncoder.addParam(entry.getKey(), value);
+            }
         }
         return this;
-    }
-
-    protected URL getURL() {
-        return url;
     }
 
     @Override
@@ -130,6 +152,20 @@ public class HttpClientRequestBuilder implements HttpRequestBuilder, HttpRequest
     }
 
     @Override
+    public HttpRequestBuilder addParam(String name, String value) {
+        if (queryStringEncoder != null) {
+            queryStringEncoder.addParam(name, value);
+        }
+        return this;
+    }
+
+    @Override
+    public HttpRequestBuilder addCookie(Cookie cookie) {
+        cookies.add(cookie);
+        return this;
+    }
+
+    @Override
     public HttpRequestBuilder contentType(String contentType) {
         addHeader(HttpHeaderNames.CONTENT_TYPE, contentType);
         return this;
@@ -139,10 +175,6 @@ public class HttpClientRequestBuilder implements HttpRequestBuilder, HttpRequest
     public HttpRequestBuilder setVersion(String httpVersion) {
         this.httpVersion = HttpVersion.valueOf(httpVersion);
         return this;
-    }
-
-    protected HttpVersion getVersion() {
-        return httpVersion;
     }
 
     @Override
@@ -157,18 +189,10 @@ public class HttpClientRequestBuilder implements HttpRequestBuilder, HttpRequest
         return this;
     }
 
-    protected boolean isFollowRedirect() {
-        return followRedirect;
-    }
-
     @Override
     public HttpRequestBuilder setMaxRedirects(int maxRedirects) {
         this.maxRedirects = maxRedirects;
         return this;
-    }
-
-    protected int getMaxRedirects() {
-        return maxRedirects;
     }
 
     @Override
@@ -179,60 +203,90 @@ public class HttpClientRequestBuilder implements HttpRequestBuilder, HttpRequest
 
     @Override
     public HttpRequestBuilder text(String text) throws IOException {
-        setBody(text, HttpHeaderValues.TEXT_PLAIN);
+        content(text, HttpHeaderValues.TEXT_PLAIN);
         return this;
     }
 
     @Override
     public HttpRequestBuilder json(String json) throws IOException {
-        setBody(json, HttpHeaderValues.APPLICATION_JSON);
+        content(json, HttpHeaderValues.APPLICATION_JSON);
         return this;
     }
 
     @Override
     public HttpRequestBuilder xml(String xml) throws IOException {
-        setBody(xml, "application/xml");
+        content(xml, "application/xml");
         return this;
     }
 
     @Override
-    public HttpRequestBuilder setBody(CharSequence charSequence, String contentType) throws IOException {
-        setBody(charSequence.toString().getBytes(CharsetUtil.UTF_8), AsciiString.of(contentType));
+    public HttpRequestBuilder content(CharSequence charSequence, String contentType) throws IOException {
+        content(charSequence.toString().getBytes(CharsetUtil.UTF_8), AsciiString.of(contentType));
         return this;
     }
 
     @Override
-    public HttpRequestBuilder setBody(byte[] buf, String contentType) throws IOException {
-        setBody(buf, AsciiString.of(contentType));
+    public HttpRequestBuilder content(byte[] buf, String contentType) throws IOException {
+        content(buf, AsciiString.of(contentType));
         return this;
     }
 
     @Override
-    public HttpRequestBuilder setBody(ByteBuf body, String contentType) throws IOException {
-        setBody(body, AsciiString.of(contentType));
+    public HttpRequestBuilder content(ByteBuf body, String contentType) throws IOException {
+        content(body, AsciiString.of(contentType));
+        return this;
+    }
+
+    @Override
+    public HttpRequestBuilder onHeaders(HttpHeadersListener httpHeadersListener) {
+        this.httpHeadersListener = httpHeadersListener;
+        return this;
+    }
+
+    @Override
+    public HttpRequestBuilder onCookie(CookieListener cookieListener) {
+        this.cookieListener = cookieListener;
+        return this;
+    }
+
+    @Override
+    public HttpRequestBuilder onResponse(HttpResponseListener httpResponseListener) {
+        this.httpResponseListener = httpResponseListener;
+        return this;
+    }
+
+    @Override
+    public HttpRequestBuilder onException(ExceptionListener exceptionListener) {
+        this.exceptionListener = exceptionListener;
+        return this;
+    }
+
+    @Override
+    public HttpRequestBuilder onPushReceived(HttpPushListener httpPushListener) {
+        this.httpPushListener = httpPushListener;
         return this;
     }
 
     @Override
     public HttpRequest build() {
-        if (url == null) {
+        if (uri == null) {
             throw new IllegalStateException("URL not set");
         }
-        if (url.getHost() == null) {
-            throw new IllegalStateException("URL host not set: " + url);
+        if (uri.getHost() == null) {
+            throw new IllegalStateException("URL host not set: " + uri);
         }
         DefaultHttpRequest httpRequest = createHttpRequest();
-        String scheme = url.getProtocol();
-        StringBuilder sb = new StringBuilder(url.getHost());
+        String scheme = uri.getScheme();
+        StringBuilder sb = new StringBuilder(uri.getHost());
         int defaultPort = "http".equals(scheme) ? 80 : "https".equals(scheme) ? 443 : -1;
-        if (defaultPort != -1 && url.getPort() != -1 && defaultPort != url.getPort()) {
-            sb.append(":").append(url.getPort());
+        if (defaultPort != -1 && uri.getPort() != -1 && defaultPort != uri.getPort()) {
+            sb.append(":").append(uri.getPort());
         }
         if (httpVersion.majorVersion() == 2) {
-            // this is a hack, because we only use the "origin-form" in request URIs
             httpRequest.headers().set(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), scheme);
         }
-        httpRequest.headers().add(HttpHeaderNames.HOST, sb.toString());
+        String host = sb.toString();
+        httpRequest.headers().add(HttpHeaderNames.HOST, host);
         httpRequest.headers().add(HttpHeaderNames.DATE,
                 DateTimeFormatter.RFC_1123_DATE_TIME.format(ZonedDateTime.ofInstant(Instant.now(), ZoneId.of("GMT"))));
         if (userAgent != null) {
@@ -258,31 +312,57 @@ public class HttpClientRequestBuilder implements HttpRequestBuilder, HttpRequest
         return httpRequest;
     }
 
-    private DefaultHttpRequest createHttpRequest() {
-        // Regarding request-target URI:
-        // RFC https://tools.ietf.org/html/rfc7230#section-5.3.2
-        // would allow url.toExternalForm as absolute-form,
-        // but some servers do not support that. So, we create origin-form.
-        // But for HTTP/2, we should create the absolute-form, otherwise
-        // netty will throw "java.lang.IllegalArgumentException: :scheme must be specified."
-        String requestTarget = toOriginForm(url);
-        return body == null ?
-                new DefaultHttpRequest(httpVersion, httpMethod, requestTarget) :
-                new DefaultFullHttpRequest(httpVersion, httpMethod, requestTarget, body);
+    @Override
+    public HttpRequestContext execute() {
+        if (httpRequest == null) {
+            httpRequest = build();
+        }
+        if (httpResponseListener == null) {
+            httpResponseListener = httpRequestContext;
+        }
+        httpRequestContext = new HttpRequestContext(uri, httpRequest, streamId,
+                new AtomicBoolean(false),
+                new AtomicBoolean(false),
+                timeout, System.currentTimeMillis(),
+                followRedirect, maxRedirects, new AtomicInteger(0),
+                new CountDownLatch(1),
+                httpResponseListener,
+                exceptionListener,
+                httpHeadersListener,
+                cookieListener,
+                httpPushListener);
+        // copy cookie(s) to context, will be added later to headers in dispatch (because of auto-cookie setting while redirect)
+        if (!cookies.isEmpty()) {
+            for (Cookie cookie : cookies) {
+                httpRequestContext.addCookie(cookie);
+            }
+        }
+        httpClient.dispatch(httpRequestContext);
+        return httpRequestContext;
     }
 
-    private String toOriginForm(URL base) {
+    @Override
+    public <T> CompletableFuture<T> execute(Function<FullHttpResponse, T> supplier) {
+        final CompletableFuture<T> completableFuture = new CompletableFuture<>();
+        onResponse(response -> completableFuture.complete(supplier.apply(response)));
+        onException(completableFuture::completeExceptionally);
+        execute();
+        return completableFuture;
+    }
+
+    private DefaultHttpRequest createHttpRequest() {
+        String requestTarget = toOriginForm();
+        logger.log(Level.FINE, () -> "origin form is " + requestTarget);
+        return content == null ?
+                new DefaultHttpRequest(httpVersion, httpMethod, requestTarget) :
+                new DefaultFullHttpRequest(httpVersion, httpMethod, requestTarget, content);
+    }
+
+    private String toOriginForm() {
         StringBuilder sb = new StringBuilder();
-        String path = base.getPath() != null && !base.getPath().isEmpty() ? base.getPath() : "/";
-        String query = base.getQuery();
-        String ref = base.getRef();
-        if (path.charAt(0) != '/') {
-            sb.append('/');
-        }
-        sb.append(path);
-        if (query != null && !query.isEmpty()) {
-            sb.append('?').append(query);
-        }
+        String pathAndQuery = queryStringEncoder.toString();
+        sb.append(pathAndQuery.isEmpty() ? "/" : pathAndQuery);
+        String ref = uri.getFragment();
         if (ref != null && !ref.isEmpty()) {
             sb.append('#').append(ref);
         }
@@ -293,60 +373,18 @@ public class HttpClientRequestBuilder implements HttpRequestBuilder, HttpRequest
         headers.add(name, value);
     }
 
-    private void setBody(CharSequence charSequence, AsciiString contentType) throws IOException {
-        setBody(charSequence.toString().getBytes(CharsetUtil.UTF_8), contentType);
+    private void content(CharSequence charSequence, AsciiString contentType) throws IOException {
+        content(charSequence.toString().getBytes(CharsetUtil.UTF_8), contentType);
     }
 
-    private void setBody(byte[] buf, AsciiString contentType) throws IOException {
+    private void content(byte[] buf, AsciiString contentType) throws IOException {
         ByteBuf buffer = byteBufAllocator.buffer(buf.length).writeBytes(buf);
-        setBody(buffer, contentType);
+        content(buffer, contentType);
     }
 
-    private void setBody(ByteBuf body, AsciiString contentType) throws IOException {
-        this.body = body;
+    private void content(ByteBuf body, AsciiString contentType) throws IOException {
+        this.content = body;
         addHeader(HttpHeaderNames.CONTENT_LENGTH, (long) body.readableBytes());
         addHeader(HttpHeaderNames.CONTENT_TYPE, contentType);
-    }
-
-    @Override
-    public HttpRequestBuilder onResponse(HttpResponseListener httpResponseListener) {
-        this.httpResponseListener = httpResponseListener;
-        return this;
-    }
-
-    @Override
-    public HttpRequestBuilder onError(ExceptionListener exceptionListener) {
-        this.exceptionListener = exceptionListener;
-        return this;
-    }
-
-    @Override
-    public HttpRequestContext execute() {
-        if (httpRequest == null) {
-            httpRequest = build();
-        }
-        if (httpRequestContext == null) {
-            httpRequestContext = new HttpRequestContext(getURL(),
-                    httpRequest,
-                    new AtomicBoolean(false),
-                    new AtomicBoolean(false),
-                    getTimeout(), System.currentTimeMillis(),
-                    isFollowRedirect(), getMaxRedirects(), new AtomicInteger(0),
-                    new CountDownLatch(1), streamId.get());
-        }
-        if (httpResponseListener == null) {
-            httpResponseListener = httpRequestContext;
-        }
-        httpClient.dispatch(httpRequestContext, httpResponseListener, exceptionListener);
-        return httpRequestContext;
-    }
-
-    @Override
-    public <T> CompletableFuture<T> execute(Function<FullHttpResponse, T> supplier) {
-        final CompletableFuture<T> completableFuture = new CompletableFuture<>();
-        onResponse(response -> completableFuture.complete(supplier.apply(response)));
-        onError(completableFuture::completeExceptionally);
-        execute();
-        return completableFuture;
     }
 }

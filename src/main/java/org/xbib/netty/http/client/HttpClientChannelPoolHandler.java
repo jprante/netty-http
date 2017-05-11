@@ -18,6 +18,7 @@ package org.xbib.netty.http.client;
 import io.netty.channel.Channel;
 import io.netty.channel.pool.ChannelPoolHandler;
 import io.netty.channel.socket.SocketChannel;
+import org.xbib.netty.http.client.util.InetAddressKey;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
@@ -45,7 +46,7 @@ public class HttpClientChannelPoolHandler implements ChannelPoolHandler {
 
     @Override
     public void channelCreated(Channel ch) throws Exception {
-        logger.log(Level.INFO, () -> "channel created " + ch + " key:" + key);
+        logger.log(Level.FINE, () -> "channel created " + ch + " key:" + key);
         channelInitializer.initChannel((SocketChannel) ch, key);
         int n = active.incrementAndGet();
         if (n > peak) {
@@ -55,12 +56,12 @@ public class HttpClientChannelPoolHandler implements ChannelPoolHandler {
 
     @Override
     public void channelAcquired(Channel ch) throws Exception {
-        logger.log(Level.INFO, () -> "channel acquired from pool " + ch);
+        logger.log(Level.FINE, () -> "channel acquired from pool " + ch);
     }
 
     @Override
     public void channelReleased(Channel ch) throws Exception {
-        logger.log(Level.INFO, () -> "channel released to pool " + ch);
+        logger.log(Level.FINE, () -> "channel released to pool " + ch);
         active.decrementAndGet();
     }
 

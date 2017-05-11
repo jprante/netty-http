@@ -40,7 +40,7 @@ public class Http2PushioTest {
         httpClient.prepareGet()
                 .setVersion("HTTP/2.0")
                 .setURL("https://http2-push.io")
-                .onError(e -> logger.log(Level.SEVERE, e.getMessage(), e))
+                .onException(e -> logger.log(Level.SEVERE, e.getMessage(), e))
                 .onResponse(fullHttpResponse -> {
                     String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
                     logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);

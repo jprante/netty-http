@@ -60,7 +60,7 @@ public class ExceptionTest {
                     String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
                     logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
                 })
-                .onError(e -> logger.log(Level.SEVERE, e.getMessage(), e))
+                .onException(e -> logger.log(Level.SEVERE, e.getMessage(), e))
                 .execute()
                 .get();
         httpClient.close();

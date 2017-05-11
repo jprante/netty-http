@@ -22,6 +22,12 @@ import io.netty.handler.proxy.Socks5ProxyHandler;
 import io.netty.handler.ssl.CipherSuiteFilter;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.util.AttributeKey;
+import org.xbib.netty.http.client.listener.CookieListener;
+import org.xbib.netty.http.client.listener.ExceptionListener;
+import org.xbib.netty.http.client.listener.HttpPushListener;
+import org.xbib.netty.http.client.listener.HttpHeadersListener;
+import org.xbib.netty.http.client.listener.HttpResponseListener;
+import org.xbib.netty.http.client.util.ClientAuthMode;
 
 import java.io.InputStream;
 import javax.net.ssl.TrustManagerFactory;
@@ -38,6 +44,15 @@ final class HttpClientChannelContext {
 
     static final AttributeKey<HttpResponseListener> RESPONSE_LISTENER_ATTRIBUTE_KEY =
             AttributeKey.valueOf("httpClientResponseListener");
+
+    static final AttributeKey<HttpHeadersListener> HEADER_LISTENER_ATTRIBUTE_KEY =
+            AttributeKey.valueOf("httpHeaderListener");
+
+    static final AttributeKey<CookieListener> COOKIE_LISTENER_ATTRIBUTE_KEY =
+            AttributeKey.valueOf("cookieListener");
+
+    static final AttributeKey<HttpPushListener> PUSH_LISTENER_ATTRIBUTE_KEY =
+            AttributeKey.valueOf("pushListener");
 
     static final AttributeKey<ExceptionListener> EXCEPTION_LISTENER_ATTRIBUTE_KEY =
             AttributeKey.valueOf("httpClientExceptionListener");
@@ -74,7 +89,7 @@ final class HttpClientChannelContext {
 
     private final boolean useServerNameIdentification;
 
-    private final SslClientAuthMode sslClientAuthMode;
+    private final ClientAuthMode clientAuthMode;
 
     private final HttpProxyHandler httpProxyHandler;
 
@@ -98,7 +113,7 @@ final class HttpClientChannelContext {
                              InputStream keyInputStream,
                              String keyPassword,
                              boolean useServerNameIdentification,
-                             SslClientAuthMode sslClientAuthMode,
+                             ClientAuthMode clientAuthMode,
                              HttpProxyHandler httpProxyHandler,
                              Socks4ProxyHandler socks4ProxyHandler,
                              Socks5ProxyHandler socks5ProxyHandler) {
@@ -118,7 +133,7 @@ final class HttpClientChannelContext {
         this.keyInputStream = keyInputStream;
         this.keyPassword = keyPassword;
         this.useServerNameIdentification = useServerNameIdentification;
-        this.sslClientAuthMode = sslClientAuthMode;
+        this.clientAuthMode = clientAuthMode;
         this.httpProxyHandler = httpProxyHandler;
         this.socks4ProxyHandler = socks4ProxyHandler;
         this.socks5ProxyHandler = socks5ProxyHandler;
@@ -188,8 +203,8 @@ final class HttpClientChannelContext {
         return useServerNameIdentification;
     }
 
-    SslClientAuthMode getSslClientAuthMode() {
-        return sslClientAuthMode;
+    ClientAuthMode getClientAuthMode() {
+        return clientAuthMode;
     }
 
     HttpProxyHandler getHttpProxyHandler() {

@@ -13,7 +13,7 @@ import java.util.logging.SimpleFormatter;
 
 /**
  */
-public class AkamaiTest {
+public class WebtideTest {
 
     static {
         System.setProperty("java.util.logging.SimpleFormatter.format",
@@ -23,54 +23,38 @@ public class AkamaiTest {
         Handler handler = new ConsoleHandler();
         handler.setFormatter(new SimpleFormatter());
         rootLogger.addHandler(handler);
-        rootLogger.setLevel(Level.ALL);
+        rootLogger.setLevel(Level.FINE);
         for (Handler h : rootLogger.getHandlers()) {
             handler.setFormatter(new SimpleFormatter());
-            h.setLevel(Level.ALL);
+            h.setLevel(Level.FINE);
         }
     }
 
     private static final Logger logger = Logger.getLogger("");
 
     @Test
-    public void testAkamaiHttps() throws Exception {
-
-        // here we see server PUSH_PROMISE as response to headers, a go-away frame is written.
-
-        /*
-        ----------------INBOUND--------------------
-        [id: 0x27d23874, L:/192.168.178.23:52376 - R:http2.akamai.com/104.94.191.203:443]
-        PUSH_PROMISE: streamId=3, promisedStreamId=2, headers=DefaultHttp2Headers[:method: GET,
-        :path: /resources/push.css, :authority: http2.akamai.com, :scheme: https, host: http2.akamai.com,
-        user-agent: XbibHttpClient/unknown (Java/Azul Systems, Inc./1.8.0_112) (Netty/4.1.9.Final),
-        accept-encoding: gzip], padding=0
-                ------------------------------------
-        2017-05-01 18:53:46.076 AM FEINSTEN [org.xbib.netty.http.client.HttpClientChannelInitializer]
-        io.netty.handler.codec.http2.Http2FrameLogger log
-        ----------------OUTBOUND--------------------
-        [id: 0x27d23874, L:/192.168.178.23:52376 - R:http2.akamai.com/104.94.191.203:443]
-        GO_AWAY: lastStreamId=2, errorCode=1, length=75, bytes=556e7265636f676e697a656420485454...
-         */
-
+    public void testWebtide() throws Exception {
         HttpClient httpClient = HttpClient.builder()
                 .build();
 
         httpClient.prepareGet()
                 .setVersion("HTTP/2.0")
-                .setURL("https://http2.akamai.com/demo/h2_demo_frame.html")
+                .setURL("https://webtide.com")
                 .onException(e -> logger.log(Level.SEVERE, e.getMessage(), e))
                 .onResponse(fullHttpResponse -> {
-                    String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-                    logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
+                    logger.log(Level.INFO, "status = " + fullHttpResponse.status()
+                            + " response headers = " + fullHttpResponse.headers().entries()
+                            );
                 })
                 .onPushReceived((headers, fullHttpResponse) -> {
                     logger.log(Level.INFO, "received push promise: request headers = " + headers
                             + " status = " + fullHttpResponse.status()
                             + " response headers = " + fullHttpResponse.headers().entries()
-                    );
+                            );
                 })
                 .execute()
                 .get();
+
         httpClient.close();
     }
 }

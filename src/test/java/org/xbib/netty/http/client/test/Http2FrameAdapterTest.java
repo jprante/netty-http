@@ -68,7 +68,8 @@ public class Http2FrameAdapterTest {
     @Test
     public void testHttp2FrameAdapter() throws Exception {
         final int serverExpectedDataFrames = 1;
-        final InetSocketAddress inetSocketAddress = new InetSocketAddress("http2-push.io", 443);
+        //final InetSocketAddress inetSocketAddress = new InetSocketAddress("http2-push.io", 443);
+        final InetSocketAddress inetSocketAddress = new InetSocketAddress("webtide.com", 443);
         final CountDownLatch dataLatch = new CountDownLatch(serverExpectedDataFrames);
         EventLoopGroup group = new NioEventLoopGroup();
         Channel clientChannel = null;

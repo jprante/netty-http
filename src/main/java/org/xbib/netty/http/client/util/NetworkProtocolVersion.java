@@ -13,16 +13,12 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.xbib.netty.http.client;
+package org.xbib.netty.http.client.util;
 
 /**
+ * The TCP/IP network protocol versions.
  */
-@FunctionalInterface
-public interface ExceptionListener {
+public enum NetworkProtocolVersion {
 
-    /**
-     * Called when an exception is transported to a listener.
-     * @param throwable the exception
-     */
-    void onException(Throwable throwable);
+    IPV4, IPV6, IPV46, NONE
 }

@@ -28,6 +28,7 @@ import io.netty.handler.proxy.Socks4ProxyHandler;
 import io.netty.handler.proxy.Socks5ProxyHandler;
 import io.netty.handler.ssl.CipherSuiteFilter;
 import io.netty.handler.ssl.SslProvider;
+import org.xbib.netty.http.client.util.ClientAuthMode;
 
 import java.io.InputStream;
 import java.net.InetSocketAddress;
@@ -46,7 +47,7 @@ public class HttpClientBuilder implements HttpClientChannelContextDefaults {
 
     private Bootstrap bootstrap;
 
-    // let Netty decide, where default is Runtime.getRuntime().availableProcessors() * 2
+    // let Netty decide about thread number, default is Runtime.getRuntime().availableProcessors() * 2
     private int threads = 0;
 
     private boolean tcpNodelay = DEFAULT_TCP_NODELAY;
@@ -95,7 +96,7 @@ public class HttpClientBuilder implements HttpClientChannelContextDefaults {
 
     private boolean useServerNameIdentification = DEFAULT_USE_SERVER_NAME_IDENTIFICATION;
 
-    private SslClientAuthMode sslClientAuthMode = DEFAULT_SSL_CLIENT_AUTH_MODE;
+    private ClientAuthMode clientAuthMode = DEFAULT_SSL_CLIENT_AUTH_MODE;
 
     private HttpProxyHandler httpProxyHandler;
 
@@ -252,8 +253,8 @@ public class HttpClientBuilder implements HttpClientChannelContextDefaults {
         return this;
     }
 
-    public HttpClientBuilder setSslClientAuthMode(SslClientAuthMode sslClientAuthMode) {
-        this.sslClientAuthMode = sslClientAuthMode;
+    public HttpClientBuilder setClientAuthMode(ClientAuthMode clientAuthMode) {
+        this.clientAuthMode = clientAuthMode;
         return this;
     }
 
@@ -319,7 +320,7 @@ public class HttpClientBuilder implements HttpClientChannelContextDefaults {
                         readTimeoutMillis, enableGzip, installHttp2Upgrade,
                         sslProvider, ciphers, cipherSuiteFilter, trustManagerFactory,
                         keyCertChainInputStream, keyInputStream, keyPassword,
-                        useServerNameIdentification, sslClientAuthMode,
+                        useServerNameIdentification, clientAuthMode,
                         httpProxyHandler, socks4ProxyHandler, socks5ProxyHandler);
         return new HttpClient(byteBufAllocator, eventLoopGroup, bootstrap, maxConnections, httpClientChannelContext);
     }

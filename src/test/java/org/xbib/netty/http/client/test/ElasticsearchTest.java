@@ -15,7 +15,6 @@
  */
 package org.xbib.netty.http.client.test;
 
-import org.junit.Ignore;
 import org.junit.Test;
 import org.xbib.netty.http.client.HttpClient;
 import org.xbib.netty.http.client.HttpRequestBuilder;
@@ -64,7 +63,7 @@ public class ElasticsearchTest {
                     String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
                     logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
                 })
-                .onError(e -> logger.log(Level.SEVERE, e.getMessage(), e))
+                .onException(e -> logger.log(Level.SEVERE, e.getMessage(), e))
                 .execute()
                 .get();
         httpClient.close();
@@ -82,7 +81,7 @@ public class ElasticsearchTest {
                     String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
                     logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
                 })
-                .onError(e -> logger.log(Level.SEVERE, e.getMessage(), e))
+                .onException(e -> logger.log(Level.SEVERE, e.getMessage(), e))
                 .execute()
                 .get();
         httpClient.close();
@@ -122,6 +121,6 @@ public class ElasticsearchTest {
                     String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
                     logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
                 })
-                .onError(e -> logger.log(Level.SEVERE, e.getMessage(), e));
+                .onException(e -> logger.log(Level.SEVERE, e.getMessage(), e));
     }
 }

@@ -1,6 +1,5 @@
 package org.xbib.netty.http.client.test;
 
-import org.junit.Ignore;
 import org.junit.Test;
 import org.xbib.netty.http.client.HttpClient;
 import org.xbib.netty.http.client.HttpRequestBuilder;
@@ -41,7 +40,8 @@ public class GoogleTest {
                 .build();
         httpClient.prepareGet()
                 .setURL("http://www.google.com")
-                .onError(e -> logger.log(Level.SEVERE, e.getMessage(), e))
+                .onException(e -> logger.log(Level.SEVERE, e.getMessage(), e))
+                .onHeaders(headers -> logger.log(Level.INFO, headers.toString()))
                 .onResponse(fullHttpResponse -> {
                     String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
                     logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
@@ -51,7 +51,7 @@ public class GoogleTest {
         httpClient.close();
     }
 
-    @Test
+
     public void testGoogleWithoutFollowRedirects() throws Exception {
         HttpClient httpClient = HttpClient.builder()
                 .build();
@@ -68,13 +68,14 @@ public class GoogleTest {
         httpClient.close();
     }
 
+
     @Test
     public void testGoogleHttps1() throws Exception {
         HttpClient httpClient = HttpClient.builder()
                 .build();
         httpClient.prepareGet()
                 .setURL("https://www.google.com")
-                .onError(e -> logger.log(Level.SEVERE, e.getMessage(), e))
+                .onException(e -> logger.log(Level.SEVERE, e.getMessage(), e))
                 .onResponse(fullHttpResponse -> {
                     String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
                     logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
@@ -92,7 +93,7 @@ public class GoogleTest {
         httpClient.prepareGet()
                 .setVersion("HTTP/2.0")
                 .setURL("https://www.google.com")
-                .onError(e -> logger.log(Level.SEVERE, e.getMessage(), e))
+                .onException(e -> logger.log(Level.SEVERE, e.getMessage(), e))
                 .onResponse(fullHttpResponse -> {
                     String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
                     logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
@@ -110,8 +111,7 @@ public class GoogleTest {
         HttpRequestBuilder builder1 = httpClient.prepareGet()
                 .setVersion("HTTP/2.0")
                 .setURL("https://www.google.com")
-                .setTimeout(10000)
-                .onError(e -> logger.log(Level.SEVERE, e.getMessage(), e))
+                .onException(e -> logger.log(Level.SEVERE, e.getMessage(), e))
                 .onResponse(fullHttpResponse -> {
                     String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
                     logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
@@ -120,19 +120,15 @@ public class GoogleTest {
         HttpRequestBuilder builder2 = httpClient.prepareGet()
                 .setVersion("HTTP/2.0")
                 .setURL("https://www.google.com")
-                .setTimeout(10000)
-                .onError(e -> logger.log(Level.SEVERE, e.getMessage(), e))
+                .onException(e -> logger.log(Level.SEVERE, e.getMessage(), e))
                 .onResponse(fullHttpResponse -> {
                     String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
                     logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
                 });
 
-        // only sequential ... this sucks.
-
         HttpRequestContext context1 = builder1.execute();
-        context1.get();
-
         HttpRequestContext context2 = builder2.execute();
+        context1.get();
         context2.get();
 
         httpClient.close();

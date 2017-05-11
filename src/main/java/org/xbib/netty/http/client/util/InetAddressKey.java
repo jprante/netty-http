@@ -13,66 +13,64 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.xbib.netty.http.client;
+package org.xbib.netty.http.client.util;
 
 import io.netty.handler.codec.http.HttpVersion;
 
 import java.net.InetSocketAddress;
-import java.net.URL;
 
 /**
+ * A key for host, port, HTTP version, and secure transport mode of a channel for HTTP.
  */
 public class InetAddressKey {
 
-    private final InetSocketAddress inetSocketAddress;
+    private final String host;
+
+    private final int port;
 
     private final HttpVersion version;
 
     private final Boolean secure;
 
-    InetAddressKey(URL url, HttpVersion version) {
-        this.version = version;
-        String protocol = url.getProtocol();
-        this.secure = "https".equals(protocol);
-        int port = url.getPort();
-        if (port == -1) {
-            port = "http".equals(protocol) ? 80 : (secure ? 443 : -1);
-        }
-        this.inetSocketAddress = new InetSocketAddress(url.getHost(), port);
-    }
+    private InetSocketAddress inetSocketAddress;
 
-    InetAddressKey(InetSocketAddress inetSocketAddress, HttpVersion version, boolean secure) {
-        this.inetSocketAddress = inetSocketAddress;
+    public InetAddressKey(String host, int port, HttpVersion version, boolean secure) {
+        this.host = host;
+        this.port = port == -1 ? secure ? 443 : 80 : port;
         this.version = version;
         this.secure = secure;
     }
 
-    InetSocketAddress getInetSocketAddress() {
+    public InetSocketAddress getInetSocketAddress() {
+        if (inetSocketAddress == null) {
+            this.inetSocketAddress = new InetSocketAddress(host, port);
+        }
         return inetSocketAddress;
     }
 
-    HttpVersion getVersion() {
+    public HttpVersion getVersion() {
         return version;
     }
 
-    boolean isSecure() {
+    public boolean isSecure() {
         return secure;
     }
 
     public String toString() {
-        return inetSocketAddress + " (version:" + version + ",secure:" + secure + ")";
+        return host + ":" + port + " (version:" + version + ",secure:" + secure + ")";
     }
 
     @Override
     public boolean equals(Object object) {
         return object instanceof InetAddressKey &&
-                inetSocketAddress.equals(((InetAddressKey) object).inetSocketAddress) &&
+                host.equals(((InetAddressKey) object).host) &&
+                port == ((InetAddressKey) object).port &&
                 version.equals(((InetAddressKey) object).version) &&
                 secure == ((InetAddressKey) object).secure;
     }
 
     @Override
     public int hashCode() {
-        return inetSocketAddress.hashCode() ^ version.hashCode() ^ secure.hashCode();
+        return host.hashCode() ^ port ^ version.hashCode() ^ secure.hashCode();
     }
 }

@@ -13,14 +13,17 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.xbib.netty.http.client;
+package org.xbib.netty.http.client.listener;
 
 import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http2.Http2Headers;
 
 /**
+ * This listener can forward HTTP push
+ *
  */
 @FunctionalInterface
-public interface HttpResponseListener {
+public interface HttpPushListener {
 
-    void onResponse(FullHttpResponse fullHttpResponse);
+    void onPushReceived(Http2Headers headers, FullHttpResponse fullHttpResponse);
 }

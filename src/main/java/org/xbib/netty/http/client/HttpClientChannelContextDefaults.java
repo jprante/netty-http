@@ -17,9 +17,12 @@ package org.xbib.netty.http.client;
 
 import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.ssl.CipherSuiteFilter;
+import io.netty.handler.ssl.OpenSsl;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
+import org.xbib.netty.http.client.util.InetAddressKey;
+import org.xbib.netty.http.client.util.ClientAuthMode;
 
 import javax.net.ssl.TrustManagerFactory;
 
@@ -105,7 +108,7 @@ public interface HttpClientChannelContextDefaults {
     /**
      * Default SSL provider.
      */
-    SslProvider DEFAULT_SSL_PROVIDER = SslProvider.OPENSSL;
+    SslProvider DEFAULT_SSL_PROVIDER = OpenSsl.isAlpnSupported() ? SslProvider.OPENSSL : SslProvider.JDK;
 
     Iterable<String> DEFAULT_CIPHERS = Http2SecurityUtil.CIPHERS;
 
@@ -118,5 +121,5 @@ public interface HttpClientChannelContextDefaults {
     /**
      * Default for SSL client authentication.
      */
-    SslClientAuthMode DEFAULT_SSL_CLIENT_AUTH_MODE = SslClientAuthMode.NONE;
+    ClientAuthMode DEFAULT_SSL_CLIENT_AUTH_MODE = ClientAuthMode.NONE;
 }

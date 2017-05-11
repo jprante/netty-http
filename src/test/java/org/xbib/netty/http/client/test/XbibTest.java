@@ -92,6 +92,7 @@ public class XbibTest {
     }
 
     @Test
+    @Ignore
     public void testXbibOrgWithProxy() throws Exception {
         HttpClient httpClient = HttpClient.builder()
                 .setHttpProxyHandler(new InetSocketAddress("80.241.223.251", 8080))
@@ -104,7 +105,7 @@ public class XbibTest {
                     String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
                     logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
                 })
-                .onError(e -> logger.log(Level.SEVERE, e.getMessage(), e))
+                .onException(e -> logger.log(Level.SEVERE, e.getMessage(), e))
                 .execute()
                 .get();
         httpClient.close();
@@ -122,7 +123,7 @@ public class XbibTest {
                     String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
                     logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
                 })
-                .onError(e -> logger.log(Level.SEVERE, e.getMessage(), e))
+                .onException(e -> logger.log(Level.SEVERE, e.getMessage(), e))
                 .execute()
                 .get();
         httpClient.close();
@@ -137,7 +138,7 @@ public class XbibTest {
         httpClient.prepareGet()
                 .setVersion("HTTP/1.1")
                 .setURL("http://xbib.org")
-                .onError(e -> logger.log(Level.SEVERE, e.getMessage(), e))
+                .onException(e -> logger.log(Level.SEVERE, e.getMessage(), e))
                 .onResponse(fullHttpResponse -> {
                     String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
                     logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
@@ -148,7 +149,7 @@ public class XbibTest {
         httpClient.prepareGet()
                 .setVersion("HTTP/1.1")
                 .setURL("http://xbib.org")
-                .onError(e -> logger.log(Level.SEVERE, e.getMessage(), e))
+                .onException(e -> logger.log(Level.SEVERE, e.getMessage(), e))
                 .onResponse(fullHttpResponse -> {
                     String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
                     logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);

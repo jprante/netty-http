@@ -20,21 +20,29 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.pool.ChannelPool;
 import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.cookie.ClientCookieDecoder;
+import io.netty.handler.codec.http.cookie.Cookie;
+import org.xbib.netty.http.client.listener.CookieListener;
+import org.xbib.netty.http.client.listener.ExceptionListener;
+import org.xbib.netty.http.client.listener.HttpHeadersListener;
+import org.xbib.netty.http.client.listener.HttpResponseListener;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Netty channel handler for HTTP 1.1.
+ * HTTP 1.x Netty channel handler.
  */
 @ChannelHandler.Sharable
-final class Http1Handler extends ChannelInboundHandlerAdapter {
+final class HttpHandler extends ChannelInboundHandlerAdapter {
 
-    private static final Logger logger = Logger.getLogger(Http1Handler.class.getName());
+    private static final Logger logger = Logger.getLogger(HttpHandler.class.getName());
 
     private final HttpClient httpClient;
 
-    Http1Handler(HttpClient httpClient) {
+    HttpHandler(HttpClient httpClient) {
         this.httpClient = httpClient;
     }
 
@@ -52,16 +60,34 @@ final class Http1Handler extends ChannelInboundHandlerAdapter {
                 ctx.channel().attr(HttpClientChannelContext.REQUEST_CONTEXT_ATTRIBUTE_KEY).get();
         if (msg instanceof FullHttpResponse) {
             FullHttpResponse httpResponse = (FullHttpResponse) msg;
+            HttpHeaders httpHeaders = httpResponse.headers();
+            HttpHeadersListener httpHeadersListener =
+                    ctx.channel().attr(HttpClientChannelContext.HEADER_LISTENER_ATTRIBUTE_KEY).get();
+            if (httpHeadersListener != null) {
+                logger.log(Level.FINE, () -> "firing onHeaders");
+                httpHeadersListener.onHeaders(httpHeaders);
+            }
+            CookieListener cookieListener =
+                    ctx.channel().attr(HttpClientChannelContext.COOKIE_LISTENER_ATTRIBUTE_KEY).get();
+            for (String cookieString : httpHeaders.getAll(HttpHeaderNames.SET_COOKIE)) {
+                Cookie cookie = ClientCookieDecoder.STRICT.decode(cookieString);
+                httpRequestContext.addCookie(cookie);
+                if (cookieListener != null) {
+                    logger.log(Level.FINE, () -> "firing onCookie");
+                    cookieListener.onCookie(cookie);
+                }
+            }
             HttpResponseListener httpResponseListener =
                     ctx.channel().attr(HttpClientChannelContext.RESPONSE_LISTENER_ATTRIBUTE_KEY).get();
             if (httpResponseListener != null) {
+                logger.log(Level.FINE, () -> "firing onResponse");
                 httpResponseListener.onResponse(httpResponse);
             }
+            logger.log(Level.FINE, () -> "trying redirect");
             if (httpClient.tryRedirect(ctx.channel(), httpResponse, httpRequestContext)) {
                 return;
             }
-            logger.log(Level.FINE, () -> "success");
-            httpRequestContext.success("response arrived");
+            httpRequestContext.success("response finished");
             final ChannelPool channelPool =
                     ctx.channel().attr(HttpClientChannelContext.CHANNEL_POOL_ATTRIBUTE_KEY).get();
             channelPool.release(ctx.channel());

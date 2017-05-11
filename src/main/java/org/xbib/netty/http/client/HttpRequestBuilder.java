@@ -18,6 +18,12 @@ package org.xbib.netty.http.client;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.cookie.Cookie;
+import org.xbib.netty.http.client.listener.CookieListener;
+import org.xbib.netty.http.client.listener.ExceptionListener;
+import org.xbib.netty.http.client.listener.HttpPushListener;
+import org.xbib.netty.http.client.listener.HttpHeadersListener;
+import org.xbib.netty.http.client.listener.HttpResponseListener;
 
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
@@ -39,6 +45,10 @@ public interface HttpRequestBuilder {
 
     HttpRequestBuilder removeHeader(String name);
 
+    HttpRequestBuilder addParam(String name, String value);
+
+    HttpRequestBuilder addCookie(Cookie cookie);
+
     HttpRequestBuilder contentType(String contentType);
 
     HttpRequestBuilder acceptGzip(boolean gzip);
@@ -49,7 +59,7 @@ public interface HttpRequestBuilder {
 
     HttpRequestBuilder setUserAgent(String userAgent);
 
-    HttpRequestBuilder setBody(CharSequence charSequence, String contentType) throws IOException;
+    HttpRequestBuilder content(CharSequence charSequence, String contentType) throws IOException;
 
     HttpRequestBuilder text(String text) throws IOException;
 
@@ -57,13 +67,19 @@ public interface HttpRequestBuilder {
 
     HttpRequestBuilder xml(String xmlText) throws IOException;
 
-    HttpRequestBuilder setBody(byte[] buf, String contentType) throws IOException;
+    HttpRequestBuilder content(byte[] buf, String contentType) throws IOException;
 
-    HttpRequestBuilder setBody(ByteBuf body, String contentType) throws IOException;
+    HttpRequestBuilder content(ByteBuf body, String contentType) throws IOException;
 
-    HttpRequestBuilder onError(ExceptionListener exceptionListener);
+    HttpRequestBuilder onHeaders(HttpHeadersListener httpHeadersListener);
+
+    HttpRequestBuilder onCookie(CookieListener cookieListener);
 
     HttpRequestBuilder onResponse(HttpResponseListener httpResponseListener);
+
+    HttpRequestBuilder onException(ExceptionListener exceptionListener);
+
+    HttpRequestBuilder onPushReceived(HttpPushListener httpPushListener);
 
     HttpRequest build();
 

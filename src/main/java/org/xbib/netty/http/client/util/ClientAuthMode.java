@@ -13,11 +13,11 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.xbib.netty.http.client;
+package org.xbib.netty.http.client.util;
 
 /**
- *
+ * Client authentication modes, useful for SSL channels.
  */
-public enum SslClientAuthMode {
+public enum ClientAuthMode {
     NONE, WANT, NEED
 }

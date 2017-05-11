@@ -18,6 +18,7 @@ package org.xbib.netty.http.client;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoopGroup;
@@ -32,15 +33,27 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
+import io.netty.handler.codec.http.cookie.Cookie;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.FutureListener;
+import org.xbib.netty.http.client.listener.CookieListener;
+import org.xbib.netty.http.client.listener.ExceptionListener;
+import org.xbib.netty.http.client.listener.HttpPushListener;
+import org.xbib.netty.http.client.listener.HttpHeadersListener;
+import org.xbib.netty.http.client.listener.HttpResponseListener;
+import org.xbib.netty.http.client.util.InetAddressKey;
+import org.xbib.netty.http.client.util.NetworkUtils;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
-import java.net.URL;
+import java.net.URI;
 import java.net.URLDecoder;
+import java.util.Collection;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -51,6 +64,8 @@ public final class HttpClient implements Closeable {
 
     private static final Logger logger = Logger.getLogger(HttpClient.class.getName());
 
+    private static final AtomicInteger streamId = new AtomicInteger(3);
+
     private final ByteBufAllocator byteBufAllocator;
 
     private final EventLoopGroup eventLoopGroup;
@@ -58,7 +73,7 @@ public final class HttpClient implements Closeable {
     private final HttpClientChannelPoolMap poolMap;
 
     /**
-     * Create a new HTTP client.
+     * Create a new HTTP client. Use {@link #builder()} to build HTTP client instance.
      */
     HttpClient(ByteBufAllocator byteBufAllocator,
                        EventLoopGroup eventLoopGroup,
@@ -68,6 +83,9 @@ public final class HttpClient implements Closeable {
         this.byteBufAllocator = byteBufAllocator;
         this.eventLoopGroup = eventLoopGroup;
         this.poolMap = new HttpClientChannelPoolMap(this, httpClientChannelContext, bootstrap, maxConnections);
+        NetworkUtils.extendSystemProperties();
+        logger.log(Level.FINE, () -> "local host name = " + NetworkUtils.getLocalHostName("localhost"));
+        logger.log(Level.FINE, NetworkUtils::displayNetworkInterfaces);
     }
 
     /**
@@ -80,7 +98,7 @@ public final class HttpClient implements Closeable {
     }
 
     public HttpClientRequestBuilder prepareRequest(HttpMethod method) {
-        return new HttpClientRequestBuilder(this, method, byteBufAllocator);
+        return new HttpClientRequestBuilder(this, method, byteBufAllocator, streamId.getAndAdd(2));
     }
 
     /**
@@ -172,11 +190,18 @@ public final class HttpClient implements Closeable {
         logger.log(Level.FINE, () -> "closed");
     }
 
-    void dispatch(HttpRequestContext httpRequestContext, HttpResponseListener httpResponseListener,
-                  ExceptionListener exceptionListener) {
-        final URL url = httpRequestContext.getURL();
+    void dispatch(final HttpRequestContext httpRequestContext) {
+        final URI uri = httpRequestContext.getURI();
         final HttpRequest httpRequest = httpRequestContext.getHttpRequest();
-        logger.log(Level.FINE, () -> "trying URL " + url);
+        if (!httpRequestContext.getCookies().isEmpty()) {
+            logger.log(Level.FINE, () -> "configured cookies: " + httpRequestContext.getCookies());
+            Collection<Cookie> cookies = httpRequestContext.matchCookies();
+            if (!cookies.isEmpty()) {
+                logger.log(Level.FINE, () -> "updating cookie header with matched cookies: " + cookies);
+                httpRequest.headers().set(HttpHeaderNames.COOKIE, ClientCookieEncoder.STRICT.encode(cookies));
+            }
+        }
+        logger.log(Level.FINE, () -> "trying URL " + uri);
         if (httpRequestContext.isExpired()) {
             httpRequestContext.fail("request expired");
         }
@@ -185,27 +210,31 @@ public final class HttpClient implements Closeable {
             return;
         }
         HttpVersion version = httpRequestContext.getHttpRequest().protocolVersion();
-        InetAddressKey inetAddressKey = new InetAddressKey(url, version);
-        // effectivly disable pool for HTTP/2
-        if (version.majorVersion() == 2) {
-            poolMap.remove(inetAddressKey);
-        }
+        boolean secure = "https".equals(uri.getScheme());
+        InetAddressKey inetAddressKey = new InetAddressKey(uri.getHost(), uri.getPort(), version, secure);
         final FixedChannelPool pool = poolMap.get(inetAddressKey);
         logger.log(Level.FINE, () -> "connecting to " + inetAddressKey);
         Future<Channel> futureChannel = pool.acquire();
         futureChannel.addListener((FutureListener<Channel>) future -> {
+            final ExceptionListener exceptionListener = httpRequestContext.getExceptionListener();
             if (future.isSuccess()) {
                 Channel channel = future.getNow();
+                // set settings promise before adding httpRequestContext as a channel attribute
+                ChannelPromise settingsPromise = channel.newPromise();
+                httpRequestContext.setSettingsPromise(settingsPromise);
                 channel.attr(HttpClientChannelContext.CHANNEL_POOL_ATTRIBUTE_KEY).set(pool);
                 channel.attr(HttpClientChannelContext.REQUEST_CONTEXT_ATTRIBUTE_KEY).set(httpRequestContext);
-                if (httpResponseListener != null) {
-                    channel.attr(HttpClientChannelContext.RESPONSE_LISTENER_ATTRIBUTE_KEY).set(httpResponseListener);
-                }
-                if (exceptionListener != null) {
-                    channel.attr(HttpClientChannelContext.EXCEPTION_LISTENER_ATTRIBUTE_KEY).set(exceptionListener);
-                }
+                HttpResponseListener httpResponseListener = httpRequestContext.getHttpResponseListener();
+                channel.attr(HttpClientChannelContext.RESPONSE_LISTENER_ATTRIBUTE_KEY).set(httpResponseListener);
+                HttpPushListener httpPushListener = httpRequestContext.getHttpPushListener();
+                channel.attr(HttpClientChannelContext.PUSH_LISTENER_ATTRIBUTE_KEY).set(httpPushListener);
+                HttpHeadersListener httpHeadersListener = httpRequestContext.getHttpHeadersListener();
+                channel.attr(HttpClientChannelContext.HEADER_LISTENER_ATTRIBUTE_KEY).set(httpHeadersListener);
+                CookieListener cookieListener = httpRequestContext.getCookieListener();
+                channel.attr(HttpClientChannelContext.COOKIE_LISTENER_ATTRIBUTE_KEY).set(cookieListener);
+                channel.attr(HttpClientChannelContext.EXCEPTION_LISTENER_ATTRIBUTE_KEY).set(exceptionListener);
                 if (httpRequestContext.isFailed()) {
-                    logger.log(Level.FINE, () -> "detected fail, close now");
+                    logger.log(Level.FINE, () -> "detected fail, close channel");
                     future.cancel(true);
                     if (channel.isOpen()) {
                         channel.close();
@@ -227,22 +256,60 @@ public final class HttpClient implements Closeable {
                                 }
                             });
                 } else if (httpRequest.protocolVersion().majorVersion() == 2) {
-                    HttpClientChannelInitializer.Http2SettingsHandler http2SettingsHandler =
-                            poolMap.getHttpClientChannelInitializer().getHttp2SettingsHandler();
-                    if (http2SettingsHandler != null) {
-                        logger.log(Level.FINE, "HTTP2: waiting for settings");
-                        http2SettingsHandler.awaitSettings(httpRequestContext, exceptionListener);
-                    }
-                    Http2Handler http2Handler = poolMap.getHttpClientChannelInitializer().getHttp2Handler();
-                    if (http2Handler != null) {
-                        logger.log(Level.FINE, () ->
-                                "HTTP2: trying to write, streamID=" + httpRequestContext.getStreamId() +
-                                        " request: " + httpRequest.toString());
-                        ChannelPromise channelPromise = channel.newPromise();
-                        http2Handler.put(httpRequestContext.getStreamId(), channel.write(httpRequest), channelPromise);
-                        channel.flush();
-                        logger.log(Level.FINE, "HTTP2: waiting for responses");
-                        http2Handler.awaitResponses(httpRequestContext, exceptionListener);
+                    logger.log(Level.FINE, () -> "waiting for HTTP/2 settings");
+                    settingsPromise.await(httpRequestContext.getTimeout(), TimeUnit.MILLISECONDS);
+                    logger.log(Level.FINE, () -> "waiting for HTTP/2 responses = " + httpRequestContext.getStreamIdPromiseMap().size());
+                    int timeout = httpRequestContext.getTimeout();
+                    for (Map.Entry<Integer, Map.Entry<ChannelFuture, ChannelPromise>> entry :
+                            httpRequestContext.getStreamIdPromiseMap().entrySet()) {
+                        ChannelFuture channelFuture = entry.getValue().getKey();
+                        if (channelFuture != null) {
+                            logger.log(Level.FINE, "waiting for channel, stream ID = " + entry.getKey());
+                            if (!channelFuture.awaitUninterruptibly(timeout, TimeUnit.MILLISECONDS)) {
+                                IllegalStateException illegalStateException =
+                                        new IllegalStateException("time out while waiting to write for stream id " + entry.getKey());
+                                if (exceptionListener != null) {
+                                    exceptionListener.onException(illegalStateException);
+                                    httpRequestContext.fail(illegalStateException.getMessage());
+                                    final ChannelPool channelPool =
+                                            channelFuture.channel().attr(HttpClientChannelContext.CHANNEL_POOL_ATTRIBUTE_KEY).get();
+                                    channelPool.release(channelFuture.channel());
+                                }
+                                throw illegalStateException;
+                            }
+                            if (!channelFuture.isSuccess()) {
+                                throw new RuntimeException(channelFuture.cause());
+                            }
+                        }
+                        ChannelPromise promise = entry.getValue().getValue();
+                        logger.log(Level.FINE, "waiting for promise of stream ID = " + entry.getKey());
+                        if (!promise.awaitUninterruptibly(timeout, TimeUnit.MILLISECONDS)) {
+                            IllegalStateException illegalStateException =
+                                    new IllegalStateException("time out while waiting for response on stream id " + entry.getKey());
+                            if (exceptionListener != null) {
+                                exceptionListener.onException(illegalStateException);
+                                httpRequestContext.fail(illegalStateException.getMessage());
+                                if (channelFuture != null) {
+                                    final ChannelPool channelPool =
+                                            channelFuture.channel().attr(HttpClientChannelContext.CHANNEL_POOL_ATTRIBUTE_KEY).get();
+                                    channelPool.release(channelFuture.channel());
+                                }
+                            }
+                            throw illegalStateException;
+                        }
+                        if (!promise.isSuccess()) {
+                            RuntimeException runtimeException = new RuntimeException(promise.cause());
+                            if (exceptionListener != null) {
+                                exceptionListener.onException(runtimeException);
+                                httpRequestContext.fail(runtimeException.getMessage());
+                                if (channelFuture != null) {
+                                    final ChannelPool channelPool =
+                                            channelFuture.channel().attr(HttpClientChannelContext.CHANNEL_POOL_ATTRIBUTE_KEY).get();
+                                    channelPool.release(channelFuture.channel());
+                                }
+                            }
+                            throw runtimeException;
+                        }
                     }
                 }
             } else {
@@ -262,7 +329,7 @@ public final class HttpClient implements Closeable {
                 HttpMethod method = httpResponse.status().code() == 303 ? HttpMethod.GET :
                         httpRequestContext.getHttpRequest().method();
                 if (httpRequestContext.getRedirectCount().getAndIncrement() < httpRequestContext.getMaxRedirects()) {
-                    dispatchRedirect(channel, method, new URL(redirUrl), httpRequestContext);
+                    dispatchRedirect(method, URI.create(redirUrl), httpRequestContext);
                 } else {
                     httpRequestContext.fail("too many redirections");
                     final ChannelPool channelPool =
@@ -295,7 +362,7 @@ public final class HttpClient implements Closeable {
                     return location;
                 } else {
                     logger.log(Level.FINE, "(relative->absolute) redirect to " + location);
-                    return makeAbsolute(httpRequestContext.getURL(), location);
+                    return makeAbsolute(httpRequestContext.getURI(), location);
                 }
             default:
                 break;
@@ -303,35 +370,31 @@ public final class HttpClient implements Closeable {
         return null;
     }
 
-    private void dispatchRedirect(Channel channel, HttpMethod method, URL url,
+    private void dispatchRedirect(HttpMethod method, URI uri,
                                   HttpRequestContext httpRequestContext) {
-        final String uri = httpRequestContext.getHttpRequest().protocolVersion().majorVersion() == 2 ?
-                url.toExternalForm() : makeRelative(url);
+        final String uriStr = httpRequestContext.getHttpRequest().protocolVersion().majorVersion() == 2 ?
+                uri.toASCIIString() : makeRelative(uri);
         final HttpRequest httpRequest;
         if (method.equals(httpRequestContext.getHttpRequest().method()) &&
                 httpRequestContext.getHttpRequest() instanceof DefaultFullHttpRequest) {
             DefaultFullHttpRequest defaultFullHttpRequest = (DefaultFullHttpRequest) httpRequestContext.getHttpRequest();
             FullHttpRequest fullHttpRequest = defaultFullHttpRequest.copy();
-            fullHttpRequest.setUri(uri);
+            fullHttpRequest.setUri(uriStr);
             httpRequest = fullHttpRequest;
         } else {
-            httpRequest = new DefaultHttpRequest(httpRequestContext.getHttpRequest().protocolVersion(), method, uri);
+            httpRequest = new DefaultHttpRequest(httpRequestContext.getHttpRequest().protocolVersion(), method, uriStr);
         }
         for (Map.Entry<String, String> e : httpRequestContext.getHttpRequest().headers().entries()) {
             httpRequest.headers().add(e.getKey(), e.getValue());
         }
-        httpRequest.headers().set(HttpHeaderNames.HOST, url.getHost());
-        HttpRequestContext redirectContext = new HttpRequestContext(url, httpRequest,
+        httpRequest.headers().set(HttpHeaderNames.HOST, uri.getHost());
+        HttpRequestContext redirectContext = new HttpRequestContext(uri, httpRequest,
                 httpRequestContext);
-        logger.log(Level.FINE, "dispatchRedirect url = " + url + " with new request " + httpRequest.toString());
-        HttpResponseListener httpResponseListener =
-                channel.attr(HttpClientChannelContext.RESPONSE_LISTENER_ATTRIBUTE_KEY).get();
-        ExceptionListener exceptionListener =
-                channel.attr(HttpClientChannelContext.EXCEPTION_LISTENER_ATTRIBUTE_KEY).get();
-        dispatch(redirectContext, httpResponseListener, exceptionListener);
+        logger.log(Level.FINE, "dispatchRedirect url = " + uri + " with new request " + httpRequest.toString());
+        dispatch(redirectContext);
     }
 
-    private String makeRelative(URL base) {
+    private String makeRelative(URI base) {
         String uri = base.getPath();
         if (base.getQuery() != null) {
             uri = uri + "?" + base.getQuery();
@@ -339,7 +402,7 @@ public final class HttpClient implements Closeable {
         return uri;
     }
 
-    private String makeAbsolute(URL base, String location) throws UnsupportedEncodingException {
+    private String makeAbsolute(URI base, String location) throws UnsupportedEncodingException {
         String path = base.getPath() == null ? "/" : URLDecoder.decode(base.getPath(), "UTF-8");
         if (location.startsWith("/")) {
             path = location;
@@ -348,7 +411,7 @@ public final class HttpClient implements Closeable {
         } else {
             path += "/" + location;
         }
-        String scheme = base.getProtocol();
+        String scheme = base.getScheme();
         StringBuilder sb = new StringBuilder(scheme).append("://").append(base.getHost());
         int defaultPort = "http".equals(scheme) ? 80 : "https".equals(scheme) ? 443 : -1;
         if (defaultPort != -1 && base.getPort() != -1 && defaultPort != base.getPort()) {

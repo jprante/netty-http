@@ -65,8 +65,6 @@ jar {
 
 test {
     jvmArgs "-javaagent:" + configurations.alpnagent.asPath
-    include 'org/xbib/netty/http/client/test/Http2FrameAdapterTest*'
-    include 'org/xbib/netty/http/client/test/InboundHttp2ToHttpAdapterTest*'
     testLogging {
         showStandardStreams = false
         exceptionFormat = 'full'

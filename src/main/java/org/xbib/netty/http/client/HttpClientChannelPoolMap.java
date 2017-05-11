@@ -18,6 +18,7 @@ package org.xbib.netty.http.client;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.pool.AbstractChannelPoolMap;
 import io.netty.channel.pool.FixedChannelPool;
+import org.xbib.netty.http.client.util.InetAddressKey;
 
 /**
  *
@@ -49,7 +50,7 @@ public class HttpClientChannelPoolMap extends AbstractChannelPoolMap<InetAddress
     @Override
     protected FixedChannelPool newPool(InetAddressKey key) {
         this.httpClientChannelInitializer = new HttpClientChannelInitializer(httpClientChannelContext,
-                new Http1Handler(httpClient), new Http2Handler(httpClient));
+                new HttpHandler(httpClient), new Http2ResponseHandler(httpClient));
         this.httpClientChannelPoolHandler = new HttpClientChannelPoolHandler(httpClientChannelInitializer, key);
         return new FixedChannelPool(bootstrap.remoteAddress(key.getInetSocketAddress()),
                httpClientChannelPoolHandler, maxConnections);
