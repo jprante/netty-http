@@ -41,6 +41,8 @@ public interface HttpRequestBuilder {
 
     HttpRequestBuilder setURL(String url);
 
+    HttpRequestBuilder path(String path);
+
     HttpRequestBuilder setHeader(String name, Object value);
 
     HttpRequestBuilder addHeader(String name, Object value);

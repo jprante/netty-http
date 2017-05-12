@@ -79,7 +79,7 @@ public class HttpClientRequestBuilder implements HttpRequestBuilder, HttpRequest
 
     private int maxRedirects = DEFAULT_MAX_REDIRECT;
 
-    private URI uri;
+    private URI uri = DEFAULT_URI;
 
     private QueryStringEncoder queryStringEncoder;
 
@@ -159,6 +159,16 @@ public class HttpClientRequestBuilder implements HttpRequestBuilder, HttpRequest
             for (String value : entry.getValue()) {
                 queryStringEncoder.addParam(entry.getKey(), value);
             }
+        }
+        return this;
+    }
+
+    @Override
+    public HttpRequestBuilder path(String path) {
+        if (this.uri != null) {
+            setURL(this.uri.resolve(path).toString());
+        } else {
+            setURL(path);
         }
         return this;
     }

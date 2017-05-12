@@ -17,6 +17,8 @@ package org.xbib.netty.http.client;
 
 import io.netty.handler.codec.http.HttpVersion;
 
+import java.net.URI;
+
 /**
  */
 public interface HttpRequestDefaults {
@@ -24,6 +26,8 @@ public interface HttpRequestDefaults {
     HttpVersion DEFAULT_HTTP_VERSION = HttpVersion.HTTP_1_1;
 
     String DEFAULT_USER_AGENT = HttpClientUserAgent.getUserAgent();
+
+    URI DEFAULT_URI = URI.create("http://localhost");
 
     boolean DEFAULT_GZIP = true;
 

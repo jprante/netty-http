@@ -104,6 +104,11 @@ public class HttpClientBuilder implements HttpClientChannelContextDefaults {
 
     private Socks5ProxyHandler socks5ProxyHandler;
 
+    /**
+     * Set byte buf allocator for payload in HTTP requests.
+     * @param byteBufAllocator the byte buf allocator
+     * @return this builder
+     */
     public HttpClientBuilder withByteBufAllocator(ByteBufAllocator byteBufAllocator) {
         this.byteBufAllocator = byteBufAllocator;
         return this;
