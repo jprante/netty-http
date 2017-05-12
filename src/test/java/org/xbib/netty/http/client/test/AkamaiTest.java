@@ -45,7 +45,7 @@ public class AkamaiTest {
                 })
                 .onPushReceived((requestHeaders, fullHttpResponse) -> {
                     String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-                    logger.log(Level.INFO, "received push promise: request headers = " + requestHeaders
+                    logger.log(Level.INFO, "received push: request headers = " + requestHeaders
                             + " status = " + fullHttpResponse.status()
                             + " response headers = " + fullHttpResponse.headers().entries()
                             + " response body = " + response

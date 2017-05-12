@@ -33,6 +33,8 @@ public class HttpBinTest {
     private static final Logger logger = Logger.getLogger("");
 
     /**
+     * Test httpbin.org cookie setter with HTTP/1.1.
+     *
      * The reponse body should be
      * <pre>
      *   {
@@ -44,7 +46,7 @@ public class HttpBinTest {
      * @throws Exception
      */
     @Test
-    public void testHttpBin() throws Exception {
+    public void testHttpBinCookies() throws Exception {
         HttpClient httpClient = HttpClient.builder()
                 .build();
         httpClient.prepareGet()
