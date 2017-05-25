@@ -13,9 +13,10 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.xbib.netty.http.client;
+package org.xbib.netty.http.client.internal;
 
 import io.netty.bootstrap.Bootstrap;
+import org.xbib.netty.http.client.HttpClient;
 
 import java.util.Optional;
 

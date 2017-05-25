@@ -16,6 +16,7 @@
 package org.xbib.netty.http.client;
 
 import io.netty.handler.codec.http.HttpVersion;
+import org.xbib.netty.http.client.internal.HttpClientUserAgent;
 
 import java.net.URI;
 

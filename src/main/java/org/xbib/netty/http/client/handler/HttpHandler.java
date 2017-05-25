@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.xbib.netty.http.client;
+package org.xbib.netty.http.client.handler;
 
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -24,6 +24,9 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.cookie.ClientCookieDecoder;
 import io.netty.handler.codec.http.cookie.Cookie;
+import org.xbib.netty.http.client.HttpClient;
+import org.xbib.netty.http.client.HttpClientChannelContextDefaults;
+import org.xbib.netty.http.client.HttpRequestContext;
 import org.xbib.netty.http.client.listener.CookieListener;
 import org.xbib.netty.http.client.listener.ExceptionListener;
 import org.xbib.netty.http.client.listener.HttpHeadersListener;
@@ -36,13 +39,13 @@ import java.util.logging.Logger;
  * HTTP 1.x Netty channel handler.
  */
 @ChannelHandler.Sharable
-final class HttpHandler extends ChannelInboundHandlerAdapter {
+public final class HttpHandler extends ChannelInboundHandlerAdapter {
 
     private static final Logger logger = Logger.getLogger(HttpHandler.class.getName());
 
     private final HttpClient httpClient;
 
-    HttpHandler(HttpClient httpClient) {
+    public HttpHandler(HttpClient httpClient) {
         this.httpClient = httpClient;
     }
 
@@ -57,18 +60,18 @@ final class HttpHandler extends ChannelInboundHandlerAdapter {
     public void channelRead(final ChannelHandlerContext ctx, Object msg) throws Exception {
         logger.log(Level.FINE, () -> "channelRead msg " + msg.getClass().getName());
         final HttpRequestContext httpRequestContext =
-                ctx.channel().attr(HttpClientChannelContext.REQUEST_CONTEXT_ATTRIBUTE_KEY).get();
+                ctx.channel().attr(HttpClientChannelContextDefaults.REQUEST_CONTEXT_ATTRIBUTE_KEY).get();
         if (msg instanceof FullHttpResponse) {
             FullHttpResponse httpResponse = (FullHttpResponse) msg;
             HttpHeaders httpHeaders = httpResponse.headers();
             HttpHeadersListener httpHeadersListener =
-                    ctx.channel().attr(HttpClientChannelContext.HEADER_LISTENER_ATTRIBUTE_KEY).get();
+                    ctx.channel().attr(HttpClientChannelContextDefaults.HEADER_LISTENER_ATTRIBUTE_KEY).get();
             if (httpHeadersListener != null) {
                 logger.log(Level.FINE, () -> "firing onHeaders");
                 httpHeadersListener.onHeaders(httpHeaders);
             }
             CookieListener cookieListener =
-                    ctx.channel().attr(HttpClientChannelContext.COOKIE_LISTENER_ATTRIBUTE_KEY).get();
+                    ctx.channel().attr(HttpClientChannelContextDefaults.COOKIE_LISTENER_ATTRIBUTE_KEY).get();
             for (String cookieString : httpHeaders.getAll(HttpHeaderNames.SET_COOKIE)) {
                 Cookie cookie = ClientCookieDecoder.STRICT.decode(cookieString);
                 httpRequestContext.addCookie(cookie);
@@ -78,7 +81,7 @@ final class HttpHandler extends ChannelInboundHandlerAdapter {
                 }
             }
             HttpResponseListener httpResponseListener =
-                    ctx.channel().attr(HttpClientChannelContext.RESPONSE_LISTENER_ATTRIBUTE_KEY).get();
+                    ctx.channel().attr(HttpClientChannelContextDefaults.RESPONSE_LISTENER_ATTRIBUTE_KEY).get();
             if (httpResponseListener != null) {
                 logger.log(Level.FINE, () -> "firing onResponse");
                 httpResponseListener.onResponse(httpResponse);
@@ -89,7 +92,7 @@ final class HttpHandler extends ChannelInboundHandlerAdapter {
             }
             httpRequestContext.success("response finished");
             final ChannelPool channelPool =
-                    ctx.channel().attr(HttpClientChannelContext.CHANNEL_POOL_ATTRIBUTE_KEY).get();
+                    ctx.channel().attr(HttpClientChannelContextDefaults.CHANNEL_POOL_ATTRIBUTE_KEY).get();
             channelPool.release(ctx.channel());
         }
     }
@@ -98,12 +101,12 @@ final class HttpHandler extends ChannelInboundHandlerAdapter {
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         logger.log(Level.FINE, () -> "channelInactive " + ctx);
         final HttpRequestContext httpRequestContext =
-                ctx.channel().attr(HttpClientChannelContext.REQUEST_CONTEXT_ATTRIBUTE_KEY).get();
+                ctx.channel().attr(HttpClientChannelContextDefaults.REQUEST_CONTEXT_ATTRIBUTE_KEY).get();
         if (httpRequestContext.getRedirectCount().get() == 0 && !httpRequestContext.isSucceeded()) {
             httpRequestContext.fail("channel inactive");
         }
         final ChannelPool channelPool =
-                ctx.channel().attr(HttpClientChannelContext.CHANNEL_POOL_ATTRIBUTE_KEY).get();
+                ctx.channel().attr(HttpClientChannelContextDefaults.CHANNEL_POOL_ATTRIBUTE_KEY).get();
         channelPool.release(ctx.channel());
     }
 
@@ -116,16 +119,16 @@ final class HttpHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
         ExceptionListener exceptionListener =
-                ctx.channel().attr(HttpClientChannelContext.EXCEPTION_LISTENER_ATTRIBUTE_KEY).get();
+                ctx.channel().attr(HttpClientChannelContextDefaults.EXCEPTION_LISTENER_ATTRIBUTE_KEY).get();
         logger.log(Level.FINE, () -> "exceptionCaught");
         if (exceptionListener != null) {
             exceptionListener.onException(cause);
         }
         final HttpRequestContext httpRequestContext =
-                ctx.channel().attr(HttpClientChannelContext.REQUEST_CONTEXT_ATTRIBUTE_KEY).get();
+                ctx.channel().attr(HttpClientChannelContextDefaults.REQUEST_CONTEXT_ATTRIBUTE_KEY).get();
         httpRequestContext.fail(cause.getMessage());
         final ChannelPool channelPool =
-                ctx.channel().attr(HttpClientChannelContext.CHANNEL_POOL_ATTRIBUTE_KEY).get();
+                ctx.channel().attr(HttpClientChannelContextDefaults.CHANNEL_POOL_ATTRIBUTE_KEY).get();
         channelPool.release(ctx.channel());
     }
 }

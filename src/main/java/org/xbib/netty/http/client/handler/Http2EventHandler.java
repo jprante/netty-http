@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.xbib.netty.http.client;
+package org.xbib.netty.http.client.handler;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -37,6 +37,8 @@ import io.netty.handler.codec.http2.Http2LocalFlowController;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.Http2Stream;
 import io.netty.handler.codec.http2.HttpConversionUtil;
+import org.xbib.netty.http.client.HttpClientChannelContextDefaults;
+import org.xbib.netty.http.client.HttpRequestContext;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -67,7 +69,7 @@ public class Http2EventHandler extends Http2EventAdapter {
      * @param maxContentLength the maximum content length
      * @param validateHeaders true if headers should be validated
      */
-    Http2EventHandler(Http2Connection connection, int maxContentLength, boolean validateHeaders) {
+    public Http2EventHandler(Http2Connection connection, int maxContentLength, boolean validateHeaders) {
         this.connection = connection;
         this.maxContentLength = maxContentLength;
         this.validateHttpHeaders = validateHeaders;
@@ -87,7 +89,7 @@ public class Http2EventHandler extends Http2EventAdapter {
         logger.log(Level.FINEST, () -> "settings received " + settings);
         Channel channel = ctx.channel();
         final HttpRequestContext httpRequestContext =
-                channel.attr(HttpClientChannelContext.REQUEST_CONTEXT_ATTRIBUTE_KEY).get();
+                channel.attr(HttpClientChannelContextDefaults.REQUEST_CONTEXT_ATTRIBUTE_KEY).get();
         final HttpRequest httpRequest = httpRequestContext.getHttpRequest();
         ChannelPromise channelPromise = channel.newPromise();
         Http2Headers headers = toHttp2Headers(httpRequestContext);
@@ -242,7 +244,7 @@ public class Http2EventHandler extends Http2EventAdapter {
             removeMessage(stream, true);
         }
         final HttpRequestContext httpRequestContext =
-                ctx.channel().attr(HttpClientChannelContext.REQUEST_CONTEXT_ATTRIBUTE_KEY).get();
+                ctx.channel().attr(HttpClientChannelContextDefaults.REQUEST_CONTEXT_ATTRIBUTE_KEY).get();
         httpRequestContext.getPushMap().remove(streamId);
     }
 
@@ -285,7 +287,7 @@ public class Http2EventHandler extends Http2EventAdapter {
         }
         Channel channel = ctx.channel();
         final HttpRequestContext httpRequestContext =
-                channel.attr(HttpClientChannelContext.REQUEST_CONTEXT_ATTRIBUTE_KEY).get();
+                channel.attr(HttpClientChannelContextDefaults.REQUEST_CONTEXT_ATTRIBUTE_KEY).get();
         httpRequestContext.receiveStreamID(promisedStreamId, headers, channel.newPromise());
     }
 

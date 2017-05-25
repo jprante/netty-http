@@ -28,6 +28,7 @@ import io.netty.handler.proxy.Socks4ProxyHandler;
 import io.netty.handler.proxy.Socks5ProxyHandler;
 import io.netty.handler.ssl.CipherSuiteFilter;
 import io.netty.handler.ssl.SslProvider;
+import org.xbib.netty.http.client.internal.HttpClientThreadFactory;
 import org.xbib.netty.http.client.util.ClientAuthMode;
 
 import javax.net.ssl.TrustManagerFactory;

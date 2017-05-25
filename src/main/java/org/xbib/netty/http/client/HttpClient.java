@@ -38,6 +38,7 @@ import io.netty.handler.codec.http.cookie.Cookie;
 import io.netty.handler.ssl.OpenSsl;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.FutureListener;
+import org.xbib.netty.http.client.internal.HttpClientChannelPoolMap;
 import org.xbib.netty.http.client.listener.CookieListener;
 import org.xbib.netty.http.client.listener.ExceptionListener;
 import org.xbib.netty.http.client.listener.HttpHeadersListener;
@@ -230,7 +231,7 @@ public final class HttpClient implements Closeable {
         logger.log(Level.FINE, () -> "closed");
     }
 
-    void dispatch(final HttpRequestContext httpRequestContext) {
+    public void dispatch(final HttpRequestContext httpRequestContext) {
         final URI uri = httpRequestContext.getURI();
         final HttpRequest httpRequest = httpRequestContext.getHttpRequest();
         if (!httpRequestContext.getCookies().isEmpty()) {
@@ -262,17 +263,17 @@ public final class HttpClient implements Closeable {
                 // set settings promise before adding httpRequestContext as a channel attribute
                 ChannelPromise settingsPromise = channel.newPromise();
                 httpRequestContext.setSettingsPromise(settingsPromise);
-                channel.attr(HttpClientChannelContext.CHANNEL_POOL_ATTRIBUTE_KEY).set(pool);
-                channel.attr(HttpClientChannelContext.REQUEST_CONTEXT_ATTRIBUTE_KEY).set(httpRequestContext);
+                channel.attr(HttpClientChannelContextDefaults.CHANNEL_POOL_ATTRIBUTE_KEY).set(pool);
+                channel.attr(HttpClientChannelContextDefaults.REQUEST_CONTEXT_ATTRIBUTE_KEY).set(httpRequestContext);
                 HttpResponseListener httpResponseListener = httpRequestContext.getHttpResponseListener();
-                channel.attr(HttpClientChannelContext.RESPONSE_LISTENER_ATTRIBUTE_KEY).set(httpResponseListener);
+                channel.attr(HttpClientChannelContextDefaults.RESPONSE_LISTENER_ATTRIBUTE_KEY).set(httpResponseListener);
                 HttpPushListener httpPushListener = httpRequestContext.getHttpPushListener();
-                channel.attr(HttpClientChannelContext.PUSH_LISTENER_ATTRIBUTE_KEY).set(httpPushListener);
+                channel.attr(HttpClientChannelContextDefaults.PUSH_LISTENER_ATTRIBUTE_KEY).set(httpPushListener);
                 HttpHeadersListener httpHeadersListener = httpRequestContext.getHttpHeadersListener();
-                channel.attr(HttpClientChannelContext.HEADER_LISTENER_ATTRIBUTE_KEY).set(httpHeadersListener);
+                channel.attr(HttpClientChannelContextDefaults.HEADER_LISTENER_ATTRIBUTE_KEY).set(httpHeadersListener);
                 CookieListener cookieListener = httpRequestContext.getCookieListener();
-                channel.attr(HttpClientChannelContext.COOKIE_LISTENER_ATTRIBUTE_KEY).set(cookieListener);
-                channel.attr(HttpClientChannelContext.EXCEPTION_LISTENER_ATTRIBUTE_KEY).set(exceptionListener);
+                channel.attr(HttpClientChannelContextDefaults.COOKIE_LISTENER_ATTRIBUTE_KEY).set(cookieListener);
+                channel.attr(HttpClientChannelContextDefaults.EXCEPTION_LISTENER_ATTRIBUTE_KEY).set(exceptionListener);
                 if (httpRequestContext.isFailed()) {
                     logger.log(Level.FINE, () -> "detected fail, close channel");
                     future.cancel(true);
@@ -314,7 +315,7 @@ public final class HttpClient implements Closeable {
                                     exceptionListener.onException(illegalStateException);
                                     httpRequestContext.fail(illegalStateException.getMessage());
                                     final ChannelPool channelPool = channelFuture.channel()
-                                                    .attr(HttpClientChannelContext.CHANNEL_POOL_ATTRIBUTE_KEY).get();
+                                                    .attr(HttpClientChannelContextDefaults.CHANNEL_POOL_ATTRIBUTE_KEY).get();
                                     channelPool.release(channelFuture.channel());
                                 }
                                 throw illegalStateException;
@@ -334,7 +335,7 @@ public final class HttpClient implements Closeable {
                                 httpRequestContext.fail(illegalStateException.getMessage());
                                 if (channelFuture != null) {
                                     final ChannelPool channelPool = channelFuture.channel()
-                                                    .attr(HttpClientChannelContext.CHANNEL_POOL_ATTRIBUTE_KEY).get();
+                                                    .attr(HttpClientChannelContextDefaults.CHANNEL_POOL_ATTRIBUTE_KEY).get();
                                     channelPool.release(channelFuture.channel());
                                 }
                             }
@@ -347,7 +348,7 @@ public final class HttpClient implements Closeable {
                                 httpRequestContext.fail(runtimeException.getMessage());
                                 if (channelFuture != null) {
                                     final ChannelPool channelPool = channelFuture.channel()
-                                            .attr(HttpClientChannelContext.CHANNEL_POOL_ATTRIBUTE_KEY).get();
+                                            .attr(HttpClientChannelContextDefaults.CHANNEL_POOL_ATTRIBUTE_KEY).get();
                                     channelPool.release(channelFuture.channel());
                                 }
                             }
@@ -364,7 +365,7 @@ public final class HttpClient implements Closeable {
         });
     }
 
-    boolean tryRedirect(Channel channel, FullHttpResponse httpResponse, HttpRequestContext httpRequestContext)
+    public boolean tryRedirect(Channel channel, FullHttpResponse httpResponse, HttpRequestContext httpRequestContext)
             throws IOException {
         if (httpRequestContext.isFollowRedirect()) {
             String redirUrl = findRedirect(httpRequestContext, httpResponse);
@@ -376,7 +377,7 @@ public final class HttpClient implements Closeable {
                 } else {
                     httpRequestContext.fail("too many redirections");
                     final ChannelPool channelPool =
-                            channel.attr(HttpClientChannelContext.CHANNEL_POOL_ATTRIBUTE_KEY).get();
+                            channel.attr(HttpClientChannelContextDefaults.CHANNEL_POOL_ATTRIBUTE_KEY).get();
                     channelPool.release(channel);
                 }
                 return true;

@@ -13,11 +13,16 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.xbib.netty.http.client;
+package org.xbib.netty.http.client.internal;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.pool.AbstractChannelPoolMap;
 import io.netty.channel.pool.FixedChannelPool;
+import org.xbib.netty.http.client.HttpClient;
+import org.xbib.netty.http.client.HttpClientChannelContext;
+import org.xbib.netty.http.client.handler.Http2ResponseHandler;
+import org.xbib.netty.http.client.handler.HttpClientChannelInitializer;
+import org.xbib.netty.http.client.handler.HttpHandler;
 import org.xbib.netty.http.client.util.InetAddressKey;
 
 /**
@@ -37,7 +42,7 @@ public class HttpClientChannelPoolMap extends AbstractChannelPoolMap<InetAddress
 
     private HttpClientChannelPoolHandler httpClientChannelPoolHandler;
 
-    HttpClientChannelPoolMap(HttpClient httpClient,
+    public HttpClientChannelPoolMap(HttpClient httpClient,
                              HttpClientChannelContext httpClientChannelContext,
                              Bootstrap bootstrap,
                              int maxConnections) {

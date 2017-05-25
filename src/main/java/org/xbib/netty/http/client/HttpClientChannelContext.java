@@ -15,18 +15,11 @@
  */
 package org.xbib.netty.http.client;
 
-import io.netty.channel.pool.ChannelPool;
 import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.proxy.Socks4ProxyHandler;
 import io.netty.handler.proxy.Socks5ProxyHandler;
 import io.netty.handler.ssl.CipherSuiteFilter;
 import io.netty.handler.ssl.SslProvider;
-import io.netty.util.AttributeKey;
-import org.xbib.netty.http.client.listener.CookieListener;
-import org.xbib.netty.http.client.listener.ExceptionListener;
-import org.xbib.netty.http.client.listener.HttpHeadersListener;
-import org.xbib.netty.http.client.listener.HttpPushListener;
-import org.xbib.netty.http.client.listener.HttpResponseListener;
 import org.xbib.netty.http.client.util.ClientAuthMode;
 
 import javax.net.ssl.TrustManagerFactory;
@@ -34,28 +27,7 @@ import java.io.InputStream;
 
 /**
  */
-final class HttpClientChannelContext {
-
-    static final AttributeKey<ChannelPool> CHANNEL_POOL_ATTRIBUTE_KEY =
-            AttributeKey.valueOf("httpClientChannelPool");
-
-    static final AttributeKey<HttpRequestContext> REQUEST_CONTEXT_ATTRIBUTE_KEY =
-            AttributeKey.valueOf("httpClientRequestContext");
-
-    static final AttributeKey<HttpResponseListener> RESPONSE_LISTENER_ATTRIBUTE_KEY =
-            AttributeKey.valueOf("httpClientResponseListener");
-
-    static final AttributeKey<HttpHeadersListener> HEADER_LISTENER_ATTRIBUTE_KEY =
-            AttributeKey.valueOf("httpHeaderListener");
-
-    static final AttributeKey<CookieListener> COOKIE_LISTENER_ATTRIBUTE_KEY =
-            AttributeKey.valueOf("cookieListener");
-
-    static final AttributeKey<HttpPushListener> PUSH_LISTENER_ATTRIBUTE_KEY =
-            AttributeKey.valueOf("pushListener");
-
-    static final AttributeKey<ExceptionListener> EXCEPTION_LISTENER_ATTRIBUTE_KEY =
-            AttributeKey.valueOf("httpClientExceptionListener");
+public final class HttpClientChannelContext {
 
     private final int maxInitialLineLength;
 
@@ -139,83 +111,83 @@ final class HttpClientChannelContext {
         this.socks5ProxyHandler = socks5ProxyHandler;
     }
 
-    int getMaxInitialLineLength() {
+    public int getMaxInitialLineLength() {
         return maxInitialLineLength;
     }
 
-    int getMaxHeaderSize() {
+    public int getMaxHeaderSize() {
         return maxHeaderSize;
     }
 
-    int getMaxChunkSize() {
+    public int getMaxChunkSize() {
         return maxChunkSize;
     }
 
-    int getMaxContentLength() {
+    public int getMaxContentLength() {
         return maxContentLength;
     }
 
-    int getMaxCompositeBufferComponents() {
+    public int getMaxCompositeBufferComponents() {
         return maxCompositeBufferComponents;
     }
 
-    int getReadTimeoutMillis() {
+    public int getReadTimeoutMillis() {
         return readTimeoutMillis;
     }
 
-    boolean isGzipEnabled() {
+    public boolean isGzipEnabled() {
         return enableGzip;
     }
 
-    boolean isInstallHttp2Upgrade() {
+    public boolean isInstallHttp2Upgrade() {
         return installHttp2Upgrade;
     }
 
-    SslProvider getSslProvider() {
+    public SslProvider getSslProvider() {
         return sslProvider;
     }
 
-    Iterable<String> getCiphers() {
+    public Iterable<String> getCiphers() {
         return ciphers;
     }
 
-    CipherSuiteFilter getCipherSuiteFilter() {
+    public CipherSuiteFilter getCipherSuiteFilter() {
         return cipherSuiteFilter;
     }
 
-    TrustManagerFactory getTrustManagerFactory() {
+    public TrustManagerFactory getTrustManagerFactory() {
         return trustManagerFactory;
     }
 
-    InputStream getKeyCertChainInputStream() {
+    public InputStream getKeyCertChainInputStream() {
         return keyCertChainInputStream;
     }
 
-    InputStream getKeyInputStream() {
+    public InputStream getKeyInputStream() {
         return keyInputStream;
     }
 
-    String getKeyPassword() {
+    public String getKeyPassword() {
         return keyPassword;
     }
 
-    boolean isUseServerNameIdentification() {
+    public boolean isUseServerNameIdentification() {
         return useServerNameIdentification;
     }
 
-    ClientAuthMode getClientAuthMode() {
+    public ClientAuthMode getClientAuthMode() {
         return clientAuthMode;
     }
 
-    HttpProxyHandler getHttpProxyHandler() {
+    public HttpProxyHandler getHttpProxyHandler() {
         return httpProxyHandler;
     }
 
-    Socks4ProxyHandler getSocks4ProxyHandler() {
+    public Socks4ProxyHandler getSocks4ProxyHandler() {
         return socks4ProxyHandler;
     }
 
-    Socks5ProxyHandler getSocks5ProxyHandler() {
+    public Socks5ProxyHandler getSocks5ProxyHandler() {
         return socks5ProxyHandler;
     }
 }

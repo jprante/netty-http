@@ -13,11 +13,12 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.xbib.netty.http.client;
+package org.xbib.netty.http.client.internal;
 
 import io.netty.channel.Channel;
 import io.netty.channel.pool.ChannelPoolHandler;
 import io.netty.channel.socket.SocketChannel;
+import org.xbib.netty.http.client.handler.HttpClientChannelInitializer;
 import org.xbib.netty.http.client.util.InetAddressKey;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -39,7 +40,7 @@ public class HttpClientChannelPoolHandler implements ChannelPoolHandler {
 
     private int peak;
 
-    HttpClientChannelPoolHandler(HttpClientChannelInitializer channelInitializer, InetAddressKey key) {
+    public HttpClientChannelPoolHandler(HttpClientChannelInitializer channelInitializer, InetAddressKey key) {
         this.channelInitializer = channelInitializer;
         this.key = key;
     }

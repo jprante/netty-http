@@ -15,12 +15,19 @@
  */
 package org.xbib.netty.http.client;
 
+import io.netty.channel.pool.ChannelPool;
 import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.ssl.CipherSuiteFilter;
 import io.netty.handler.ssl.OpenSsl;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
+import io.netty.util.AttributeKey;
+import org.xbib.netty.http.client.listener.CookieListener;
+import org.xbib.netty.http.client.listener.ExceptionListener;
+import org.xbib.netty.http.client.listener.HttpHeadersListener;
+import org.xbib.netty.http.client.listener.HttpPushListener;
+import org.xbib.netty.http.client.listener.HttpResponseListener;
 import org.xbib.netty.http.client.util.ClientAuthMode;
 import org.xbib.netty.http.client.util.InetAddressKey;
 
@@ -29,6 +36,27 @@ import javax.net.ssl.TrustManagerFactory;
 /**
  */
 public interface HttpClientChannelContextDefaults {
+
+    AttributeKey<ChannelPool> CHANNEL_POOL_ATTRIBUTE_KEY =
+            AttributeKey.valueOf("httpClientChannelPool");
+
+    AttributeKey<HttpRequestContext> REQUEST_CONTEXT_ATTRIBUTE_KEY =
+            AttributeKey.valueOf("httpClientRequestContext");
+
+    AttributeKey<HttpResponseListener> RESPONSE_LISTENER_ATTRIBUTE_KEY =
+            AttributeKey.valueOf("httpClientResponseListener");
+
+    AttributeKey<HttpHeadersListener> HEADER_LISTENER_ATTRIBUTE_KEY =
+            AttributeKey.valueOf("httpHeaderListener");
+
+    AttributeKey<CookieListener> COOKIE_LISTENER_ATTRIBUTE_KEY =
+            AttributeKey.valueOf("cookieListener");
+
+    AttributeKey<HttpPushListener> PUSH_LISTENER_ATTRIBUTE_KEY =
+            AttributeKey.valueOf("pushListener");
+
+    AttributeKey<ExceptionListener> EXCEPTION_LISTENER_ATTRIBUTE_KEY =
+            AttributeKey.valueOf("httpClientExceptionListener");
 
     /**
      * Default for TCP_NODELAY.

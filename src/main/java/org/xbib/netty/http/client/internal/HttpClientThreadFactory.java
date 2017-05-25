@@ -13,11 +13,14 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.xbib.netty.http.client;
+package org.xbib.netty.http.client.internal;
 
 import java.util.concurrent.ThreadFactory;
 
-class HttpClientThreadFactory implements ThreadFactory {
+/**
+ *
+ */
+public class HttpClientThreadFactory implements ThreadFactory {
 
     private int number = 0;
 
