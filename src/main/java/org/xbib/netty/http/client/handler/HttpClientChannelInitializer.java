@@ -142,9 +142,9 @@ public class HttpClientChannelInitializer extends ChannelInitializer<SocketChann
                         new Http2ClientUpgradeCodec(http2connectionHandler);
                 HttpClientUpgradeHandler upgradeHandler =
                         new HttpClientUpgradeHandler(http1connectionHandler, upgradeCodec, context.getMaxContentLength());
+                pipeline.addLast(upgradeHandler);
                 UpgradeRequestHandler upgradeRequestHandler =
                         new UpgradeRequestHandler();
-                pipeline.addLast(upgradeHandler);
                 pipeline.addLast(upgradeRequestHandler);
             } else {
                 pipeline.addLast(http2connectionHandler);

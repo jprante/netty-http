@@ -21,6 +21,7 @@ import org.xbib.netty.http.client.HttpRequestBuilder;
 import org.xbib.netty.http.client.HttpRequestContext;
 
 import java.io.IOException;
+import java.net.ConnectException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,6 +31,8 @@ import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
+
+import static org.junit.Assert.assertTrue;
 
 /**
  */
@@ -56,7 +59,8 @@ public class ElasticsearchTest {
     public void testElasticsearchCreateDocument() throws Exception {
         HttpClient httpClient = HttpClient.builder()
                 .build();
-        HttpRequestContext requestContext = httpClient.preparePut()
+        try {
+            HttpRequestContext requestContext = httpClient.preparePut()
                 .setURL("http://localhost:9200/test/test/1")
                 .json("{\"text\":\"Hello World\"}")
                 .onResponse(fullHttpResponse -> {
@@ -66,15 +70,20 @@ public class ElasticsearchTest {
                 .onException(e -> logger.log(Level.SEVERE, e.getMessage(), e))
                 .execute()
                 .get();
+            logger.log(Level.FINE, "took = " + requestContext.took());
+        } catch (Exception exception) {
+            assertTrue(exception.getCause() instanceof ConnectException);
+            logger.log(Level.INFO, "got expected exception");
+        }
         httpClient.close();
-        logger.log(Level.FINE, "took = " + requestContext.took());
     }
 
     @Test
     public void testElasticsearchMatchQuery() throws Exception {
         HttpClient httpClient = HttpClient.builder()
                 .build();
-        HttpRequestContext requestContext = httpClient.preparePost()
+        try {
+            HttpRequestContext requestContext = httpClient.preparePost()
                 .setURL("http://localhost:9200/test/_search")
                 .json("{\"query\":{\"match\":{\"_all\":\"Hello World\"}}}")
                 .onResponse(fullHttpResponse -> {
@@ -84,8 +93,12 @@ public class ElasticsearchTest {
                 .onException(e -> logger.log(Level.SEVERE, e.getMessage(), e))
                 .execute()
                 .get();
+            logger.log(Level.FINE, "took = " + requestContext.took());
+        } catch (Exception exception) {
+            assertTrue(exception.getCause() instanceof ConnectException);
+            logger.log(Level.INFO, "got expected exception");
+        }
         httpClient.close();
-        logger.log(Level.FINE, "took = " + requestContext.took());
     }
 
     @Test
@@ -103,9 +116,14 @@ public class ElasticsearchTest {
         }
         List<HttpRequestContext> responses = new ArrayList<>();
         for (int i = 0; i < max; i++) {
-            responses.add(contexts.get(i).get());
+            try {
+                responses.add(contexts.get(i).get());
+            } catch (Exception exception) {
+                assertTrue(exception.getCause() instanceof ConnectException);
+                logger.log(Level.INFO, "got expected exception");
+            }
         }
-        for (int i = 0; i < max; i++) {
+        for (int i = 0; i < responses.size(); i++) {
             logger.log(Level.FINE, "took = " + responses.get(i).took());
         }
         httpClient.close();

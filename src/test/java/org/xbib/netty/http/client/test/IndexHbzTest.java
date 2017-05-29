@@ -52,6 +52,7 @@ public class IndexHbzTest {
 
     private static final Logger logger = Logger.getLogger("");
 
+    @Test
     public void testIndexHbz() throws Exception {
         HttpClient httpClient = HttpClient.builder()
                 .build();

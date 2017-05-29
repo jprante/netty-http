@@ -34,9 +34,9 @@ import java.util.AbstractMap;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -53,9 +53,7 @@ public final class HttpRequestContext implements HttpResponseListener, HttpReque
 
     private final HttpRequest httpRequest;
 
-    private final AtomicBoolean succeeded;
-
-    private final AtomicBoolean failed;
+    private final HttpRequestFuture<String> httpRequestFuture;
 
     private final boolean followRedirect;
 
@@ -66,8 +64,6 @@ public final class HttpRequestContext implements HttpResponseListener, HttpReque
     private final Integer timeout;
 
     private final Long startTime;
-
-    private final CountDownLatch latch;
 
     private final AtomicInteger streamId;
 
@@ -91,15 +87,13 @@ public final class HttpRequestContext implements HttpResponseListener, HttpReque
 
     private Map<Integer, FullHttpResponse> httpResponses;
 
-    private boolean hastimeout;
-
     private Long stopTime;
 
-    HttpRequestContext(URI uri, HttpRequest httpRequest, AtomicInteger streamId,
-                       AtomicBoolean succeeded, AtomicBoolean failed,
+    HttpRequestContext(URI uri, HttpRequest httpRequest,
+                       HttpRequestFuture<String> httpRequestFuture,
+                       AtomicInteger streamId,
                        int timeout, Long startTime,
                        boolean followRedirect, int maxRedirects, AtomicInteger redirectCount,
-                       CountDownLatch latch,
                        HttpResponseListener httpResponseListener,
                        ExceptionListener exceptionListener,
                        HttpHeadersListener httpHeadersListener,
@@ -107,15 +101,13 @@ public final class HttpRequestContext implements HttpResponseListener, HttpReque
                        HttpPushListener httpPushListener) {
         this.uri = uri;
         this.httpRequest = httpRequest;
+        this.httpRequestFuture = httpRequestFuture;
         this.streamId = streamId;
-        this.succeeded = succeeded;
-        this.failed = failed;
         this.timeout = timeout;
         this.startTime = startTime;
         this.followRedirect = followRedirect;
         this.maxRedirects = maxRedirects;
         this.redirectCount = redirectCount;
-        this.latch = latch;
         this.httpResponseListener = httpResponseListener;
         this.exceptionListener = exceptionListener;
         this.httpHeadersListener = httpHeadersListener;
@@ -133,16 +125,13 @@ public final class HttpRequestContext implements HttpResponseListener, HttpReque
     HttpRequestContext(URI uri, HttpRequest httpRequest, HttpRequestContext httpRequestContext) {
         this.uri = uri;
         this.httpRequest = httpRequest;
+        this.httpRequestFuture = httpRequestContext.httpRequestFuture;
         this.streamId = httpRequestContext.streamId;
-        this.succeeded = httpRequestContext.succeeded;
-        this.failed = httpRequestContext.failed;
-        this.failed.lazySet(false); // reset
         this.timeout = httpRequestContext.timeout;
         this.startTime = httpRequestContext.startTime;
         this.followRedirect = httpRequestContext.followRedirect;
         this.maxRedirects = httpRequestContext.maxRedirects;
         this.redirectCount = httpRequestContext.redirectCount;
-        this.latch = httpRequestContext.latch;
         this.httpResponseListener = httpRequestContext.httpResponseListener;
         this.exceptionListener = httpRequestContext.exceptionListener;
         this.httpHeadersListener = httpRequestContext.httpHeadersListener;
@@ -247,11 +236,11 @@ public final class HttpRequestContext implements HttpResponseListener, HttpReque
     }
 
     public boolean isSucceeded() {
-        return succeeded.get();
+        return httpRequestFuture.isSucceeded();
     }
 
     public boolean isFailed() {
-        return failed.get();
+        return httpRequestFuture.isFailed();
     }
 
     public boolean isFollowRedirect() {
@@ -278,44 +267,36 @@ public final class HttpRequestContext implements HttpResponseListener, HttpReque
         return (startTime + timeout) - System.currentTimeMillis();
     }
 
-    public CountDownLatch getLatch() {
-        return latch;
-    }
-
     public AtomicInteger getStreamId() {
         return streamId;
     }
 
-    public HttpRequestContext get() throws InterruptedException {
-        return waitFor(DEFAULT_TIMEOUT_MILLIS, TimeUnit.SECONDS);
+    public HttpRequestContext get() throws InterruptedException, TimeoutException, ExecutionException {
+        return get(DEFAULT_TIMEOUT_MILLIS, TimeUnit.SECONDS);
     }
 
-    public HttpRequestContext waitFor(long value, TimeUnit timeUnit) throws InterruptedException {
-        this.hastimeout = latch.await(value, timeUnit);
+    public HttpRequestContext get(long timeout, TimeUnit timeUnit)
+            throws InterruptedException, TimeoutException, ExecutionException {
+        httpRequestFuture.get(timeout, timeUnit);
         stopTime = System.currentTimeMillis();
         return this;
     }
 
-    public boolean isTimeout() {
-        return hastimeout;
-    }
-
     public void success(String reason) {
         logger.log(Level.FINE, () -> "success because of " + reason);
-        if (succeeded.compareAndSet(false, true)) {
-            latch.countDown();
-        }
+        httpRequestFuture.success(reason);
     }
 
     public void fail(String reason) {
-        logger.log(Level.FINE, () -> "failed because of " + reason);
-        IllegalStateException exception = new IllegalStateException(reason);
+        fail(new IllegalStateException(reason));
+    }
+
+    public void fail(Exception exception) {
+        logger.log(Level.FINE, () -> "failed because of " + exception.getMessage());
         if (exceptionListener != null) {
             exceptionListener.onException(exception);
         }
-        if (failed.compareAndSet(false, true)) {
-            latch.countDown();
-        }
+        httpRequestFuture.fail(exception);
     }
 
     @Override

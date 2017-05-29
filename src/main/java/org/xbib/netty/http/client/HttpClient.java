@@ -50,6 +50,7 @@ import org.xbib.netty.http.client.util.NetworkUtils;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.net.ConnectException;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.util.Collection;
@@ -70,6 +71,13 @@ public final class HttpClient implements Closeable {
 
     private static final HttpClient INSTANCE = HttpClient.builder().build();
 
+    static {
+        NetworkUtils.extendSystemProperties();
+        logger.log(Level.FINE, () -> "OpenSSL ALPN support: " + OpenSsl.isAlpnSupported());
+        logger.log(Level.FINE, () -> "local host name = " + NetworkUtils.getLocalHostName("localhost"));
+        logger.log(Level.FINE, NetworkUtils::displayNetworkInterfaces);
+    }
+
     private final ByteBufAllocator byteBufAllocator;
 
     private final EventLoopGroup eventLoopGroup;
@@ -87,10 +95,6 @@ public final class HttpClient implements Closeable {
         this.byteBufAllocator = byteBufAllocator;
         this.eventLoopGroup = eventLoopGroup;
         this.poolMap = new HttpClientChannelPoolMap(this, httpClientChannelContext, bootstrap, maxConnections);
-        logger.log(Level.FINE, () -> "OpenSSL ALPN support: " + OpenSsl.isAlpnSupported());
-        NetworkUtils.extendSystemProperties();
-        logger.log(Level.FINE, () -> "local host name = " + NetworkUtils.getLocalHostName("localhost"));
-        logger.log(Level.FINE, NetworkUtils::displayNetworkInterfaces);
     }
 
     public static HttpClient getInstance() {
@@ -225,7 +229,7 @@ public final class HttpClient implements Closeable {
         logger.log(Level.FINE, () -> "closing pool map");
         poolMap.close();
         logger.log(Level.FINE, () -> "closing event loop group");
-        if (!eventLoopGroup.isTerminated()) {
+        if (!eventLoopGroup.isShuttingDown()) {
             eventLoopGroup.shutdownGracefully();
         }
         logger.log(Level.FINE, () -> "closed");
@@ -360,7 +364,7 @@ public final class HttpClient implements Closeable {
                 if (exceptionListener != null) {
                     exceptionListener.onException(future.cause());
                 }
-                httpRequestContext.fail("channel pool failure");
+                httpRequestContext.fail(new ConnectException("unable to connect to " + inetAddressKey));
             }
         });
     }

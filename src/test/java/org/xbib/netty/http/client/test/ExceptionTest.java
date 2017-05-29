@@ -18,6 +18,7 @@ package org.xbib.netty.http.client.test;
 import org.junit.Test;
 import org.xbib.netty.http.client.HttpClient;
 
+import java.net.ConnectException;
 import java.nio.charset.StandardCharsets;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Handler;
@@ -25,6 +26,8 @@ import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
+
+import static org.junit.Assert.assertTrue;
 
 /**
  */
@@ -54,15 +57,20 @@ public class ExceptionTest {
 
         HttpClient httpClient = HttpClient.builder()
                 .build();
-        httpClient.prepareGet()
-                .setURL("http://localhost:1234")
-                .onResponse(fullHttpResponse -> {
-                    String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-                    logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
-                })
-                .onException(e -> logger.log(Level.SEVERE, e.getMessage(), e))
-                .execute()
-                .get();
+        try {
+            httpClient.prepareGet()
+                    .setURL("http://localhost:1234")
+                    .onResponse(fullHttpResponse -> {
+                        String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
+                        logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
+                    })
+                    .onException(e -> logger.log(Level.SEVERE, e.getMessage(), e))
+                    .execute()
+                    .get();
+        } catch (Exception exception) {
+            assertTrue(exception.getCause() instanceof ConnectException);
+            logger.log(Level.INFO, "got expected exception");
+        }
         httpClient.close();
     }
 }

@@ -37,4 +37,6 @@ public interface HttpRequestDefaults {
     int DEFAULT_TIMEOUT_MILLIS = 5000;
 
     int DEFAULT_MAX_REDIRECT = 10;
+
+    HttpRequestFuture<String> DEFAULT_FUTURE = new HttpRequestFuture<>();
 }

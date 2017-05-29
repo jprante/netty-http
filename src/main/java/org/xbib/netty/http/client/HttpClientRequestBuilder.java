@@ -52,8 +52,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.logging.Level;
@@ -102,6 +100,8 @@ public class HttpClientRequestBuilder implements HttpRequestBuilder, HttpRequest
 
     private HttpRequest httpRequest;
 
+    private HttpRequestFuture<String> httpRequestFuture = DEFAULT_FUTURE;
+
     private HttpRequestContext httpRequestContext;
 
     private HttpResponseListener httpResponseListener;
@@ -139,6 +139,11 @@ public class HttpClientRequestBuilder implements HttpRequestBuilder, HttpRequest
 
     public static HttpRequestBuilder builder(HttpMethod httpMethod) {
         return new HttpClientRequestBuilder(httpMethod, UnpooledByteBufAllocator.DEFAULT, 3);
+    }
+
+    public HttpRequestBuilder withFuture(HttpRequestFuture<String> httpRequestFuture) {
+        this.httpRequestFuture = httpRequestFuture;
+        return this;
     }
 
     @Override
@@ -377,12 +382,11 @@ public class HttpClientRequestBuilder implements HttpRequestBuilder, HttpRequest
         if (httpResponseListener == null) {
             httpResponseListener = httpRequestContext;
         }
-        httpRequestContext = new HttpRequestContext(uri, httpRequest, streamId,
-                new AtomicBoolean(false),
-                new AtomicBoolean(false),
+        httpRequestContext = new HttpRequestContext(uri, httpRequest,
+                httpRequestFuture,
+                streamId,
                 timeout, System.currentTimeMillis(),
                 followRedirect, maxRedirects, new AtomicInteger(0),
-                new CountDownLatch(1),
                 httpResponseListener,
                 exceptionListener,
                 httpHeadersListener,
