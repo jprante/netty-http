@@ -61,11 +61,11 @@ public class HttpClientBuilder implements HttpClientChannelContextDefaults {
 
     private int tcpReceiveBufferSize = DEFAULT_TCP_RECEIVE_BUFFER_SIZE;
 
-    private int maxChunkSize = DEFAULT_MAX_CHUNK_SIZE;
-
     private int maxInitialLineLength = DEFAULT_MAX_INITIAL_LINE_LENGTH;
 
     private int maxHeadersSize = DEFAULT_MAX_HEADERS_SIZE;
+
+    private int maxChunkSize = DEFAULT_MAX_CHUNK_SIZE;
 
     private int maxConnections = DEFAULT_MAX_CONNECTIONS;
 

@@ -16,6 +16,7 @@
 package org.xbib.netty.http.client.handler;
 
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandler;
 import io.netty.handler.ssl.ApplicationProtocolNames;
@@ -45,18 +46,17 @@ class Http2NegotiationHandler extends ApplicationProtocolNegotiationHandler {
 
     @Override
     protected void configurePipeline(ChannelHandlerContext ctx, String protocol) throws Exception {
+        ChannelPipeline pipeline = ctx.pipeline();
         if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
-            HttpToHttp2ConnectionHandler http2connectionHandler = createHttp2ConnectionHandler(initializer.getContext());
-            ctx.pipeline().addLast(http2connectionHandler);
-            configureHttp2Pipeline(ctx.pipeline(), initializer.getHttp2ResponseHandler());
-            logger.log(Level.FINE, () -> "negotiated HTTP/2: handler = " + ctx.pipeline().names());
+            pipeline.addLast(createHttp2ConnectionHandler(initializer.getContext()));
+            configureHttp2Pipeline(pipeline, initializer.getHttp2ResponseHandler());
+            logger.log(Level.FINE, () -> "negotiated HTTP/2: handler = " + pipeline.names());
             return;
         }
         if (ApplicationProtocolNames.HTTP_1_1.equals(protocol)) {
-            HttpClientCodec http1connectionHandler = createHttp1ConnectionHandler(initializer.getContext());
-            ctx.pipeline().addLast(http1connectionHandler);
-            configureHttp1Pipeline(ctx.pipeline(), initializer.getContext(), initializer.getHttpHandler());
-            logger.log(Level.FINE, () -> "negotiated HTTP/1.1: handler = " + ctx.pipeline().names());
+            pipeline.addLast(createHttp1ConnectionHandler(initializer.getContext()));
+            configureHttp1Pipeline(pipeline, initializer.getContext(), initializer.getHttpHandler());
+            logger.log(Level.FINE, () -> "negotiated HTTP/1.1: handler = " + pipeline.names());
             return;
         }
         ctx.close();
