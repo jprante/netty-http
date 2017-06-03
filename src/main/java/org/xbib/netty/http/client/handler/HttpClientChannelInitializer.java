@@ -26,9 +26,10 @@ import io.netty.handler.codec.http2.DefaultHttp2Connection;
 import io.netty.handler.codec.http2.DelegatingDecompressorFrameListener;
 import io.netty.handler.codec.http2.Http2ClientUpgradeCodec;
 import io.netty.handler.codec.http2.Http2Connection;
+import io.netty.handler.codec.http2.Http2ConnectionHandler;
+import io.netty.handler.codec.http2.Http2ConnectionHandlerBuilder;
 import io.netty.handler.codec.http2.Http2FrameLogger;
-import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandler;
-import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder;
+import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ApplicationProtocolNames;
@@ -134,7 +135,7 @@ public class HttpClientChannelInitializer extends ChannelInitializer<SocketChann
             pipeline.addLast(http1connectionHandler);
             configureHttp1Pipeline(pipeline, context, httpHandler);
         } else if (key.getVersion().majorVersion() == 2) {
-            HttpToHttp2ConnectionHandler http2connectionHandler = createHttp2ConnectionHandler(context);
+            Http2ConnectionHandler http2connectionHandler = createHttp2ConnectionHandler(context);
             // using the upgrade handler means mixed HTTP 1 and HTTP 2 on the same connection
             if (context.isInstallHttp2Upgrade()) {
                 HttpClientCodec http1connectionHandler = createHttp1ConnectionHandler(context);
@@ -220,11 +221,13 @@ public class HttpClientChannelInitializer extends ChannelInitializer<SocketChann
         return new HttpClientCodec(context.getMaxInitialLineLength(), context.getMaxHeaderSize(), context.getMaxChunkSize());
     }
 
-    static HttpToHttp2ConnectionHandler createHttp2ConnectionHandler(HttpClientChannelContext context) {
+    static Http2ConnectionHandler createHttp2ConnectionHandler(HttpClientChannelContext context) {
         final Http2Connection http2Connection = new DefaultHttp2Connection(false);
-        return new HttpToHttp2ConnectionHandlerBuilder()
+        return new Http2ConnectionHandlerBuilder()
                 .connection(http2Connection)
                 .frameLogger(new Http2FrameLogger(LogLevel.TRACE, HttpClientChannelInitializer.class))
+                .initialSettings(new Http2Settings())
+                .encoderEnforceMaxConcurrentStreams(true)
                 .frameListener(new DelegatingDecompressorFrameListener(http2Connection,
                         new Http2EventHandler(http2Connection, context.getMaxContentLength(), false)))
                 .build();
