@@ -1,12 +1,15 @@
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 
 plugins {
-    id "org.sonarqube" version "2.2"
-    id "org.xbib.gradle.plugin.asciidoctor" version "1.5.4.1.0"
-    id "io.codearte.nexus-staging" version "0.7.0"
+    id "org.sonarqube" version "2.6.1"
+    id "io.codearte.nexus-staging" version "0.11.0"
+    id "org.xbib.gradle.plugin.asciidoctor" version "1.6.0.0"
 }
 
-printf "Host: %s\nOS: %s %s %s\nJVM: %s %s %s %s\nGroovy: %s\nGradle: %s\n" +
+printf "Date: %s\nHost: %s\nOS: %s %s %s\nJVM: %s %s %s %s\nGradle: %s Groovy: %s Java: %s\n" +
         "Build: group: ${project.group} name: ${project.name} version: ${project.version}\n",
+        ZonedDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME),
         InetAddress.getLocalHost(),
         System.getProperty("os.name"),
         System.getProperty("os.arch"),
@@ -15,23 +18,14 @@ printf "Host: %s\nOS: %s %s %s\nJVM: %s %s %s %s\nGroovy: %s\nGradle: %s\n" +
         System.getProperty("java.vm.version"),
         System.getProperty("java.vm.vendor"),
         System.getProperty("java.vm.name"),
-        GroovySystem.getVersion(),
-        gradle.gradleVersion
+        gradle.gradleVersion, GroovySystem.getVersion(), JavaVersion.current()
 
 apply plugin: 'java'
 apply plugin: 'maven'
 apply plugin: 'signing'
-apply plugin: 'findbugs'
-apply plugin: 'pmd'
-apply plugin: 'checkstyle'
-apply plugin: "jacoco"
-apply plugin: 'org.xbib.gradle.plugin.asciidoctor'
 apply plugin: "io.codearte.nexus-staging"
+apply plugin: 'org.xbib.gradle.plugin.asciidoctor'
 
-
-repositories {
-    mavenCentral()
-}
 
 configurations {
     alpnagent
@@ -43,9 +37,11 @@ dependencies {
     compile "io.netty:netty-codec-http2:${project.property('netty.version')}"
     compile "io.netty:netty-handler-proxy:${project.property('netty.version')}"
     compile "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
-    alpnagent "org.mortbay.jetty.alpn:jetty-alpn-agent:${project.property('alpnagent.version')}"
+    compile "org.xbib:net-url:${project.property('xbib-net-url.version')}"
     testCompile "junit:junit:${project.property('junit.version')}"
-    asciidoclet "org.asciidoctor:asciidoclet:${project.property('asciidoclet.version')}"
+    testCompile "com.fasterxml.jackson.core:jackson-databind:${project.property('jackson.version')}"
+    alpnagent "org.mortbay.jetty.alpn:jetty-alpn-agent:${project.property('alpnagent.version')}"
+    asciidoclet "org.xbib:asciidoclet:${project.property('asciidoclet.version')}"
     wagon "org.apache.maven.wagon:wagon-ssh:${project.property('wagon.version')}"
 }
 
@@ -54,7 +50,7 @@ targetCompatibility = JavaVersion.VERSION_1_8
 
 [compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
 tasks.withType(JavaCompile) {
-    options.compilerArgs << "-Xlint:all"
+    options.compilerArgs << "-Xlint:all,-serial"
 }
 
 jar {
@@ -64,7 +60,9 @@ jar {
 }
 
 test {
-    jvmArgs "-javaagent:" + configurations.alpnagent.asPath
+    if (JavaVersion.current() == JavaVersion.VERSION_1_8) {
+        jvmArgs "-javaagent:" + configurations.alpnagent.asPath
+    }
     testLogging {
         showStandardStreams = false
         exceptionFormat = 'full'
@@ -72,18 +70,20 @@ test {
 }
 
 asciidoctor {
-    backends 'html5'
-    separateOutputDirs = false
-    attributes 'source-highlighter': 'coderay',
-            toc                 : '',
-            idprefix            : '',
-            idseparator         : '-',
-            stylesheet: "${projectDir}/src/docs/asciidoc/css/foundation.css"
+    attributes toc: 'left',
+            doctype: 'book',
+            icons: 'font',
+            encoding: 'utf-8',
+            sectlink: true,
+            sectanchors: true,
+            linkattrs: true,
+            imagesdir: 'img',
+            'source-highlighter': 'coderay'
 }
 
 javadoc {
     options.docletpath = configurations.asciidoclet.files.asType(List)
-    options.doclet = 'org.asciidoctor.Asciidoclet'
+    options.doclet = "org.xbib.asciidoclet.Asciidoclet"
     options.overview = "src/docs/asciidoclet/overview.adoc"
     options.addStringOption "-base-dir", "${projectDir}"
     options.addStringOption "-attribute",
@@ -117,4 +117,3 @@ if (project.hasProperty('signing.keyId')) {
 
 apply from: 'gradle/ext.gradle'
 apply from: 'gradle/publish.gradle'
-apply from: 'gradle/sonarqube.gradle'

@@ -1,36 +1,21 @@
-/*
- * Copyright 2017 Jörg Prante
- *
- * Jörg Prante licenses this file to you under the Apache License,
- * version 2.0 (the "License"); you may not use this file except in compliance
- * with the License. You may obtain a copy of the License at:
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations
- * under the License.
- */
-package org.xbib.netty.http.client.internal;
+package org.xbib.netty.http.client;
 
 import io.netty.bootstrap.Bootstrap;
-import org.xbib.netty.http.client.HttpClient;
 
 import java.util.Optional;
 
 /**
+ * HTTP client user agent.
  */
-public final class HttpClientUserAgent {
+public final class UserAgent {
 
     /**
-     * The default valut for {@code User-Agent}.
+     * The default value for {@code User-Agent}.
      */
     private static final String USER_AGENT = String.format("XbibHttpClient/%s (Java/%s/%s) (Netty/%s)",
             httpClientVersion(), javaVendor(), javaVersion(), nettyVersion());
 
-    private HttpClientUserAgent() {
+    private UserAgent() {
     }
 
     public static String getUserAgent() {
@@ -38,7 +23,7 @@ public final class HttpClientUserAgent {
     }
 
     private static String httpClientVersion() {
-        return Optional.ofNullable(HttpClient.class.getPackage().getImplementationVersion())
+        return Optional.ofNullable(UserAgent.class.getPackage().getImplementationVersion())
                 .orElse("unknown");
     }
 

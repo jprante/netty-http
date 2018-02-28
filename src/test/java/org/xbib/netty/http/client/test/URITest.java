@@ -1,9 +1,8 @@
 package org.xbib.netty.http.client.test;
 
-import io.netty.handler.codec.http.HttpMethod;
 import org.junit.Test;
-import org.xbib.netty.http.client.HttpClientRequestBuilder;
-import org.xbib.netty.http.client.HttpRequestBuilder;
+import org.xbib.netty.http.client.Request;
+import org.xbib.netty.http.client.RequestBuilder;
 
 import java.net.URI;
 
@@ -24,15 +23,15 @@ public class URITest {
     }
 
     @Test
-    public void testClientRequestURIs() {
-        HttpRequestBuilder httpRequestBuilder = HttpClientRequestBuilder.builder(HttpMethod.GET);
+    public void testRequestURIs() {
+        RequestBuilder httpRequestBuilder = Request.get();
         httpRequestBuilder.setURL("https://localhost").path("/path");
-        assertEquals("/path", httpRequestBuilder.build().uri());
+        assertEquals("/path", httpRequestBuilder.build().relativeUri());
         httpRequestBuilder.path("/foobar");
-        assertEquals("/foobar", httpRequestBuilder.build().uri());
+        assertEquals("/foobar", httpRequestBuilder.build().relativeUri());
         httpRequestBuilder.path("/path1?a=b");
-        assertEquals("/path1?a=b", httpRequestBuilder.build().uri());
+        assertEquals("/path1?a=b", httpRequestBuilder.build().relativeUri());
         httpRequestBuilder.path("/path2?c=d");
-        assertEquals("/path2?c=d", httpRequestBuilder.build().uri());
+        assertEquals("/path2?c=d", httpRequestBuilder.build().relativeUri());
     }
 }

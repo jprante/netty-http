@@ -1,39 +1,21 @@
 package org.xbib.netty.http.client.test;
 
 import org.junit.Test;
-import org.xbib.netty.http.client.HttpClient;
+import org.xbib.netty.http.client.Client;
+import org.xbib.netty.http.client.Request;
 
 import java.nio.charset.StandardCharsets;
-import java.util.logging.ConsoleHandler;
-import java.util.logging.Handler;
 import java.util.logging.Level;
-import java.util.logging.LogManager;
 import java.util.logging.Logger;
-import java.util.logging.SimpleFormatter;
 
 /**
  */
-public class HttpBinTest {
+public class HttpBinTest extends LoggingBase {
 
-    static {
-        System.setProperty("java.util.logging.SimpleFormatter.format",
-                "%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS.%1$tL %4$-7s [%3$s] %2$s %5$s %6$s%n");
-        LogManager.getLogManager().reset();
-        Logger rootLogger = LogManager.getLogManager().getLogger("");
-        Handler handler = new ConsoleHandler();
-        handler.setFormatter(new SimpleFormatter());
-        rootLogger.addHandler(handler);
-        rootLogger.setLevel(Level.ALL);
-        for (Handler h : rootLogger.getHandlers()) {
-            handler.setFormatter(new SimpleFormatter());
-            h.setLevel(Level.ALL);
-        }
-    }
-
-    private static final Logger logger = Logger.getLogger("");
+    private static final Logger logger = Logger.getLogger(HttpBinTest.class.getName());
 
     /**
-     * Test httpbin.org cookie setter with HTTP/1.1.
+     * Test httpbin.org "Set-Cookie:" header after redirection of URL.
      *
      * The reponse body should be
      * <pre>
@@ -46,21 +28,22 @@ public class HttpBinTest {
      * @throws Exception
      */
     @Test
-    public void testHttpBinCookies() throws Exception {
-        HttpClient httpClient = HttpClient.builder()
-                .build();
-        httpClient.prepareGet()
-                .setURL("http://httpbin.org/cookies/set?name=value")
-                .onException(e -> logger.log(Level.SEVERE, e.getMessage(), e))
-                .onCookie(cookie -> logger.log(Level.INFO, cookie.toString()))
-                .onHeaders(headers -> logger.log(Level.INFO, headers.toString()))
-                .onResponse(fullHttpResponse -> {
-                    String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-                    logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
-                })
-                .execute()
-                .get();
-        httpClient.close();
+    public void testHttpBinCookies() {
+        Client client = new Client();
+        try {
+            Request request = Request.get()
+                    .setURL("http://httpbin.org/cookies/set?name=value")
+                    .build()
+                    .setExceptionListener(e -> logger.log(Level.SEVERE, e.getMessage(), e))
+                    .setCookieListener(cookie -> logger.log(Level.INFO, "this is the cookie " + cookie.toString()))
+                    .setHeadersListener(headers -> logger.log(Level.INFO, headers.toString()))
+                    .setResponseListener(fullHttpResponse -> {
+                        String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
+                        logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
+                    });
+            client.execute(request).get();
+        } finally {
+            client.shutdownGracefully();
+        }
     }
-
 }
