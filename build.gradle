@@ -34,10 +34,11 @@ configurations {
 }
 
 dependencies {
+    compile "org.xbib:net-url:${project.property('xbib-net-url.version')}"
     compile "io.netty:netty-codec-http2:${project.property('netty.version')}"
     compile "io.netty:netty-handler-proxy:${project.property('netty.version')}"
-    compile "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
-    compile "org.xbib:net-url:${project.property('xbib-net-url.version')}"
+    testCompile "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
+    testCompile "org.conscrypt:conscrypt-openjdk-uber:${project.property('conscrypt.version')}"
     testCompile "junit:junit:${project.property('junit.version')}"
     testCompile "com.fasterxml.jackson.core:jackson-databind:${project.property('jackson.version')}"
     alpnagent "org.mortbay.jetty.alpn:jetty-alpn-agent:${project.property('alpnagent.version')}"

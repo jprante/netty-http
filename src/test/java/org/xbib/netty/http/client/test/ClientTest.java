@@ -1,7 +1,6 @@
 package org.xbib.netty.http.client.test;
 
 import io.netty.handler.codec.http.HttpMethod;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.HttpAddress;
@@ -17,7 +16,6 @@ public class ClientTest {
     private static final Logger logger = Logger.getLogger(ClientTest.class.getName());
 
     @Test
-    @Ignore
     public void testHttp1() throws Exception {
         Client client = new Client();
         try {
@@ -37,7 +35,6 @@ public class ClientTest {
     }
 
     @Test
-    @Ignore
     public void testHttp1ParallelRequests() {
         Client client = new Client();
         try {
@@ -65,7 +62,6 @@ public class ClientTest {
     }
 
     @Test
-    @Ignore
     public void testHttp2() throws Exception {
         String host = "webtide.com";
         Client client = new Client();
@@ -74,11 +70,12 @@ public class ClientTest {
             Transport transport = client.newTransport(HttpAddress.http2(host));
             transport.setResponseListener(msg -> logger.log(Level.INFO, "got response: " +
                     msg.headers().entries() +
-                    msg.content().toString(StandardCharsets.UTF_8) +
+                    //msg.content().toString(StandardCharsets.UTF_8) +
                     " status=" + msg.status().code()));
             transport.setPushListener((hdrs, msg) -> logger.log(Level.INFO, "got push: " +
                     msg.headers().entries() +
-                    msg.content().toString(StandardCharsets.UTF_8)));
+                    //msg.content().toString(StandardCharsets.UTF_8) +
+                    " status=" + msg.status().code()));
             transport.connect();
             transport.awaitSettings();
             simpleRequest(transport);
@@ -115,7 +112,6 @@ public class ClientTest {
     }
 
     @Test
-    @Ignore
     public void testHttp2TwoRequestsOnSameConnection() {
         Client client = new Client();
         try {
@@ -151,9 +147,8 @@ public class ClientTest {
     }
 
     @Test
-    @Ignore
-    public void testMixed() throws Exception {
-        Client client = new Client();
+    public void testTwoTransports() throws Exception {
+        Client client = Client.builder().enableDebug().build();
         try {
             Transport transport = client.newTransport(HttpAddress.http1("xbib.org"));
             transport.setResponseListener(msg -> logger.log(Level.INFO, "got response: " +
@@ -178,7 +173,9 @@ public class ClientTest {
     }
 
     private void simpleRequest(Transport transport) {
-        transport.execute(Request.builder(HttpMethod.GET).setURL(transport.httpAddress().base()).build());
+        transport.execute(Request.builder(HttpMethod.GET)
+                .setVersion(transport.httpAddress().getVersion())
+                .setURL(transport.httpAddress().base()).build());
     }
 
 }

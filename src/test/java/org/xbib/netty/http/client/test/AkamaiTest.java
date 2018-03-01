@@ -16,12 +16,15 @@ public class AkamaiTest extends LoggingBase {
     private static final Logger logger = Logger.getLogger("");
 
     /**
+     * h2_demo_frame.html fails with:
      * 2018-02-27 23:43:32.048 INFORMATION [client] io.netty.handler.codec.http2.Http2FrameLogger
      * logRstStream [id: 0x4fe29f1e, L:/192.168.178.23:49429 - R:http2.akamai.com/104.94.191.203:443]
      * INBOUND RST_STREAM: streamId=2 errorCode=8
      * 2018-02-27 23:43:32.049 SCHWERWIEGEND [] org.xbib.netty.http.client.test.a.AkamaiTest lambda$testAkamaiHttps$0
      * HTTP/2 to HTTP layer caught stream reset
      * io.netty.handler.codec.http2.Http2Exception$StreamException: HTTP/2 to HTTP layer caught stream reset
+     *
+     * TODO(jprante) catch all promised pushes
      */
     @Test
     public void testAkamaiHttps() {

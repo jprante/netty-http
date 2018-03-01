@@ -17,7 +17,6 @@ import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslHandler;
-import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import org.xbib.netty.http.client.ClientConfig;
@@ -62,28 +61,31 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
     @Override
     protected void initChannel(SocketChannel ch) {
         DefaultHttp2Connection http2Connection = new DefaultHttp2Connection(false);
-        Http2FrameLogger frameLogger = new Http2FrameLogger(LogLevel.INFO, "client");
-        Http2ConnectionHandler http2ConnectionHandler = new HttpToHttp2ConnectionHandlerBuilder()
+        HttpToHttp2ConnectionHandlerBuilder http2ConnectionHandlerBuilder = new HttpToHttp2ConnectionHandlerBuilder()
                 .connection(http2Connection)
-                .frameLogger(frameLogger)
                 .frameListener(new DelegatingDecompressorFrameListener(http2Connection,
                         new InboundHttp2ToHttpAdapterBuilder(http2Connection)
                                 .maxContentLength(clientConfig.getMaxContentLength())
                                 .propagateSettings(true)
-                                .build()))
-                .build();
-
+                                .build()));
+        if (clientConfig.isDebug()) {
+            http2ConnectionHandlerBuilder.frameLogger(new Http2FrameLogger(LogLevel.INFO, "client"));
+        }
+        Http2ConnectionHandler http2ConnectionHandler = http2ConnectionHandlerBuilder.build();
         try {
-            SslContext sslContext = SslContextBuilder.forClient()
-                    .sslProvider(SslProvider.JDK)
+            SslContextBuilder sslContextBuilder = SslContextBuilder.forClient()
+                    .sslProvider(clientConfig.getSslProvider())
                     .trustManager(InsecureTrustManagerFactory.INSTANCE)
                     .ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE)
                     .applicationProtocolConfig(new ApplicationProtocolConfig(
                             ApplicationProtocolConfig.Protocol.ALPN,
                             ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
                             ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
-                            ApplicationProtocolNames.HTTP_2))
-                    .build();
+                            ApplicationProtocolNames.HTTP_2));
+            if (clientConfig.getSslContextProvider() != null) {
+                sslContextBuilder.sslContextProvider(clientConfig.getSslContextProvider());
+            }
+            SslContext sslContext = sslContextBuilder.build();
             SslHandler sslHandler = sslContext.newHandler(ch.alloc());
             SSLEngine engine = sslHandler.engine();
             if (clientConfig.isServerNameIdentification()) {

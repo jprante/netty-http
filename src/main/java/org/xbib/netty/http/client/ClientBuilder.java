@@ -9,6 +9,7 @@ import io.netty.handler.ssl.SslProvider;
 
 import javax.net.ssl.TrustManagerFactory;
 import java.io.InputStream;
+import java.security.Provider;
 
 public class ClientBuilder {
 
@@ -22,6 +23,16 @@ public class ClientBuilder {
 
     public ClientBuilder() {
         this.clientConfig = new ClientConfig();
+    }
+
+    public ClientBuilder enableDebug() {
+        clientConfig.enableDebug();
+        return this;
+    }
+
+    public ClientBuilder disableDebug() {
+        clientConfig.disableDebug();
+        return this;
     }
 
     /**
@@ -104,11 +115,6 @@ public class ClientBuilder {
         return this;
     }
 
-    public ClientBuilder setMaxConnections(int maxConnections) {
-        clientConfig.setMaxConnections(maxConnections);
-        return this;
-    }
-
     public ClientBuilder setReadTimeoutMillis(int readTimeoutMillis) {
         clientConfig.setReadTimeoutMillis(readTimeoutMillis);
         return this;
@@ -131,6 +137,11 @@ public class ClientBuilder {
 
     public ClientBuilder setOpenSSLSslProvider() {
         clientConfig.setOpenSSLSslProvider();
+        return this;
+    }
+
+    public ClientBuilder setSslContextProvider(Provider provider) {
+        clientConfig.setSslContextProvider(provider);
         return this;
     }
 

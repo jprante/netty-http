@@ -6,8 +6,10 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http.HttpContentDecompressor;
 import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.handler.stream.ChunkedWriteHandler;
 import org.xbib.netty.http.client.ClientConfig;
 import org.xbib.netty.http.client.HttpAddress;
 import org.xbib.netty.http.client.handler.TrafficLoggingHandler;
@@ -34,7 +36,9 @@ public class HttpChannelInitializer extends ChannelInitializer<SocketChannel> {
 
     @Override
     protected void initChannel(SocketChannel ch) {
-        ch.pipeline().addLast(new TrafficLoggingHandler());
+        if (clientConfig.isDebug()) {
+            ch.pipeline().addLast(new TrafficLoggingHandler());
+        }
         if (httpAddress.isSecure()) {
             configureEncryptedHttp1(ch);
         } else {
@@ -47,11 +51,13 @@ public class HttpChannelInitializer extends ChannelInitializer<SocketChannel> {
         try {
             SslContextBuilder sslContextBuilder = SslContextBuilder.forClient()
                     .sslProvider(clientConfig.getSslProvider())
+                    .sslContextProvider(clientConfig.getSslContextProvider())
                     .keyManager(clientConfig.getKeyCertChainInputStream(), clientConfig.getKeyInputStream(),
                             clientConfig.getKeyPassword())
                     .ciphers(clientConfig.getCiphers(), clientConfig.getCipherSuiteFilter())
                     .trustManager(clientConfig.getTrustManagerFactory());
-            SslHandler sslHandler = sslContextBuilder.build().newHandler(ch.alloc());
+            SslContext sslContext = sslContextBuilder.build();
+            SslHandler sslHandler = sslContext.newHandler(ch.alloc());
             SSLEngine engine = sslHandler.engine();
             if (clientConfig.isServerNameIdentification()) {
                 String fullQualifiedHostname = httpAddress.getInetSocketAddress().getHostName();
@@ -87,6 +93,10 @@ public class HttpChannelInitializer extends ChannelInitializer<SocketChannel> {
                 false);
         httpObjectAggregator.setMaxCumulationBufferComponents(clientConfig.getMaxCompositeBufferComponents());
         pipeline.addLast(httpObjectAggregator);
+        /*if (clientConfig.isEnableGzip()) {
+            pipeline.addLast(new HttpChunkContentCompressor(6));
+        }
+        pipeline.addLast(new ChunkedWriteHandler());*/
         pipeline.addLast(httpResponseHandler);
     }
 }

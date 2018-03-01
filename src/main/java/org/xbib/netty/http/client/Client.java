@@ -100,6 +100,10 @@ public final class Client {
         return new ClientBuilder();
     }
 
+    public ClientConfig getClientConfig() {
+        return clientConfig;
+    }
+
     public ByteBufAllocator getByteBufAllocator() {
         return byteBufAllocator;
     }
@@ -145,6 +149,17 @@ public final class Client {
                 .connect(httpAddress.getInetSocketAddress()).sync().await().channel();
     }
 
+    public Transport execute(Request request) {
+        Transport nextTransport = newTransport(HttpAddress.of(request));
+        nextTransport.execute(request);
+        return nextTransport;
+    }
+
+    public <T> CompletableFuture<T> execute(Request request,
+                                            Function<FullHttpResponse, T> supplier) {
+        return newTransport(HttpAddress.of(request)).execute(request, supplier);
+    }
+
     /**
      * For following redirects by a chain of transports.
      * @param transport the previous transport
@@ -163,16 +178,6 @@ public final class Client {
         close(nextTransport);
     }
 
-    public Transport execute(Request request) {
-        Transport nextTransport = newTransport(HttpAddress.of(request));
-        nextTransport.execute(request);
-        return nextTransport;
-    }
-
-    public <T> CompletableFuture<T> execute(Request request,
-                                            Function<FullHttpResponse, T> supplier) {
-        return newTransport(HttpAddress.of(request)).execute(request, supplier);
-    }
 
     public Transport prepareRequest(Request request) {
         return newTransport(HttpAddress.of(request));

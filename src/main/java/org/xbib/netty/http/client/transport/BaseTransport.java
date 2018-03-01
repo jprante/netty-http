@@ -107,6 +107,7 @@ abstract class BaseTransport implements Transport {
                 new DefaultFullHttpRequest(request.httpVersion(), request.httpMethod(), uri) :
                 new DefaultFullHttpRequest(request.httpVersion(), request.httpMethod(), uri,
                         request.content());
+        logger.log(Level.INFO, fullHttpRequest.toString());
         Integer streamId = nextStream();
         if (streamId != null) {
             request.headers().add(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), Integer.toString(streamId));

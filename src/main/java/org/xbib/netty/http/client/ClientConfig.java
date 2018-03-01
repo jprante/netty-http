@@ -10,10 +10,16 @@ import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 
 import javax.net.ssl.TrustManagerFactory;
 import java.io.InputStream;
+import java.security.Provider;
 
 public class ClientConfig {
 
     interface Defaults {
+
+        /**
+         * If frame logging /traffic logging is enabled or not.
+         */
+        boolean DEBUG = false;
 
         /**
          * Default for thread count.
@@ -75,12 +81,6 @@ public class ClientConfig {
         int MAX_COMPOSITE_BUFFER_COMPONENTS = 1024;
 
         /**
-         * Allow maximum concurrent connections.
-         * Usually, browsers restrict concurrent connections to 8 for a single address.
-         */
-        int MAX_CONNECTIONS = 8;
-
-        /**
          * Default read/write timeout in milliseconds.
          */
         int TIMEOUT_MILLIS = 5000;
@@ -93,11 +93,15 @@ public class ClientConfig {
         /**
          * Default SSL provider.
          */
-        SslProvider SSL_PROVIDER = OpenSsl.isAvailable() && OpenSsl.isAlpnSupported() ?
-                SslProvider.OPENSSL : SslProvider.JDK;
+        SslProvider SSL_PROVIDER = SslProvider.JDK;
 
         /**
-         * Default ciphers.
+         * Default SSL context provider (for JDK SSL only).
+         */
+        Provider SSL_CONTEXT_PROVIDER = null;
+
+        /**
+         * Default ciphers. We care about HTTP/2.
          */
         Iterable<String> CIPHERS = Http2SecurityUtil.CIPHERS;
 
@@ -119,6 +123,7 @@ public class ClientConfig {
         ClientAuthMode SSL_CLIENT_AUTH_MODE = ClientAuthMode.NONE;
     }
 
+    private boolean debug = Defaults.DEBUG;
 
     /**
      * If set to 0, then Netty will decide about thread count.
@@ -142,8 +147,6 @@ public class ClientConfig {
 
     private int maxChunkSize = Defaults.MAX_CHUNK_SIZE;
 
-    private int maxConnections = Defaults.MAX_CONNECTIONS;
-
     private int maxContentLength = Defaults.MAX_CONTENT_LENGTH;
 
     private int maxCompositeBufferComponents = Defaults.MAX_COMPOSITE_BUFFER_COMPONENTS;
@@ -155,6 +158,8 @@ public class ClientConfig {
     private boolean enableGzip = Defaults.ENABLE_GZIP;
 
     private SslProvider sslProvider = Defaults.SSL_PROVIDER;
+
+    private Provider sslContextProvider = Defaults.SSL_CONTEXT_PROVIDER;
 
     private Iterable<String> ciphers = Defaults.CIPHERS;
 
@@ -173,6 +178,25 @@ public class ClientConfig {
     private String keyPassword;
 
     private HttpProxyHandler httpProxyHandler;
+
+    public ClientConfig setDebug(boolean debug) {
+        this.debug = debug;
+        return this;
+    }
+
+    public ClientConfig enableDebug() {
+        this.debug = true;
+        return this;
+    }
+
+    public ClientConfig disableDebug() {
+        this.debug = false;
+        return this;
+    }
+
+    public boolean isDebug() {
+        return debug;
+    }
 
     public ClientConfig setThreadCount(int threadCount) {
         this.threadCount = threadCount;
@@ -255,15 +279,6 @@ public class ClientConfig {
         return maxChunkSize;
     }
 
-    public ClientConfig setMaxConnections(int maxConnections) {
-        this.maxConnections = maxConnections;
-        return this;
-    }
-
-    public int getMaxConnections() {
-        return maxConnections;
-    }
-
     public ClientConfig setMaxContentLength(int maxContentLength) {
         this.maxContentLength = maxContentLength;
         return this;
@@ -326,6 +341,15 @@ public class ClientConfig {
     public ClientConfig setOpenSSLSslProvider() {
         this.sslProvider = SslProvider.OPENSSL;
         return this;
+    }
+
+    public ClientConfig setSslContextProvider(Provider sslContextProvider) {
+        this.sslContextProvider = sslContextProvider;
+        return this;
+    }
+
+    public Provider getSslContextProvider() {
+        return sslContextProvider;
     }
 
     public ClientConfig setCiphers(Iterable<String> ciphers) {
@@ -406,5 +430,15 @@ public class ClientConfig {
 
     public HttpProxyHandler getHttpProxyHandler() {
         return httpProxyHandler;
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("SSL=").append(sslProvider)
+                .append(",SSL context provider=").append(sslContextProvider != null ? sslContextProvider.getName() : "<none>");
+        return sb.toString();
+
+
     }
 }
