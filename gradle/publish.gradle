@@ -1,5 +1,6 @@
 
 task xbibUpload(type: Upload) {
+    group = 'publish'
     configuration = configurations.archives
     uploadDescriptor = true
     repositories {
@@ -15,6 +16,7 @@ task xbibUpload(type: Upload) {
 }
 
 task sonaTypeUpload(type: Upload) {
+    group = 'publish'
     configuration = configurations.archives
     uploadDescriptor = true
     repositories {

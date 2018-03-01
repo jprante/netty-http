@@ -100,6 +100,10 @@ public final class Client {
         return new ClientBuilder();
     }
 
+    public ByteBufAllocator getByteBufAllocator() {
+        return byteBufAllocator;
+    }
+
     public void setTransportListener(TransportListener transportListener) {
         this.transportListener = transportListener;
     }
