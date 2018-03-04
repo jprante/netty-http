@@ -6,6 +6,7 @@ import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.client.transport.Transport;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,17 +22,16 @@ public class ElasticsearchTest extends LoggingBase {
     private static final Logger logger = Logger.getLogger(ElasticsearchTest.class.getName());
 
     @Test
-    public void testElasticsearchCreateDocument() {
+    public void testElasticsearchCreateDocument() throws IOException {
         Client client = new Client();
         try {
-            Request request = Request.put().setURL("http://localhost:9200/test/test/1")
+            Request request = Request.put().url("http://localhost:9200/test/test/1")
                     .json("{\"text\":\"Hello World\"}")
                     .build()
                     .setResponseListener(fullHttpResponse -> {
                         String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
                         logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
-                    })
-                    .setExceptionListener(e -> logger.log(Level.SEVERE, e.getMessage(), e));
+                    });
             client.execute(request);
         } finally {
             client.shutdownGracefully();
@@ -39,17 +39,16 @@ public class ElasticsearchTest extends LoggingBase {
     }
 
     @Test
-    public void testElasticsearchMatchQuery() {
+    public void testElasticsearchMatchQuery() throws IOException {
         Client client = new Client();
         try {
-            Request request = Request.post().setURL("http://localhost:9200/test/_search")
+            Request request = Request.post().url("http://localhost:9200/test/_search")
                     .json("{\"query\":{\"match\":{\"text\":\"Hello World\"}}}")
                     .build()
                     .setResponseListener(fullHttpResponse -> {
                         String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
                         logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
-                    })
-                    .setExceptionListener(e -> logger.log(Level.SEVERE, e.getMessage(), e));
+                    });
             client.execute(request).get();
         } finally {
             client.shutdownGracefully();
@@ -57,7 +56,7 @@ public class ElasticsearchTest extends LoggingBase {
     }
 
     @Test
-    public void testElasticsearchConcurrent() {
+    public void testElasticsearchConcurrent() throws IOException {
         Client client = Client.builder().setReadTimeoutMillis(20000).build();
         int max = 1000;
         try {
@@ -78,15 +77,14 @@ public class ElasticsearchTest extends LoggingBase {
 
     private Request newRequest() {
         return Request.post()
-                .setURL("http://localhost:9200/test/_search")
+                .url("http://localhost:9200/test/_search")
                 .json("{\"query\":{\"match\":{\"text\":\"Hello World\"}}}")
                 .addHeader("connection", "keep-alive")
                 .build()
                 .setResponseListener(fullHttpResponse ->
                     logger.log(Level.FINE, "status = " + fullHttpResponse.status() +
                             " counter = " + count.incrementAndGet() +
-                            " response body = " + fullHttpResponse.content().toString(StandardCharsets.UTF_8)))
-                .setExceptionListener(e -> logger.log(Level.SEVERE, e.getMessage(), e));
+                            " response body = " + fullHttpResponse.content().toString(StandardCharsets.UTF_8)));
     }
 
     private final AtomicInteger count = new AtomicInteger();

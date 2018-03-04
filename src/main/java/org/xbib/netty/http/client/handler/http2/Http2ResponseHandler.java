@@ -21,11 +21,6 @@ public class Http2ResponseHandler extends SimpleChannelInboundHandler<FullHttpRe
     }
 
     @Override
-    public void channelReadComplete(ChannelHandlerContext ctx)  {
-        // do nothing
-    }
-
-    @Override
     public void channelInactive(ChannelHandlerContext ctx)  {
         ctx.fireChannelInactive();
         Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();

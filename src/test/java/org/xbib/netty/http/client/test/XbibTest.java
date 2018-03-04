@@ -5,8 +5,8 @@ import io.netty.handler.proxy.HttpProxyHandler;
 import org.junit.Test;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.Request;
-import org.xbib.netty.http.client.test.LoggingBase;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
@@ -19,10 +19,10 @@ public class XbibTest extends LoggingBase {
     private static final Logger logger = Logger.getLogger("");
 
     @Test
-    public void testXbibOrgWithDefaults() {
+    public void testXbibOrgWithDefaults() throws IOException {
         Client client = new Client();
         try {
-            Request request = Request.get().setURL("http://xbib.org")
+            Request request = Request.get().url("http://xbib.org")
                     .build()
                     .setResponseListener(fullHttpResponse -> {
                         String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
@@ -35,21 +35,28 @@ public class XbibTest extends LoggingBase {
     }
 
     @Test
-    public void testXbibOrgWithCompletableFuture() {
+    public void testXbibOrgWithCompletableFuture() throws IOException {
         Client httpClient = Client.builder()
                 .setTcpNodelay(true)
                 .build();
         try {
             final Function<FullHttpResponse, String> httpResponseStringFunction =
                     response -> response.content().toString(StandardCharsets.UTF_8);
-            Request request = Request.get().setURL("http://xbib.org")
+            Request request = Request.get().url("http://xbib.org")
                     .build();
             final CompletableFuture<String> completableFuture = httpClient.execute(request, httpResponseStringFunction)
                     .exceptionally(Throwable::getMessage)
-                    .thenCompose(content -> httpClient.execute(Request.post()
-                            .setURL("http://google.de")
-                            .addParam("query", content)
-                            .build(), httpResponseStringFunction));
+                    .thenCompose(content -> {
+                        try {
+                            return httpClient.execute(Request.post()
+                                    .url("http://google.de")
+                                    .addParameter("query", content)
+                                    .build(), httpResponseStringFunction);
+                        } catch (IOException e) {
+                            logger.log(Level.WARNING, e.getMessage(), e);
+                            return null;
+                        }
+                    });
             String result = completableFuture.join();
             logger.info("result = " + result);
         } finally {
@@ -58,7 +65,7 @@ public class XbibTest extends LoggingBase {
     }
 
     @Test
-    public void testXbibOrgWithProxy() {
+    public void testXbibOrgWithProxy() throws IOException {
         Client httpClient = Client.builder()
                 .setHttpProxyHandler(new HttpProxyHandler(new InetSocketAddress("80.241.223.251", 8080)))
                 .setConnectTimeoutMillis(30000)
@@ -66,13 +73,12 @@ public class XbibTest extends LoggingBase {
                 .build();
         try {
             httpClient.execute(Request.get()
-                    .setURL("http://xbib.org")
+                    .url("http://xbib.org")
                     .build()
                     .setResponseListener(fullHttpResponse -> {
                         String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
                         logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
-                    })
-                    .setExceptionListener(e -> logger.log(Level.SEVERE, e.getMessage(), e)))
+                    }))
                     .get();
         } finally {
             httpClient.shutdownGracefully();
@@ -80,19 +86,18 @@ public class XbibTest extends LoggingBase {
     }
 
     @Test
-    public void testXbibOrgWithVeryShortReadTimeout() {
+    public void testXbibOrgWithVeryShortReadTimeout() throws IOException {
         Client httpClient = Client.builder()
                 .setReadTimeoutMillis(50)
                 .build();
         try {
             httpClient.execute(Request.get()
-                    .setURL("http://xbib.org")
+                    .url("http://xbib.org")
                     .build()
                     .setResponseListener(fullHttpResponse -> {
                         String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
                         logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
-                    })
-                    .setExceptionListener(e -> logger.log(Level.SEVERE, e.getMessage(), e)))
+                    }))
                     .get();
         } finally {
             httpClient.shutdownGracefully();
@@ -100,14 +105,13 @@ public class XbibTest extends LoggingBase {
     }
 
     @Test
-    public void testXbibTwoSequentialRequests() {
+    public void testXbibTwoSequentialRequests() throws IOException {
         Client httpClient = new Client();
         try {
             httpClient.execute(Request.get()
                     .setVersion("HTTP/1.1")
-                    .setURL("http://xbib.org")
+                    .url("http://xbib.org")
                     .build()
-                    .setExceptionListener(e -> logger.log(Level.SEVERE, e.getMessage(), e))
                     .setResponseListener(fullHttpResponse -> {
                         String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
                         logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
@@ -116,9 +120,8 @@ public class XbibTest extends LoggingBase {
 
             httpClient.execute(Request.get()
                     .setVersion("HTTP/1.1")
-                    .setURL("http://xbib.org")
+                    .url("http://xbib.org")
                     .build()
-                    .setExceptionListener(e -> logger.log(Level.SEVERE, e.getMessage(), e))
                     .setResponseListener(fullHttpResponse -> {
                         String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
                         logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);

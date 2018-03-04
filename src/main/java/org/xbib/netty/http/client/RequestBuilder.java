@@ -13,6 +13,7 @@ import io.netty.handler.codec.http.QueryStringEncoder;
 import io.netty.handler.codec.http.cookie.Cookie;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.util.AsciiString;
+import org.xbib.net.QueryParameters;
 import org.xbib.net.URL;
 import org.xbib.net.URLSyntaxException;
 
@@ -67,7 +68,9 @@ public class RequestBuilder {
 
     private URL url;
 
-    private QueryStringEncoder queryStringEncoder;
+    private String uri;
+
+    private QueryParameters queryParameters;
 
     private ByteBuf content;
 
@@ -90,6 +93,7 @@ public class RequestBuilder {
         headers = new DefaultHttpHeaders();
         removeHeaders = new ArrayList<>();
         cookies = new HashSet<>();
+        queryParameters = new QueryParameters();
     }
 
     public RequestBuilder setMethod(HttpMethod httpMethod) {
@@ -97,12 +101,12 @@ public class RequestBuilder {
         return this;
     }
 
-    public RequestBuilder setHttp1() {
+    public RequestBuilder enableHttp1() {
         this.httpVersion = HttpVersion.HTTP_1_1;
         return this;
     }
 
-    public RequestBuilder setHttp2() {
+    public RequestBuilder enableHttp2() {
         this.httpVersion = HTTP_2_0;
         return this;
     }
@@ -122,32 +126,27 @@ public class RequestBuilder {
         return this;
     }
 
-    public RequestBuilder setURL(String url) {
-        return setURL(URL.from(url));
-    }
-
-    public RequestBuilder setURL(URL url) {
-        this.url = url;
-        QueryStringDecoder queryStringDecoder = new QueryStringDecoder(URI.create(url.toString()), StandardCharsets.UTF_8);
-        this.queryStringEncoder = new QueryStringEncoder(queryStringDecoder.path());
-        for (Map.Entry<String, List<String>> entry : queryStringDecoder.parameters().entrySet()) {
-            for (String value : entry.getValue()) {
-                queryStringEncoder.addParam(entry.getKey(), value);
-            }
-        }
+    public RequestBuilder remoteAddress(HttpAddress httpAddress) {
+        this.url = URL.builder()
+                .scheme(httpAddress.isSecure() ? "https" : "http")
+                .host(httpAddress.getInetSocketAddress().getHostString())
+                .port(httpAddress.getInetSocketAddress().getPort())
+                .build();
+        this.httpVersion = httpAddress.getVersion();
         return this;
     }
 
-    public RequestBuilder path(String path) {
-        if (this.url != null) {
-            try {
-                setURL(URL.base(url).resolve(path).toString());
-            } catch (URLSyntaxException e) {
-                throw new IllegalArgumentException(e);
-            }
-        } else {
-            setURL(path);
-        }
+    public RequestBuilder url(String url) {
+        return url(URL.from(url));
+    }
+
+    public RequestBuilder url(URL url) {
+        this.url = url;
+        return this;
+    }
+
+    public RequestBuilder uri(String uri) {
+        this.uri = uri;
         return this;
     }
 
@@ -171,9 +170,9 @@ public class RequestBuilder {
         return this;
     }
 
-    public RequestBuilder addParam(String name, String value) {
-        if (queryStringEncoder != null) {
-            queryStringEncoder.addParam(name, value);
+    public RequestBuilder addParameter(String name, String value) {
+        if (queryParameters != null) {
+            queryParameters.add(name, value);
         }
         return this;
     }
@@ -213,11 +212,6 @@ public class RequestBuilder {
         return this;
     }
 
-    public RequestBuilder setContent(ByteBuf byteBuf) {
-        this.content = byteBuf;
-        return this;
-    }
-
     public RequestBuilder text(String text) {
         content(text, HttpHeaderValues.TEXT_PLAIN);
         return this;
@@ -230,6 +224,11 @@ public class RequestBuilder {
 
     public RequestBuilder xml(String xml) {
         content(xml, "application/xml");
+        return this;
+    }
+
+    public RequestBuilder content(ByteBuf byteBuf) {
+        this.content = byteBuf;
         return this;
     }
 
@@ -253,8 +252,38 @@ public class RequestBuilder {
             throw new IllegalStateException("URL not set");
         }
         if (url.getHost() == null) {
-            throw new IllegalStateException("URL host not set: " + url);
+            throw new IllegalStateException("host in URL not defined: " + url);
         }
+        if (uri != null) {
+            if (this.url != null) {
+                try {
+                    url = URL.base(url).resolve(uri);
+                } catch (URLSyntaxException e) {
+                    throw new IllegalArgumentException(e);
+                }
+            } else {
+                url(uri);
+            }
+        }
+        // add explicit parameters to URL
+        queryParameters.forEach(param -> url.getQueryParams().add(param));
+        // let Netty's query string decoder/encoder work over the URL to add paramters given implicitly in url()
+        QueryStringDecoder queryStringDecoder = new QueryStringDecoder(URI.create(url.toString()), StandardCharsets.UTF_8);
+        QueryStringEncoder queryStringEncoder = new QueryStringEncoder(queryStringDecoder.path());
+        for (Map.Entry<String, List<String>> entry : queryStringDecoder.parameters().entrySet()) {
+            for (String value : entry.getValue()) {
+                queryStringEncoder.addParam(entry.getKey(), value);
+            }
+        }
+        // build uri from QueryStringDecoder
+        StringBuilder sb = new StringBuilder();
+        String pathAndQuery = queryStringEncoder.toString();
+        sb.append(pathAndQuery.isEmpty() ? "/" : pathAndQuery);
+        String ref = url.getFragment();
+        if (ref != null && !ref.isEmpty()) {
+            sb.append('#').append(ref);
+        }
+        String uri = sb.toString();
         DefaultHttpHeaders validatedHeaders = new DefaultHttpHeaders(true);
         validatedHeaders.set(headers);
         String scheme = url.getScheme();
@@ -290,21 +319,8 @@ public class RequestBuilder {
         for (String headerName : removeHeaders) {
             validatedHeaders.remove(headerName);
         }
-        // create origin form from query string encoder
-        String uri = toOriginForm();
         return new Request(url, httpVersion, httpMethod, validatedHeaders, cookies, uri, content,
                 timeout, followRedirect, maxRedirects, 0);
-    }
-
-    private String toOriginForm() {
-        StringBuilder sb = new StringBuilder();
-        String pathAndQuery = queryStringEncoder.toString();
-        sb.append(pathAndQuery.isEmpty() ? "/" : pathAndQuery);
-        String ref = url.getFragment();
-        if (ref != null && !ref.isEmpty()) {
-            sb.append('#').append(ref);
-        }
-        return sb.toString();
     }
 
     private void addHeader(AsciiString name, Object value) {

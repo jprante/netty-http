@@ -2,13 +2,14 @@ package org.xbib.netty.http.client;
 
 import io.netty.handler.codec.http.HttpVersion;
 import org.xbib.net.URL;
+import org.xbib.netty.http.client.pool.PoolKey;
 
 import java.net.InetSocketAddress;
 
 /**
  * A handle for host, port, HTTP version, secure transport flag of a channel for HTTP.
  */
-public class HttpAddress {
+public class HttpAddress implements PoolKey {
 
     private static final HttpVersion HTTP_2_0 = HttpVersion.valueOf("HTTP/2.0");
 

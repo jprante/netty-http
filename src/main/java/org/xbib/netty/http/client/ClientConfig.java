@@ -3,14 +3,14 @@ package org.xbib.netty.http.client;
 import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.ssl.CipherSuiteFilter;
-import io.netty.handler.ssl.OpenSsl;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 
 import javax.net.ssl.TrustManagerFactory;
 import java.io.InputStream;
+import java.security.KeyStore;
 import java.security.Provider;
+import java.util.List;
 
 public class ClientConfig {
 
@@ -110,17 +110,26 @@ public class ClientConfig {
          */
         CipherSuiteFilter CIPHER_SUITE_FILTER = SupportedCipherSuiteFilter.INSTANCE;
 
-        /**
-         * Default trust manager factory.
-         */
-        TrustManagerFactory TRUST_MANAGER_FACTORY = InsecureTrustManagerFactory.INSTANCE;
-
         boolean USE_SERVER_NAME_IDENTIFICATION = true;
 
         /**
          * Default for SSL client authentication.
          */
         ClientAuthMode SSL_CLIENT_AUTH_MODE = ClientAuthMode.NONE;
+    }
+
+    private static TrustManagerFactory TRUST_MANAGER_FACTORY;
+
+    static {
+        try {
+            TRUST_MANAGER_FACTORY = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+                    //InsecureTrustManagerFactory.INSTANCE;
+            //TRUST_MANAGER_FACTORY.init((KeyStore) null);
+            // java.lang.IllegalStateException: TrustManagerFactoryImpl is not initialized
+                    //TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+        } catch (Exception e) {
+            TRUST_MANAGER_FACTORY = null;
+        }
     }
 
     private boolean debug = Defaults.DEBUG;
@@ -165,7 +174,9 @@ public class ClientConfig {
 
     private CipherSuiteFilter cipherSuiteFilter = Defaults.CIPHER_SUITE_FILTER;
 
-    private TrustManagerFactory trustManagerFactory = Defaults.TRUST_MANAGER_FACTORY;
+    private TrustManagerFactory trustManagerFactory = TRUST_MANAGER_FACTORY;
+
+    private KeyStore trustManagerKeyStore = null;
 
     private boolean serverNameIdentification = Defaults.USE_SERVER_NAME_IDENTIFICATION;
 
@@ -178,6 +189,12 @@ public class ClientConfig {
     private String keyPassword;
 
     private HttpProxyHandler httpProxyHandler;
+
+    private List<HttpAddress> nodes;
+
+    private Integer nodeConnectionLimit;
+
+    private Integer retriesPerNode;
 
     public ClientConfig setDebug(boolean debug) {
         this.debug = debug;
@@ -370,15 +387,6 @@ public class ClientConfig {
         return cipherSuiteFilter;
     }
 
-    public ClientConfig setTrustManagerFactory(TrustManagerFactory trustManagerFactory) {
-        this.trustManagerFactory = trustManagerFactory;
-        return this;
-    }
-
-    public TrustManagerFactory getTrustManagerFactory() {
-        return trustManagerFactory;
-    }
-
     public ClientConfig setKeyCert(InputStream keyCertChainInputStream, InputStream keyInputStream) {
         this.keyCertChainInputStream = keyCertChainInputStream;
         this.keyInputStream = keyInputStream;
@@ -423,6 +431,24 @@ public class ClientConfig {
         return clientAuthMode;
     }
 
+    public ClientConfig setTrustManagerFactory(TrustManagerFactory trustManagerFactory) {
+        this.trustManagerFactory = trustManagerFactory;
+        return this;
+    }
+
+    public TrustManagerFactory getTrustManagerFactory() {
+        return trustManagerFactory;
+    }
+
+    public ClientConfig setTrustManagerKeyStore(KeyStore trustManagerKeyStore) {
+        this.trustManagerKeyStore = trustManagerKeyStore;
+        return this;
+    }
+
+    public KeyStore getTrustManagerKeyStore() {
+        return trustManagerKeyStore;
+    }
+
     public ClientConfig setHttpProxyHandler(HttpProxyHandler httpProxyHandler) {
         this.httpProxyHandler = httpProxyHandler;
         return this;
@@ -430,6 +456,33 @@ public class ClientConfig {
 
     public HttpProxyHandler getHttpProxyHandler() {
         return httpProxyHandler;
+    }
+
+    public ClientConfig setNodes(List<HttpAddress> nodes) {
+        this.nodes = nodes;
+        return this;
+    }
+
+    public List<HttpAddress> getNodes() {
+        return nodes;
+    }
+
+    public ClientConfig setNodeConnectionLimit(Integer nodeConnectionLimit) {
+        this.nodeConnectionLimit = nodeConnectionLimit;
+        return this;
+    }
+
+    public Integer getNodeConnectionLimit() {
+        return nodeConnectionLimit;
+    }
+
+    public ClientConfig setRetriesPerNode(Integer retriesPerNode) {
+        this.retriesPerNode = retriesPerNode;
+        return this;
+    }
+
+    public Integer getRetriesPerNode() {
+        return retriesPerNode;
     }
 
     @Override

@@ -8,9 +8,7 @@ import io.netty.handler.codec.http.cookie.Cookie;
 
 import org.xbib.net.URL;
 import org.xbib.netty.http.client.listener.CookieListener;
-import org.xbib.netty.http.client.listener.ExceptionListener;
 import org.xbib.netty.http.client.listener.HttpHeadersListener;
-import org.xbib.netty.http.client.listener.HttpPushListener;
 import org.xbib.netty.http.client.listener.HttpResponseListener;
 
 import java.nio.charset.StandardCharsets;
@@ -45,13 +43,9 @@ public class Request {
 
     private HttpResponseListener responseListener;
 
-    private ExceptionListener exceptionListener;
-
     private HttpHeadersListener headersListener;
 
     private CookieListener cookieListener;
-
-    private HttpPushListener pushListener;
 
     Request(URL url, HttpVersion httpVersion, HttpMethod httpMethod,
             HttpHeaders headers, Collection<Cookie> cookies,
@@ -120,12 +114,13 @@ public class Request {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        sb.append("base=").append(base).append(',')
-                .append("version=").append(httpVersion).append(',')
-                .append("method=").append(httpMethod).append(',')
-                .append("relativeUri=").append(uri).append(',')
-                .append("headers=").append(headers).append(',')
-                .append("content=").append(content != null ? content.copy(0,16).toString(StandardCharsets.UTF_8) : "");
+        sb.append("Request[base='").append(base)
+                .append("',version=").append(httpVersion)
+                .append(",method=").append(httpMethod)
+                .append(",uri=").append(uri)
+                .append(",headers=").append(headers.entries())
+                .append(",content=").append(content != null ? content.copy(0,16).toString(StandardCharsets.UTF_8) : "")
+                .append("]");
         return sb.toString();
     }
 
@@ -154,24 +149,6 @@ public class Request {
 
     public HttpResponseListener getResponseListener() {
         return responseListener;
-    }
-
-    public Request setExceptionListener(ExceptionListener exceptionListener) {
-        this.exceptionListener = exceptionListener;
-        return this;
-    }
-
-    public ExceptionListener getExceptionListener() {
-        return exceptionListener;
-    }
-
-    public Request setPushListener(HttpPushListener httpPushListener) {
-        this.pushListener = httpPushListener;
-        return this;
-    }
-
-    public HttpPushListener getPushListener() {
-        return pushListener;
     }
 
     public static RequestBuilder get() {

@@ -6,12 +6,17 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.cookie.ClientCookieDecoder;
 import io.netty.handler.codec.http.cookie.Cookie;
+import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2Settings;
 import org.xbib.net.URLSyntaxException;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.HttpAddress;
 import org.xbib.netty.http.client.Request;
+import org.xbib.netty.http.client.listener.CookieListener;
+import org.xbib.netty.http.client.listener.HttpHeadersListener;
+import org.xbib.netty.http.client.listener.HttpResponseListener;
 
+import java.io.IOException;
 import java.util.SortedMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -58,15 +63,19 @@ public class HttpTransport extends BaseTransport implements Transport {
 
     @Override
     public void responseReceived(Integer streamId, FullHttpResponse fullHttpResponse) {
-        if (responseListener != null) {
-            responseListener.onResponse(fullHttpResponse);
+        Request request = fromStreamId(streamId);
+        if (request != null) {
+            HttpResponseListener responseListener = request.getResponseListener();
+            if (responseListener != null) {
+                responseListener.onResponse(fullHttpResponse);
+            }
         }
         try {
-            Request request = continuation(null, fullHttpResponse);
+            request = continuation(null, fullHttpResponse);
             if (request != null) {
                 client.continuation(this, request);
             }
-        } catch (URLSyntaxException e) {
+        } catch (URLSyntaxException | IOException e) {
             logger.log(Level.WARNING, e.getMessage(), e);
         }
         if (!sequentialPromiseMap.isEmpty()) {
@@ -79,16 +88,25 @@ public class HttpTransport extends BaseTransport implements Transport {
 
     @Override
     public void headersReceived(Integer streamId, HttpHeaders httpHeaders) {
-        if (httpHeadersListener != null) {
-            httpHeadersListener.onHeaders(httpHeaders);
-        }
-        for (String cookieString : httpHeaders.getAll(HttpHeaderNames.SET_COOKIE)) {
-            Cookie cookie = ClientCookieDecoder.STRICT.decode(cookieString);
-            addCookie(cookie);
-            if (cookieListener != null) {
-                cookieListener.onCookie(cookie);
+        Request request =  fromStreamId(streamId);
+        if (request != null) {
+            HttpHeadersListener httpHeadersListener = request.getHeadersListener();
+            if (httpHeadersListener != null) {
+                httpHeadersListener.onHeaders(httpHeaders);
+            }
+            for (String cookieString : httpHeaders.getAll(HttpHeaderNames.SET_COOKIE)) {
+                Cookie cookie = ClientCookieDecoder.STRICT.decode(cookieString);
+                addCookie(cookie);
+                CookieListener cookieListener = request.getCookieListener();
+                if (cookieListener != null) {
+                    cookieListener.onCookie(cookie);
+                }
             }
         }
+    }
+
+    @Override
+    public void pushPromiseReceived(Integer streamId, Integer promisedStreamId, Http2Headers headers) {
     }
 
     @Override
@@ -125,11 +143,9 @@ public class HttpTransport extends BaseTransport implements Transport {
 
     @Override
     public void fail(Throwable throwable) {
-        if (exceptionListener != null) {
-            exceptionListener.onException(throwable);
-        }
         for (CompletableFuture<Boolean> promise : sequentialPromiseMap.values()) {
             promise.completeExceptionally(throwable);
         }
     }
+
 }

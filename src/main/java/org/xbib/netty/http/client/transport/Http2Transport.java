@@ -6,12 +6,17 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.cookie.ClientCookieDecoder;
 import io.netty.handler.codec.http.cookie.Cookie;
+import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2Settings;
 import org.xbib.net.URLSyntaxException;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.HttpAddress;
 import org.xbib.netty.http.client.Request;
+import org.xbib.netty.http.client.listener.CookieListener;
+import org.xbib.netty.http.client.listener.HttpHeadersListener;
+import org.xbib.netty.http.client.listener.HttpResponseListener;
 
+import java.io.IOException;
 import java.util.SortedMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -36,11 +41,6 @@ public class Http2Transport extends BaseTransport implements Transport {
         super(client, httpAddress);
         streamIdCounter = new AtomicInteger(3);
         streamidPromiseMap = new ConcurrentSkipListMap<>();
-    }
-
-    @Override
-    public void connect() throws InterruptedException {
-        super.connect();
         settingsPromise = new CompletableFuture<>();
     }
 
@@ -86,40 +86,51 @@ public class Http2Transport extends BaseTransport implements Transport {
         }
         CompletableFuture<Boolean> promise = streamidPromiseMap.get(streamId);
         if (promise == null) {
-            logger.log(Level.WARNING, "message received for unknown stream id " + streamId);
-            if (pushListener != null) {
-                pushListener.onPushReceived(null, fullHttpResponse);
-            }
+            logger.log(Level.WARNING, "response received for unknown stream id " + streamId);
         } else {
-            if (responseListener != null) {
-                responseListener.onResponse(fullHttpResponse);
-            }
-            // forward?
-            try {
-                Request request = continuation(streamId, fullHttpResponse);
-                if (request != null) {
-                    // synchronous call here
-                    client.continuation(this, request);
+            Request request = fromStreamId(streamId);
+            if (request != null) {
+                HttpResponseListener responseListener = request.getResponseListener();
+                if (responseListener != null) {
+                    responseListener.onResponse(fullHttpResponse);
                 }
-            } catch (URLSyntaxException e) {
-                logger.log(Level.WARNING, e.getMessage(), e);
+                try {
+                    request = continuation(streamId, fullHttpResponse);
+                    if (request != null) {
+                        // synchronous call here
+                        client.continuation(this, request);
+                    }
+                } catch (URLSyntaxException | IOException e) {
+                    logger.log(Level.WARNING, e.getMessage(), e);
+                }
             }
-            // complete origin transport
+            // complete origin
             promise.complete(true);
         }
     }
 
     @Override
     public void headersReceived(Integer streamId, HttpHeaders httpHeaders) {
-        if (httpHeadersListener != null) {
-            httpHeadersListener.onHeaders(httpHeaders);
-        }
-        if (cookieListener != null) {
-            for (String cookieString : httpHeaders.getAll(HttpHeaderNames.SET_COOKIE)) {
-                Cookie cookie = ClientCookieDecoder.STRICT.decode(cookieString);
-                cookieListener.onCookie(cookie);
+        Request request = fromStreamId(streamId);
+        if (request != null) {
+            HttpHeadersListener httpHeadersListener = request.getHeadersListener();
+            if (httpHeadersListener != null) {
+                httpHeadersListener.onHeaders(httpHeaders);
+            }
+            CookieListener cookieListener = request.getCookieListener();
+            if (cookieListener != null) {
+                for (String cookieString : httpHeaders.getAll(HttpHeaderNames.SET_COOKIE)) {
+                    Cookie cookie = ClientCookieDecoder.STRICT.decode(cookieString);
+                    cookieListener.onCookie(cookie);
+                }
             }
         }
+    }
+
+    @Override
+    public void pushPromiseReceived(Integer streamId, Integer promisedStreamId, Http2Headers headers) {
+        streamidPromiseMap.put(promisedStreamId, new CompletableFuture<>());
+        requests.put(promisedStreamId, fromStreamId(streamId));
     }
 
     @Override
@@ -156,9 +167,6 @@ public class Http2Transport extends BaseTransport implements Transport {
 
     @Override
     public void fail(Throwable throwable) {
-        if (exceptionListener != null) {
-            exceptionListener.onException(throwable);
-        }
         for (CompletableFuture<Boolean> promise : streamidPromiseMap.values()) {
             promise.completeExceptionally(throwable);
         }

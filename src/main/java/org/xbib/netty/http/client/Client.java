@@ -18,15 +18,21 @@ import org.xbib.netty.http.client.handler.http1.HttpResponseHandler;
 import org.xbib.netty.http.client.handler.http2.Http2ChannelInitializer;
 import org.xbib.netty.http.client.handler.http2.Http2ResponseHandler;
 import org.xbib.netty.http.client.handler.http2.Http2SettingsHandler;
+import org.xbib.netty.http.client.pool.Pool;
+import org.xbib.netty.http.client.pool.SimpleChannelPool;
 import org.xbib.netty.http.client.transport.Http2Transport;
 import org.xbib.netty.http.client.transport.HttpTransport;
 import org.xbib.netty.http.client.transport.Transport;
 import org.xbib.netty.http.client.util.NetworkUtils;
 
+import javax.net.ssl.TrustManagerFactory;
+import java.io.IOException;
+import java.security.KeyStoreException;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
 import java.util.function.Function;
 import java.util.logging.Level;
@@ -62,6 +68,8 @@ public final class Client {
 
     private TransportListener transportListener;
 
+    private Pool<Channel> pool;
+
     public Client() {
         this(new ClientConfig());
     }
@@ -74,6 +82,7 @@ public final class Client {
                   EventLoopGroup eventLoopGroup, Class<? extends SocketChannel> socketChannelClass) {
         Objects.requireNonNull(clientConfig);
         this.clientConfig = clientConfig;
+        initializeTrustManagerFactory(clientConfig);
         this.byteBufAllocator = byteBufAllocator != null ?
                 byteBufAllocator : PooledByteBufAllocator.DEFAULT;
         this.eventLoopGroup = eventLoopGroup != null ?
@@ -94,6 +103,22 @@ public final class Client {
         this.http2SettingsHandler = new Http2SettingsHandler();
         this.http2ResponseHandler = new Http2ResponseHandler();
         this.transports = new CopyOnWriteArrayList<>();
+        List<HttpAddress> nodes = clientConfig.getNodes();
+        if (!nodes.isEmpty()) {
+            Integer limit = clientConfig.getNodeConnectionLimit();
+            if (limit == null || limit > nodes.size()) {
+                limit = nodes.size();
+            }
+            if (limit < 1) {
+                limit = 1;
+            }
+            Semaphore semaphore = new Semaphore(limit);
+            Integer retries = clientConfig.getRetriesPerNode();
+            if (retries == null || retries < 0) {
+                retries = 0;
+            }
+            this.pool = new SimpleChannelPool<>(semaphore, nodes, bootstrap, null, retries);
+        }
     }
 
     public static ClientBuilder builder() {
@@ -140,23 +165,28 @@ public final class Client {
     public Channel newChannel(HttpAddress httpAddress) throws InterruptedException {
         HttpVersion httpVersion = httpAddress.getVersion();
         ChannelInitializer<SocketChannel> initializer;
+        Channel channel;
         if (httpVersion.majorVersion() < 2) {
             initializer = new HttpChannelInitializer(clientConfig, httpAddress, httpResponseHandler);
+            channel = bootstrap.handler(initializer)
+                    .connect(httpAddress.getInetSocketAddress()).sync().await().channel();
         } else {
-            initializer = new Http2ChannelInitializer(clientConfig, httpAddress, http2SettingsHandler, http2ResponseHandler);
+            initializer = new Http2ChannelInitializer(clientConfig, httpAddress,
+                    http2SettingsHandler, http2ResponseHandler);
+            channel = bootstrap.handler(initializer)
+                    .connect(httpAddress.getInetSocketAddress()).sync().await().channel();
         }
-        return bootstrap.handler(initializer)
-                .connect(httpAddress.getInetSocketAddress()).sync().await().channel();
+        return channel;
     }
 
-    public Transport execute(Request request) {
-        Transport nextTransport = newTransport(HttpAddress.of(request));
-        nextTransport.execute(request);
-        return nextTransport;
+    public Transport execute(Request request) throws IOException {
+        Transport transport = newTransport(HttpAddress.of(request));
+        transport.execute(request);
+        return transport;
     }
 
     public <T> CompletableFuture<T> execute(Request request,
-                                            Function<FullHttpResponse, T> supplier) {
+                                            Function<FullHttpResponse, T> supplier) throws IOException {
         return newTransport(HttpAddress.of(request)).execute(request, supplier);
     }
 
@@ -165,19 +195,19 @@ public final class Client {
      * @param transport the previous transport
      * @param request the new request for continuing the request.
      */
-    public void continuation(Transport transport, Request request) {
+    public void continuation(Transport transport, Request request) throws IOException {
         Transport nextTransport = newTransport(HttpAddress.of(request));
-        nextTransport.setResponseListener(transport.getResponseListener());
-        nextTransport.setExceptionListener(transport.getExceptionListener());
-        nextTransport.setHeadersListener(transport.getHeadersListener());
-        nextTransport.setCookieListener(transport.getCookieListener());
-        nextTransport.setPushListener(transport.getPushListener());
         nextTransport.setCookieBox(transport.getCookieBox());
         nextTransport.execute(request);
         nextTransport.get();
         close(nextTransport);
     }
 
+    public void retry(Transport transport, Request request) throws IOException {
+        transport.execute(request);
+        transport.get();
+        close(transport);
+    }
 
     public Transport prepareRequest(Request request) {
         return newTransport(HttpAddress.of(request));
@@ -204,6 +234,21 @@ public final class Client {
     public void shutdownGracefully() {
         close();
         shutdown();
+    }
+
+    /**
+     * Initialize trust manager factory once per client lifecycle.
+     * @param clientConfig the client config
+     */
+    private static void initializeTrustManagerFactory(ClientConfig clientConfig) {
+        TrustManagerFactory trustManagerFactory = clientConfig.getTrustManagerFactory();
+        if (trustManagerFactory != null) {
+            try {
+                trustManagerFactory.init(clientConfig.getTrustManagerKeyStore());
+            } catch (KeyStoreException e) {
+                logger.log(Level.WARNING, e.getMessage(), e);
+            }
+        }
     }
 
     public interface TransportListener {

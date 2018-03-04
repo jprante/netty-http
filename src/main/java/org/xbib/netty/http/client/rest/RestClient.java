@@ -11,7 +11,6 @@ import org.xbib.netty.http.client.RequestBuilder;
 import org.xbib.netty.http.client.transport.Transport;
 
 import java.io.IOException;
-import java.net.ConnectException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.logging.Logger;
@@ -55,21 +54,14 @@ public class RestClient {
         Client client = new Client();
         Transport transport = client.newTransport(HttpAddress.http1(url));
         RestClient restClient = new RestClient(client, transport);
-        transport.setResponseListener(restClient::setResponse);
-        try {
-            transport.connect();
-        } catch (InterruptedException e) {
-            throw new ConnectException("unable to connect to " + url);
-        }
-        transport.awaitSettings();
         RequestBuilder requestBuilder = Request.builder(httpMethod);
-        requestBuilder.setURL(url);
+        requestBuilder.url(url);
         if (body != null && charset != null) {
             ByteBuf byteBuf = client.getByteBufAllocator().buffer();
             byteBuf.writeCharSequence(body, charset);
-            requestBuilder.setContent(byteBuf);
+            requestBuilder.content(byteBuf);
         }
-        transport.execute(requestBuilder.build()).get();
+        transport.execute(requestBuilder.build().setResponseListener(restClient::setResponse)).get();
         return restClient;
     }
 

@@ -5,6 +5,7 @@ import org.junit.Test;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.Request;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
@@ -19,23 +20,28 @@ public class CompletableFutureTest {
      * Get some weird content from one URL and post it to another URL, by composing completable futures.
      */
     @Test
-    public void testComposeCompletableFutures() {
+    public void testComposeCompletableFutures() throws IOException {
         Client client = new Client();
         try {
             final Function<FullHttpResponse, String> httpResponseStringFunction = response ->
                     response.content().toString(StandardCharsets.UTF_8);
             Request request = Request.get()
-                    .setURL("http://alkmene.hbz-nrw.de/repository/org/xbib/content/2.0.0-SNAPSHOT/maven-metadata-local.xml")
+                    .url("http://alkmene.hbz-nrw.de/repository/org/xbib/content/2.0.0-SNAPSHOT/maven-metadata-local.xml")
                     .build();
             CompletableFuture<String> completableFuture = client.execute(request, httpResponseStringFunction)
                     .exceptionally(Throwable::getMessage)
                     .thenCompose(content -> {
                         logger.log(Level.INFO, content);
                         // POST is not allowed, we don't care
-                        return client.execute(Request.post()
-                                .setURL("http://google.com/")
-                                .addParam("query", content)
-                                .build(), httpResponseStringFunction);
+                        try {
+                            return client.execute(Request.post()
+                                    .url("http://google.com/")
+                                    .addParameter("query", content)
+                                    .build(), httpResponseStringFunction);
+                        } catch (IOException e) {
+                            logger.log(Level.WARNING, e.getMessage(), e);
+                            return null;
+                        }
                     });
             String result = completableFuture.join();
             logger.log(Level.INFO, "completablefuture result = " + result);

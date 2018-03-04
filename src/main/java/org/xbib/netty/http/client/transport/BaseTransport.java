@@ -16,12 +16,9 @@ import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.HttpAddress;
 import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.client.RequestBuilder;
-import org.xbib.netty.http.client.listener.CookieListener;
-import org.xbib.netty.http.client.listener.ExceptionListener;
-import org.xbib.netty.http.client.listener.HttpHeadersListener;
-import org.xbib.netty.http.client.listener.HttpPushListener;
-import org.xbib.netty.http.client.listener.HttpResponseListener;
 
+import java.io.IOException;
+import java.net.ConnectException;
 import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnmappableCharacterException;
@@ -51,16 +48,6 @@ abstract class BaseTransport implements Transport {
 
     protected SortedMap<Integer, Request> requests;
 
-    protected HttpResponseListener responseListener;
-
-    protected ExceptionListener exceptionListener;
-
-    protected HttpHeadersListener httpHeadersListener;
-
-    protected CookieListener cookieListener;
-
-    protected HttpPushListener pushListener;
-
     private Map<Cookie, Boolean> cookieBox;
 
     BaseTransport(Client client, HttpAddress httpAddress) {
@@ -75,31 +62,8 @@ abstract class BaseTransport implements Transport {
     }
 
     @Override
-    public void connect() throws InterruptedException {
-        channel = client.newChannel(httpAddress);
-        channel.attr(TRANSPORT_ATTRIBUTE_KEY).set(this);
-    }
-
-    @Override
-    public Channel channel() {
-        return channel;
-    }
-
-    @Override
-    public Transport execute(Request request) {
-        if (channel == null) {
-            try {
-                connect();
-                awaitSettings();
-            } catch (InterruptedException e) {
-                return this;
-            }
-        }
-        setResponseListener(request.getResponseListener());
-        setExceptionListener(request.getExceptionListener());
-        setHeadersListener(request.getHeadersListener());
-        setCookieListener(request.getCookieListener());
-        setPushListener(request.getPushListener());
+    public Transport execute(Request request) throws IOException {
+        ensureConnect();
         // some HTTP 1.1 servers like Elasticsearch do not understand full URIs in HTTP command line
         String uri = request.httpVersion().majorVersion() < 2 ?
                 request.base().relativeReference() : request.base().toString();
@@ -136,91 +100,45 @@ abstract class BaseTransport implements Transport {
      */
     @Override
     public <T> CompletableFuture<T> execute(Request request,
-                                            Function<FullHttpResponse, T> supplier) {
+                                            Function<FullHttpResponse, T> supplier) throws IOException {
         final CompletableFuture<T> completableFuture = new CompletableFuture<>();
-        request.setExceptionListener(completableFuture::completeExceptionally);
+        //request.setExceptionListener(completableFuture::completeExceptionally);
         request.setResponseListener(response -> completableFuture.complete(supplier.apply(response)));
         execute(request);
         return completableFuture;
     }
 
     @Override
-    public void close() {
+    public synchronized void close() {
         get();
         if (channel != null) {
             channel.close();
+            channel = null;
         }
     }
 
-    @Override
-    public void setResponseListener(HttpResponseListener responseListener) {
-        if (responseListener != null) {
-            this.responseListener = responseListener;
+    protected void ensureConnect() throws IOException {
+        if (channel == null) {
+            try {
+                channel = client.newChannel(httpAddress);
+                channel.attr(TRANSPORT_ATTRIBUTE_KEY).set(this);
+                awaitSettings();
+            } catch (InterruptedException e) {
+                throw new ConnectException("unable to connect to " + httpAddress);
+            }
         }
-    }
-
-    @Override
-    public HttpResponseListener getResponseListener() {
-        return responseListener;
-    }
-
-    @Override
-    public void setHeadersListener(HttpHeadersListener httpHeadersListener) {
-        if (httpHeadersListener != null) {
-            this.httpHeadersListener = httpHeadersListener;
-        }
-    }
-
-    @Override
-    public HttpHeadersListener getHeadersListener() {
-        return httpHeadersListener;
-    }
-
-    @Override
-    public void setCookieListener(CookieListener cookieListener) {
-        if (cookieListener != null) {
-            this.cookieListener = cookieListener;
-        }
-    }
-
-    @Override
-    public CookieListener getCookieListener() {
-        return cookieListener;
-    }
-
-    @Override
-    public void setExceptionListener(ExceptionListener exceptionListener) {
-        if (exceptionListener != null) {
-            this.exceptionListener = exceptionListener;
-        }
-    }
-
-    @Override
-    public ExceptionListener getExceptionListener() {
-        return exceptionListener;
-    }
-
-    @Override
-    public void setPushListener(HttpPushListener pushListener) {
-        if (pushListener != null) {
-            this.pushListener = pushListener;
-        }
-    }
-
-    @Override
-    public HttpPushListener getPushListener() {
-        return pushListener;
     }
 
     protected Request continuation(Integer streamId, FullHttpResponse httpResponse) throws URLSyntaxException {
         if (httpResponse == null) {
             return null;
         }
+        Request request = fromStreamId(streamId);
+        if (request == null) {
+            // push promise
+            return null;
+        }
         try {
-            if (streamId == null) {
-                streamId = requests.lastKey();
-            }
-            Request request = requests.get(streamId);
             if (request.checkRedirect()) {
                 int status = httpResponse.status().code();
                 switch (status) {
@@ -238,20 +156,21 @@ abstract class BaseTransport implements Transport {
                             URL redirUrl = URL.base(request.base()).resolve(location);
                             HttpMethod method = httpResponse.status().code() == 303 ? HttpMethod.GET : request.httpMethod();
                             RequestBuilder newHttpRequestBuilder = Request.builder(method)
-                                    .setURL(redirUrl)
+                                    .url(redirUrl)
                                     .setVersion(request.httpVersion())
                                     .setHeaders(request.headers())
-                                    .setContent(request.content());
+                                    .content(request.content());
+                            // TODO(jprante) convencience to copy pathAndQuery from one request to another
                             request.base().getQueryParams().forEach(pair ->
-                                newHttpRequestBuilder.addParam(pair.getFirst(), pair.getSecond())
+                                newHttpRequestBuilder.addParameter(pair.getFirst(), pair.getSecond())
                             );
                             request.cookies().forEach(newHttpRequestBuilder::addCookie);
                             Request newHttpRequest = newHttpRequestBuilder.build();
                             newHttpRequest.setResponseListener(request.getResponseListener());
-                            newHttpRequest.setExceptionListener(request.getExceptionListener());
+                            //newHttpRequest.setExceptionListener(request.getExceptionListener());
                             newHttpRequest.setHeadersListener(request.getHeadersListener());
                             newHttpRequest.setCookieListener(request.getCookieListener());
-                            newHttpRequest.setPushListener(request.getPushListener());
+                            //newHttpRequest.setPushListener(request.getPushListener());
                             StringBuilder hostAndPort = new StringBuilder();
                             hostAndPort.append(redirUrl.getHost());
                             if (redirUrl.getPort() != null) {
@@ -273,6 +192,13 @@ abstract class BaseTransport implements Transport {
             logger.log(Level.WARNING, e.getMessage(), e);
         }
         return null;
+    }
+
+    protected Request fromStreamId(Integer streamId) {
+        if (streamId == null) {
+            streamId = requests.lastKey();
+        }
+       return requests.get(streamId);
     }
 
     public void setCookieBox(Map<Cookie, Boolean> cookieBox) {

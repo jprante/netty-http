@@ -25,13 +25,13 @@ public class URITest {
     @Test
     public void testRequestURIs() {
         RequestBuilder httpRequestBuilder = Request.get();
-        httpRequestBuilder.setURL("https://localhost").path("/path");
+        httpRequestBuilder.url("https://localhost").uri("/path");
         assertEquals("/path", httpRequestBuilder.build().relativeUri());
-        httpRequestBuilder.path("/foobar");
+        httpRequestBuilder.uri("/foobar");
         assertEquals("/foobar", httpRequestBuilder.build().relativeUri());
-        httpRequestBuilder.path("/path1?a=b");
+        httpRequestBuilder.uri("/path1?a=b");
         assertEquals("/path1?a=b", httpRequestBuilder.build().relativeUri());
-        httpRequestBuilder.path("/path2?c=d");
+        httpRequestBuilder.uri("/path2?c=d");
         assertEquals("/path2?c=d", httpRequestBuilder.build().relativeUri());
     }
 }

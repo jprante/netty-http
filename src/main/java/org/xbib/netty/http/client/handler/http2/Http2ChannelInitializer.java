@@ -4,7 +4,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http2.DefaultHttp2Connection;
-import io.netty.handler.codec.http2.DelegatingDecompressorFrameListener;
+import io.netty.handler.codec.http2.Http2Connection;
 import io.netty.handler.codec.http2.Http2ConnectionHandler;
 import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2SecurityUtil;
@@ -18,7 +18,6 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import org.xbib.netty.http.client.ClientConfig;
 import org.xbib.netty.http.client.HttpAddress;
 
@@ -60,10 +59,10 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
      */
     @Override
     protected void initChannel(SocketChannel ch) {
-        DefaultHttp2Connection http2Connection = new DefaultHttp2Connection(false);
+        Http2Connection http2Connection = new DefaultHttp2Connection(false);
         HttpToHttp2ConnectionHandlerBuilder http2ConnectionHandlerBuilder = new HttpToHttp2ConnectionHandlerBuilder()
                 .connection(http2Connection)
-                .frameListener(new DelegatingDecompressorFrameListener(http2Connection,
+                .frameListener(new Http2PushPromiseHandler(http2Connection,
                         new InboundHttp2ToHttpAdapterBuilder(http2Connection)
                                 .maxContentLength(clientConfig.getMaxContentLength())
                                 .propagateSettings(true)
@@ -75,7 +74,6 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
         try {
             SslContextBuilder sslContextBuilder = SslContextBuilder.forClient()
                     .sslProvider(clientConfig.getSslProvider())
-                    .trustManager(InsecureTrustManagerFactory.INSTANCE)
                     .ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE)
                     .applicationProtocolConfig(new ApplicationProtocolConfig(
                             ApplicationProtocolConfig.Protocol.ALPN,
@@ -84,6 +82,9 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
                             ApplicationProtocolNames.HTTP_2));
             if (clientConfig.getSslContextProvider() != null) {
                 sslContextBuilder.sslContextProvider(clientConfig.getSslContextProvider());
+            }
+            if (clientConfig.getTrustManagerFactory() != null) {
+                sslContextBuilder.trustManager(clientConfig.getTrustManagerFactory());
             }
             SslContext sslContext = sslContextBuilder.build();
             SslHandler sslHandler = sslContext.newHandler(ch.alloc());

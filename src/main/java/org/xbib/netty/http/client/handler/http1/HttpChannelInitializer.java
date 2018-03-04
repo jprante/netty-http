@@ -9,7 +9,6 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslHandler;
-import io.netty.handler.stream.ChunkedWriteHandler;
 import org.xbib.netty.http.client.ClientConfig;
 import org.xbib.netty.http.client.HttpAddress;
 import org.xbib.netty.http.client.handler.TrafficLoggingHandler;
@@ -51,11 +50,15 @@ public class HttpChannelInitializer extends ChannelInitializer<SocketChannel> {
         try {
             SslContextBuilder sslContextBuilder = SslContextBuilder.forClient()
                     .sslProvider(clientConfig.getSslProvider())
-                    .sslContextProvider(clientConfig.getSslContextProvider())
                     .keyManager(clientConfig.getKeyCertChainInputStream(), clientConfig.getKeyInputStream(),
                             clientConfig.getKeyPassword())
-                    .ciphers(clientConfig.getCiphers(), clientConfig.getCipherSuiteFilter())
-                    .trustManager(clientConfig.getTrustManagerFactory());
+                    .ciphers(clientConfig.getCiphers(), clientConfig.getCipherSuiteFilter());
+            if (clientConfig.getSslContextProvider() != null) {
+                sslContextBuilder.sslContextProvider(clientConfig.getSslContextProvider());
+            }
+            if (clientConfig.getTrustManagerFactory() != null) {
+                sslContextBuilder.trustManager(clientConfig.getTrustManagerFactory());
+            }
             SslContext sslContext = sslContextBuilder.build();
             SslHandler sslHandler = sslContext.newHandler(ch.alloc());
             SSLEngine engine = sslHandler.engine();
