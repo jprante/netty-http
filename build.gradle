@@ -71,6 +71,10 @@ test {
     }
 }
 
+clean {
+    delete 'out'
+}
+
 asciidoctor {
     attributes toc: 'left',
             doctype: 'book',

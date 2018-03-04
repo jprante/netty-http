@@ -104,7 +104,7 @@ public final class Client {
         this.http2ResponseHandler = new Http2ResponseHandler();
         this.transports = new CopyOnWriteArrayList<>();
         List<HttpAddress> nodes = clientConfig.getNodes();
-        if (!nodes.isEmpty()) {
+        if (nodes != null && !nodes.isEmpty()) {
             Integer limit = clientConfig.getNodeConnectionLimit();
             if (limit == null || limit > nodes.size()) {
                 limit = nodes.size();
