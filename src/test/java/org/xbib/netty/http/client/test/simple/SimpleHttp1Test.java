@@ -24,7 +24,6 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -32,8 +31,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Handler;
 import java.util.logging.Level;
+import java.util.logging.LogManager;
 import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
 
 /**
  *
@@ -41,6 +44,24 @@ import java.util.logging.Logger;
 public class SimpleHttp1Test {
 
     private static final Logger logger = Logger.getLogger(SimpleHttp1Test.class.getName());
+
+    static {
+        System.setProperty("io.netty.leakDetection.level", "advanced");
+        System.setProperty("io.netty.noKeySetOptimization", Boolean.toString(true));
+
+        System.setProperty("java.util.logging.SimpleFormatter.format",
+                "%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS.%1$tL %4$-7s [%3$s] %2$s %5$s %6$s%n");
+        LogManager.getLogManager().reset();
+        Logger rootLogger = LogManager.getLogManager().getLogger("");
+        Handler handler = new ConsoleHandler();
+        handler.setFormatter(new SimpleFormatter());
+        rootLogger.addHandler(handler);
+        rootLogger.setLevel(Level.ALL);
+        for (Handler h : rootLogger.getHandlers()) {
+            handler.setFormatter(new SimpleFormatter());
+            h.setLevel(Level.ALL);
+        }
+    }
 
     @After
     public void checkThreads() {
@@ -58,7 +79,8 @@ public class SimpleHttp1Test {
         Client client = new Client();
         try {
             HttpTransport transport = client.newTransport("xbib.org", 80);
-            transport.onResponse(string -> logger.log(Level.INFO, "got messsage: " + string));
+            transport.onResponse(msg -> logger.log(Level.INFO,
+                    "got response: " + msg.status().code() + " headers=" + msg.headers().entries()));
             transport.connect();
             sendRequest(transport);
             transport.awaitResponse();
@@ -89,7 +111,7 @@ public class SimpleHttp1Test {
     private AttributeKey<HttpTransport> TRANSPORT_ATTRIBUTE_KEY = AttributeKey.valueOf("transport");
 
     interface ResponseWriter {
-        void write(String string);
+        void write(FullHttpResponse msg);
     }
 
     class Client {
@@ -179,7 +201,7 @@ public class SimpleHttp1Test {
 
         void responseReceived(FullHttpResponse msg) {
             if (responseWriter != null) {
-                responseWriter.write(msg.content().toString(StandardCharsets.UTF_8));
+                responseWriter.write(msg);
             }
         }
 
