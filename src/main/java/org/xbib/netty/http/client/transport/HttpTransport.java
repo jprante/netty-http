@@ -69,13 +69,11 @@ public class HttpTransport extends BaseTransport {
             if (retryRequest != null) {
                 // retry transport, wait for completion
                 client.retry(this, retryRequest);
-                retryRequest.close();
             } else {
                 Request continueRequest = continuation(request, fullHttpResponse);
                 if (continueRequest != null) {
                     // continue with new transport, synchronous call here, wait for completion
                     client.continuation(this, continueRequest);
-                    continueRequest.close();
                 }
             }
         } catch (URLSyntaxException | IOException e) {
@@ -94,7 +92,7 @@ public class HttpTransport extends BaseTransport {
     }
 
     @Override
-    public void awaitResponse(Integer streamId) throws IOException {
+    public void awaitResponse(Integer streamId) throws IOException, TimeoutException {
         if (streamId == null) {
             return;
         }
@@ -103,9 +101,17 @@ public class HttpTransport extends BaseTransport {
         }
         CompletableFuture<Boolean> promise = sequentialPromiseMap.get(streamId);
         if (promise != null) {
+            long millis = client.getClientConfig().getReadTimeoutMillis();
+            Request request = fromStreamId(streamId);
+            if (request != null && request.getTimeoutInMillis() > 0) {
+                millis = request.getTimeoutInMillis();
+            }
             try {
-                promise.get(client.getClientConfig().getReadTimeoutMillis(), TimeUnit.MILLISECONDS);
-            } catch (InterruptedException | ExecutionException | TimeoutException e) {
+                promise.get(millis, TimeUnit.MILLISECONDS);
+            } catch (TimeoutException e) {
+                this.throwable = e;
+                throw new TimeoutException("timeout of " + millis + " milliseconds exceeded");
+            } catch (InterruptedException | ExecutionException e) {
                 this.throwable = e;
                 throw new IOException(e);
             } finally {
@@ -121,7 +127,7 @@ public class HttpTransport extends BaseTransport {
                 awaitResponse(streamId);
                 client.releaseChannel(channel);
             }
-        } catch (IOException e) {
+        } catch (IOException | TimeoutException e) {
             logger.log(Level.WARNING, e.getMessage(), e);
         } finally {
             sequentialPromiseMap.clear();

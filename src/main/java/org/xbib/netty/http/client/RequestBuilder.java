@@ -1,7 +1,11 @@
 package org.xbib.netty.http.client;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.buffer.Unpooled;
+import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
@@ -51,6 +55,8 @@ public class RequestBuilder {
 
     private static final HttpVersion HTTP_2_0 = HttpVersion.valueOf("HTTP/2.0");
 
+    private final ByteBufAllocator allocator;
+
     private final List<String> removeHeaders;
 
     private final Collection<Cookie> cookies;
@@ -85,7 +91,8 @@ public class RequestBuilder {
 
     private BackOff backOff;
 
-    RequestBuilder() {
+    RequestBuilder(ByteBufAllocator allocator) {
+        this.allocator = allocator;
         httpMethod = DEFAULT_METHOD;
         httpVersion = DEFAULT_HTTP_VERSION;
         userAgent = DEFAULT_USER_AGENT;
@@ -341,11 +348,11 @@ public class RequestBuilder {
     }
 
     private void content(CharSequence charSequence, AsciiString contentType)  {
-        content(charSequence.toString().getBytes(StandardCharsets.UTF_8), contentType);
+        content(ByteBufUtil.writeUtf8(allocator, charSequence), contentType);
     }
 
     private void content(byte[] buf, AsciiString contentType) {
-        content(PooledByteBufAllocator.DEFAULT.buffer(buf.length).writeBytes(buf), contentType);
+        content(allocator.buffer().writeBytes(buf), contentType);
     }
 
     private void content(ByteBuf body, AsciiString contentType) {

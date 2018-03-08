@@ -56,7 +56,7 @@ public class HttpAddress implements PoolKey {
     }
 
     public static HttpAddress of(Request request) {
-        return new HttpAddress(request.base(), request.httpVersion());
+        return new HttpAddress(request.url(), request.httpVersion());
     }
 
     public static HttpAddress of(URL url, HttpVersion httpVersion) {
@@ -76,7 +76,7 @@ public class HttpAddress implements PoolKey {
 
     public InetSocketAddress getInetSocketAddress() {
         if (inetSocketAddress == null) {
-            // this may execute DNS
+            // this may execute DNS lookup
             this.inetSocketAddress = new InetSocketAddress(host, port);
         }
         return inetSocketAddress;

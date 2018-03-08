@@ -67,7 +67,7 @@ test {
         jvmArgs "-javaagent:" + configurations.alpnagent.asPath
     }
     testLogging {
-        showStandardStreams = true
+        showStandardStreams = false
         exceptionFormat = 'full'
     }
 }

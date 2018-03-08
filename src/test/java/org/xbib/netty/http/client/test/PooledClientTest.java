@@ -1,6 +1,8 @@
 package org.xbib.netty.http.client.test;
 
+import io.netty.handler.codec.http.HttpVersion;
 import org.junit.Test;
+import org.xbib.net.URL;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.HttpAddress;
 import org.xbib.netty.http.client.Request;
@@ -21,15 +23,15 @@ public class PooledClientTest extends LoggingBase {
     @Test
     public void testPooledClientWithSingleNode() throws IOException {
         int loop = 10;
-        HttpAddress httpAddress = HttpAddress.http1("xbib.org", 80);
+        int threads = Runtime.getRuntime().availableProcessors();
+        URL url = URL.from("http://xbib.org");
+        HttpAddress httpAddress = HttpAddress.of(url, HttpVersion.HTTP_1_1);
         Client client = Client.builder()
                 .addPoolNode(httpAddress)
-                .setPoolSecure(httpAddress.isSecure())
-                .setPoolNodeConnectionLimit(16)
+                .setPoolNodeConnectionLimit(threads)
                 .build();
         AtomicInteger count = new AtomicInteger();
         try {
-            int threads = 16;
             ExecutorService executorService = Executors.newFixedThreadPool(threads);
             for (int n = 0; n < threads; n++) {
                 executorService.submit(() -> {
@@ -37,25 +39,26 @@ public class PooledClientTest extends LoggingBase {
                         logger.log(Level.INFO, "starting " + Thread.currentThread());
                         for (int i = 0; i < loop; i++) {
                             Request request = Request.get()
-                                    .url("http://xbib.org/repository/")
-                                    .setVersion("HTTP/1.1")
+                                    .url(url.toString())
+                                    .setVersion(httpAddress.getVersion())
+                                    //.setTimeoutInMillis(25000L)
                                     .build()
                                     .setResponseListener(fullHttpResponse -> {
                                         String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
                                         //logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
+                                        count.getAndIncrement();
                                     });
                             client.pooledExecute(request).get();
-                            count.getAndIncrement();
                         }
                         logger.log(Level.INFO, "done " + Thread.currentThread());
-                    } catch (IOException e) {
+                    } catch (Throwable e) {
                         logger.log(Level.WARNING, e.getMessage(), e);
                     }
                 });
             }
             executorService.shutdown();
             executorService.awaitTermination(60, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
+        } catch (Throwable e) {
             logger.log(Level.WARNING, e.getMessage(), e);
         } finally {
             client.shutdownGracefully();

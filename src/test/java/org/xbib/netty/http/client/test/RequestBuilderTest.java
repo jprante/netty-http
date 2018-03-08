@@ -13,7 +13,7 @@ public class RequestBuilderTest {
 
     @Test
     public void testSimpleRequest() {
-        Request request = Request.builder(HttpMethod.GET).build();
+        Request request = Request.builder(HttpMethod.GET).content("Hello", "text/plain").build();
         logger.log(Level.INFO, request.toString());
     }
 }

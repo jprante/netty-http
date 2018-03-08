@@ -192,6 +192,8 @@ public class ClientBuilder {
 
     public ClientBuilder addPoolNode(HttpAddress httpAddress) {
         clientConfig.addPoolNode(httpAddress);
+        clientConfig.setPoolVersion(httpAddress.getVersion());
+        clientConfig.setPoolSecure(httpAddress.isSecure());
         return this;
     }
 
@@ -202,16 +204,6 @@ public class ClientBuilder {
 
     public ClientBuilder setRetriesPerPoolNode(int retriesPerNode) {
         clientConfig.setRetriesPerPoolNode(retriesPerNode);
-        return this;
-    }
-
-    public ClientBuilder setPoolVersion(HttpVersion poolVersion) {
-        clientConfig.setPoolVersion(poolVersion);
-        return this;
-    }
-
-    public ClientBuilder setPoolSecure(boolean poolSecure) {
-        clientConfig.setPoolSecure(poolSecure);
         return this;
     }
 

@@ -1,6 +1,8 @@
 package org.xbib.netty.http.client;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpVersion;
@@ -12,8 +14,6 @@ import org.xbib.netty.http.client.listener.HttpHeadersListener;
 import org.xbib.netty.http.client.listener.HttpResponseListener;
 import org.xbib.netty.http.client.retry.BackOff;
 
-import java.io.Closeable;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
@@ -21,9 +21,9 @@ import java.util.concurrent.CompletableFuture;
 /**
  * HTTP client request.
  */
-public class Request implements Closeable {
+public class Request {
 
-    private final URL base;
+    private final URL url;
 
     private final HttpVersion httpVersion;
 
@@ -62,7 +62,7 @@ public class Request implements Closeable {
             String uri, ByteBuf content,
             long timeoutInMillis, boolean followRedirect, int maxRedirect, int redirectCount,
             boolean isBackOff, BackOff backOff) {
-        this.base = url;
+        this.url = url;
         this.httpVersion = httpVersion;
         this.httpMethod = httpMethod;
         this.headers = headers;
@@ -77,8 +77,8 @@ public class Request implements Closeable {
         this.backOff = backOff;
     }
 
-    public URL base() {
-        return base;
+    public URL url() {
+        return url;
     }
 
     public HttpVersion httpVersion() {
@@ -139,12 +139,14 @@ public class Request implements Closeable {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        sb.append("Request[base='").append(base)
+        sb.append("Request[url='").append(url)
                 .append("',version=").append(httpVersion)
                 .append(",method=").append(httpMethod)
                 .append(",uri=").append(uri)
                 .append(",headers=").append(headers.entries())
-                .append(",content=").append(content != null ? content.copy(0,16).toString(StandardCharsets.UTF_8) : "")
+                .append(",content=").append(content != null && content.readableBytes() >= 16 ?
+                    content.copy(0,16).toString(StandardCharsets.UTF_8) + "..." :
+                    content != null ? content.toString(StandardCharsets.UTF_8) : "")
                 .append("]");
         return sb.toString();
     }
@@ -222,13 +224,10 @@ public class Request implements Closeable {
     }
 
     public static RequestBuilder builder(HttpMethod httpMethod) {
-        return new RequestBuilder().setMethod(httpMethod);
+        return new RequestBuilder(PooledByteBufAllocator.DEFAULT).setMethod(httpMethod);
     }
 
-    @Override
-    public void close() throws IOException {
-        if (content != null) {
-            content.release();
-        }
+    public static RequestBuilder builder(ByteBufAllocator allocator, HttpMethod httpMethod) {
+        return new RequestBuilder(allocator).setMethod(httpMethod);
     }
 }

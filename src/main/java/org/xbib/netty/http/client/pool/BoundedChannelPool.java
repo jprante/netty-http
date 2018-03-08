@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
@@ -85,10 +86,10 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
         }
         this.numberOfNodes = nodes.size();
         bootstraps = new HashMap<>(numberOfNodes);
-        channels = new HashMap<>(numberOfNodes);
-        availableChannels = new HashMap<>(numberOfNodes);
-        counts = new HashMap<>(numberOfNodes);
-        failedCounts = new HashMap<>(numberOfNodes);
+        channels = new ConcurrentHashMap<>(numberOfNodes);
+        availableChannels = new ConcurrentHashMap<>(numberOfNodes);
+        counts = new ConcurrentHashMap<>(numberOfNodes);
+        failedCounts = new ConcurrentHashMap<>(numberOfNodes);
         for (K node : nodes) {
             ChannelPoolInitializer initializer = new ChannelPoolInitializer(node, channelPoolHandler);
             bootstraps.put(node, bootstrap.clone().remoteAddress(node.getInetSocketAddress())
@@ -247,6 +248,9 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
         int i = ThreadLocalRandom.current().nextInt(numberOfNodes);
         for (int j = i; j < numberOfNodes; j ++) {
             nextKey = nodes.get(j % numberOfNodes);
+            if (counts == null) {
+                throw new ConnectException("strange");
+            }
             next = counts.get(nextKey);
             if (next == 0) {
                 key = nextKey;
@@ -293,9 +297,7 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
             channel.closeFuture().addListener(new CloseChannelListener(key, channel));
             channel.attr(attributeKey).set(key);
             channels.computeIfAbsent(key, node -> new ArrayList<>()).add(channel);
-            synchronized (counts) {
-                counts.put(key, counts.get(key) + 1);
-            }
+            counts.put(key, counts.get(key) + 1);
             if (retriesPerNode > 0) {
                 failedCounts.put(key, 0);
             }
@@ -343,16 +345,12 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
             logger.log(Level.FINE,"connection to " + key + " closed");
             lock.lock();
             try {
-                synchronized (counts) {
-                    if (counts.containsKey(key)) {
-                        counts.put(key, counts.get(key) - 1);
-                    }
+                if (counts.containsKey(key)) {
+                    counts.put(key, counts.get(key) - 1);
                 }
-                synchronized (channels) {
-                    List<Channel> channels = BoundedChannelPool.this.channels.get(key);
-                    if (channels != null) {
-                        channels.remove(channel);
-                    }
+                List<Channel> channels = BoundedChannelPool.this.channels.get(key);
+                if (channels != null) {
+                    channels.remove(channel);
                 }
                 semaphore.release();
             } finally {

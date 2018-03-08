@@ -40,14 +40,14 @@ public class EpollTest {
 
     private static final Logger logger = Logger.getLogger(EpollTest.class.getName());
 
-    private static final int CONCURRENCY = 10;
+    private static final int CONCURRENCY = 4;
 
     private static final List<HttpAddress> NODES =
             Collections.singletonList(HttpAddress.http1("localhost", 12345));
 
     private static final long TEST_TIME_SECONDS = 100;
 
-    private static final int ATTEMPTS = 10_000;
+    private static final int ATTEMPTS = 1_000;
 
     private static final int FAIL_EVERY_ATTEMPT = 10;
 

@@ -40,6 +40,7 @@ import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.TrustManagerFactory;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.security.KeyStoreException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -136,7 +137,7 @@ public final class Client {
         this.http2SettingsHandler = new Http2SettingsHandler();
         this.http2ResponseHandler = new Http2ResponseHandler();
         this.transports = new CopyOnWriteArrayList<>();
-        if (hasPooledConnections()) {
+        if (!clientConfig.getPoolNodes().isEmpty()) {
             List<HttpAddress> nodes = clientConfig.getPoolNodes();
             Integer limit = clientConfig.getPoolNodeConnectionLimit();
             if (limit == null || limit < 1) {
@@ -183,7 +184,7 @@ public final class Client {
     }
 
     public boolean hasPooledConnections() {
-        return !clientConfig.getPoolNodes().isEmpty();
+        return pool != null && !clientConfig.getPoolNodes().isEmpty();
     }
 
     public BoundedChannelPool<HttpAddress> getPool() {
@@ -222,13 +223,13 @@ public final class Client {
             } else {
                 transport = new Http2Transport(this, null);
             }
+        } else {
+            throw new IllegalStateException();
         }
-        if (transport != null) {
-            if (transportListener != null) {
-                transportListener.onOpen(transport);
-            }
-            transports.add(transport);
+        if (transportListener != null) {
+            transportListener.onOpen(transport);
         }
+        transports.add(transport);
         return transport;
     }
 
@@ -270,15 +271,15 @@ public final class Client {
     }
 
     public void releaseChannel(Channel channel) throws IOException{
-        if (hasPooledConnections()) {
-            try {
-                pool.release(channel);
-            } catch (Exception e) {
-                throw new IOException(e);
-            }
-        } else {
-            if (channel != null) {
-                channel.close();
+        if (channel != null) {
+            if (hasPooledConnections()) {
+                try {
+                    pool.release(channel);
+                } catch (Exception e) {
+                    throw new IOException(e);
+                }
+            } else {
+               channel.close();
             }
         }
     }
@@ -378,14 +379,16 @@ public final class Client {
 
     private static SslHandler newSslHandler(ClientConfig clientConfig, ByteBufAllocator allocator, HttpAddress httpAddress) {
         try {
-            SslContext sslContext = newSslContext(clientConfig);
-            SslHandler sslHandler = sslContext.newHandler(allocator);
+            SslContext sslContext = newSslContext(clientConfig, httpAddress.getVersion());
+            InetSocketAddress peer = httpAddress.getInetSocketAddress();
+            SslHandler sslHandler = sslContext.newHandler(allocator, peer.getHostName(), peer.getPort());
             SSLEngine engine = sslHandler.engine();
             List<String> serverNames = clientConfig.getServerNamesForIdentification();
             if (serverNames.isEmpty()) {
-                serverNames = Collections.singletonList(httpAddress.getInetSocketAddress().getHostName());
+                serverNames = Collections.singletonList(peer.getHostName());
             }
             SSLParameters params = engine.getSSLParameters();
+            // use sslContext.newHandler(allocator, peerHost, peerPort) when using params.setEndpointIdentificationAlgorithm
             params.setEndpointIdentificationAlgorithm("HTTPS");
             List<SNIServerName> sniServerNames = new ArrayList<>();
             for (String serverName : serverNames) {
@@ -409,11 +412,11 @@ public final class Client {
         }
     }
 
-    private static SslContext newSslContext(ClientConfig clientConfig) throws SSLException {
+    private static SslContext newSslContext(ClientConfig clientConfig, HttpVersion httpVersion) throws SSLException {
         SslContextBuilder sslContextBuilder = SslContextBuilder.forClient()
                 .sslProvider(clientConfig.getSslProvider())
                 .ciphers(Http2SecurityUtil.CIPHERS, clientConfig.getCipherSuiteFilter())
-                .applicationProtocolConfig(newApplicationProtocolConfig());
+                .applicationProtocolConfig(newApplicationProtocolConfig(httpVersion));
         if (clientConfig.getSslContextProvider() != null) {
             sslContextBuilder.sslContextProvider(clientConfig.getSslContextProvider());
         }
@@ -423,11 +426,16 @@ public final class Client {
         return sslContextBuilder.build();
     }
 
-    private static ApplicationProtocolConfig newApplicationProtocolConfig() {
-        return new ApplicationProtocolConfig(ApplicationProtocolConfig.Protocol.ALPN,
-                ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
-                ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
-                ApplicationProtocolNames.HTTP_2);
+    private static ApplicationProtocolConfig newApplicationProtocolConfig(HttpVersion httpVersion) {
+        return httpVersion.majorVersion() == 1 ?
+                new ApplicationProtocolConfig(ApplicationProtocolConfig.Protocol.ALPN,
+                        ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
+                        ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
+                        ApplicationProtocolNames.HTTP_1_1) :
+                new ApplicationProtocolConfig(ApplicationProtocolConfig.Protocol.ALPN,
+                        ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
+                        ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
+                        ApplicationProtocolNames.HTTP_2);
     }
 
     public interface TransportListener {

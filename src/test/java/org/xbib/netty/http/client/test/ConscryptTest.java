@@ -1,6 +1,7 @@
 package org.xbib.netty.http.client.test;
 
 import org.conscrypt.Conscrypt;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.Request;
@@ -17,13 +18,14 @@ public class ConscryptTest extends LoggingBase {
     @Test
     public void testConscrypt() throws IOException {
         Client client = Client.builder()
+                .enableDebug()
                 .setJdkSslProvider()
                 .setSslContextProvider(Conscrypt.newProvider())
                 .build();
         logger.log(Level.INFO, client.getClientConfig().toString());
         try {
             Request request = Request.get()
-                    .url("https://xbib.org")
+                    .url("https://google.com")
                     .setVersion("HTTP/1.1")
                     .build()
                     .setResponseListener(fullHttpResponse -> {

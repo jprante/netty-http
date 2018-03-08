@@ -21,7 +21,7 @@ public class LeakTest {
     }
 
     @Test
-    public void testForLeaks() throws IOException, InterruptedException {
+    public void testForLeaks() throws IOException {
         Client client = new Client();
         client.shutdownGracefully();
     }

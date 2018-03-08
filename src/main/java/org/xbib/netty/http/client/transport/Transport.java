@@ -12,6 +12,7 @@ import org.xbib.netty.http.client.Request;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 
 public interface Transport {
@@ -38,7 +39,7 @@ public interface Transport {
 
     void pushPromiseReceived(Integer streamId, Integer promisedStreamId, Http2Headers headers);
 
-    void awaitResponse(Integer streamId) throws IOException;
+    void awaitResponse(Integer streamId) throws IOException, TimeoutException;
 
     Transport get();
 

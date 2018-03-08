@@ -25,7 +25,7 @@ public class Http2Test extends LoggingBase {
      *
      * demo/h2_demo_frame.html sends no content, only a push promise, and does not continue
      *
-     * @throws IOException
+     * @throws IOException if test fails
      */
     @Test
     @Ignore

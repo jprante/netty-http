@@ -74,38 +74,34 @@ abstract class BaseTransport implements Transport {
         // Our algorithm is: use always "origin form" for HTTP 1, use absolute form for HTTP 2.
         // The reason is that Netty derives the HTTP/2 scheme header from the absolute form.
         String uri = request.httpVersion().majorVersion() == 1 ?
-                request.base().relativeReference() : request.base().toString();
+                request.url().relativeReference() : request.url().toString();
         FullHttpRequest fullHttpRequest = request.content() == null ?
                 new DefaultFullHttpRequest(request.httpVersion(), request.httpMethod(), uri) :
                 new DefaultFullHttpRequest(request.httpVersion(), request.httpMethod(), uri,
                         request.content());
-        try {
-            Integer streamId = nextStream();
-            if (streamId != null && streamId > 0) {
-                request.headers().set(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), Integer.toString(streamId));
-            } else {
-                if (request.httpVersion().majorVersion() == 2) {
-                    logger.log(Level.WARNING, "no streamId but HTTP/2 request. Strange!!! " + getClass().getName());
-                }
+        Integer streamId = nextStream();
+        if (streamId != null && streamId > 0) {
+            request.headers().set(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), Integer.toString(streamId));
+        } else {
+            if (request.httpVersion().majorVersion() == 2) {
+                logger.log(Level.WARNING, "no streamId but HTTP/2 request. Strange!!! " + getClass().getName());
             }
-            // add matching cookies from box (previous requests) and new cookies from request builder
-            Collection<Cookie> cookies = new ArrayList<>();
-            cookies.addAll(matchCookiesFromBox(request));
-            cookies.addAll(matchCookies(request));
-            if (!cookies.isEmpty()) {
-                request.headers().set(HttpHeaderNames.COOKIE, ClientCookieEncoder.STRICT.encode(cookies));
-            }
-            // add stream-id and cookie headers
-            fullHttpRequest.headers().set(request.headers());
-            if (streamId != null) {
-                requests.put(streamId, request);
-            }
-            if (channel.isWritable()) {
-                channel.writeAndFlush(fullHttpRequest);
+        }
+        // add matching cookies from box (previous requests) and new cookies from request builder
+        Collection<Cookie> cookies = new ArrayList<>();
+        cookies.addAll(matchCookiesFromBox(request));
+        cookies.addAll(matchCookies(request));
+        if (!cookies.isEmpty()) {
+            request.headers().set(HttpHeaderNames.COOKIE, ClientCookieEncoder.STRICT.encode(cookies));
+        }
+        // add stream-id and cookie headers
+        fullHttpRequest.headers().set(request.headers());
+        if (streamId != null) {
+            requests.put(streamId, request);
+        }
+        if (channel.isWritable()) {
+            channel.writeAndFlush(fullHttpRequest);
 
-            }
-        } finally {
-            request.close();
         }
         return this;
     }
@@ -214,14 +210,14 @@ abstract class BaseTransport implements Transport {
                         location = new PercentDecoder(StandardCharsets.UTF_8.newDecoder()).decode(location);
                         if (location != null) {
                             logger.log(Level.FINE, "found redirect location: " + location);
-                            URL redirUrl = URL.base(request.base()).resolve(location);
+                            URL redirUrl = URL.base(request.url()).resolve(location);
                             HttpMethod method = httpResponse.status().code() == 303 ? HttpMethod.GET : request.httpMethod();
                             RequestBuilder newHttpRequestBuilder = Request.builder(method)
                                     .url(redirUrl)
                                     .setVersion(request.httpVersion())
                                     .setHeaders(request.headers())
                                     .content(request.content());
-                            request.base().getQueryParams().forEach(pair ->
+                            request.url().getQueryParams().forEach(pair ->
                                 newHttpRequestBuilder.addParameter(pair.getFirst(), pair.getSecond())
                             );
                             request.cookies().forEach(newHttpRequestBuilder::addCookie);
@@ -309,13 +305,13 @@ abstract class BaseTransport implements Transport {
 
     private List<Cookie> matchCookiesFromBox(Request request) {
         return cookieBox == null ? Collections.emptyList() : cookieBox.keySet().stream().filter(cookie ->
-                matchCookie(request.base(), cookie)
+                matchCookie(request.url(), cookie)
         ).collect(Collectors.toList());
     }
 
     private List<Cookie> matchCookies(Request request) {
         return request.cookies().stream().filter(cookie ->
-                matchCookie(request.base(), cookie)
+                matchCookie(request.url(), cookie)
         ).collect(Collectors.toList());
     }
 

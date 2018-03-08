@@ -14,19 +14,19 @@ import java.util.logging.Logger;
 
 public class CompletableFutureTest {
 
-    private static final Logger logger = Logger.getLogger(ElasticsearchTest.class.getName());
+    private static final Logger logger = Logger.getLogger(CompletableFutureTest.class.getName());
 
     /**
      * Get some weird content from one URL and post it to another URL, by composing completable futures.
      */
     @Test
     public void testComposeCompletableFutures() throws IOException {
-        Client client = new Client();
+        Client client = Client.builder().build();
         try {
             final Function<FullHttpResponse, String> httpResponseStringFunction = response ->
                     response.content().toString(StandardCharsets.UTF_8);
             Request request = Request.get()
-                    .url("https://repo.maven.apache.org/maven2/org/xbib/netty-http-client/maven-metadata.xml.sha1")
+                    .url("http://repo.maven.apache.org/maven2/org/xbib/netty-http-client/maven-metadata.xml.sha1")
                     .build();
             CompletableFuture<String> completableFuture = client.execute(request, httpResponseStringFunction)
                     .exceptionally(Throwable::getMessage)
