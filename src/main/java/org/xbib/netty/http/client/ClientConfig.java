@@ -1,15 +1,22 @@
 package org.xbib.netty.http.client;
 
+import io.netty.channel.WriteBufferWaterMark;
+import io.netty.channel.epoll.Epoll;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http2.Http2SecurityUtil;
+import io.netty.handler.codec.http2.Http2Settings;
+import io.netty.handler.logging.LogLevel;
 import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.ssl.CipherSuiteFilter;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
+import org.xbib.netty.http.client.retry.BackOff;
 
 import javax.net.ssl.TrustManagerFactory;
 import java.io.InputStream;
 import java.security.KeyStore;
 import java.security.Provider;
+import java.util.ArrayList;
 import java.util.List;
 
 public class ClientConfig {
@@ -22,7 +29,18 @@ public class ClientConfig {
         boolean DEBUG = false;
 
         /**
-         * Default for thread count.
+         * Default debug log level.
+         */
+        LogLevel DEFAULT_DEBUG_LOG_LEVEL = LogLevel.DEBUG;
+
+        /**
+         * The default for selecting epoll. If available, select epoll.
+         */
+        boolean EPOLL = Epoll.isAvailable();
+
+        /**
+         * If set to 0, then Netty will decide about thread count.
+         * Default is Runtime.getRuntime().availableProcessors() * 2
          */
         int THREAD_COUNT = 0;
 
@@ -110,12 +128,40 @@ public class ClientConfig {
          */
         CipherSuiteFilter CIPHER_SUITE_FILTER = SupportedCipherSuiteFilter.INSTANCE;
 
-        boolean USE_SERVER_NAME_IDENTIFICATION = true;
-
         /**
          * Default for SSL client authentication.
          */
         ClientAuthMode SSL_CLIENT_AUTH_MODE = ClientAuthMode.NONE;
+
+        /**
+         * Default for pool retries per node.
+         */
+        Integer RETRIES_PER_NODE = 0;
+
+        /**
+         * Default pool HTTP version.
+         */
+        HttpVersion POOL_VERSION = HttpVersion.HTTP_1_1;
+
+        /**
+         * Default connection pool security.
+         */
+        Boolean POOL_SECURE = false;
+
+        /**
+         * Default HTTP/2 settings.
+         */
+        Http2Settings HTTP2_SETTINGS = Http2Settings.defaultSettings();
+
+        /**
+         * Default write buffer water mark.
+         */
+        WriteBufferWaterMark WRITE_BUFFER_WATER_MARK = WriteBufferWaterMark.DEFAULT;
+
+        /**
+         * Default for backoff.
+         */
+        BackOff BACK_OFF = BackOff.ZERO_BACKOFF;
     }
 
     private static TrustManagerFactory TRUST_MANAGER_FACTORY;
@@ -123,10 +169,6 @@ public class ClientConfig {
     static {
         try {
             TRUST_MANAGER_FACTORY = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-                    //InsecureTrustManagerFactory.INSTANCE;
-            //TRUST_MANAGER_FACTORY.init((KeyStore) null);
-            // java.lang.IllegalStateException: TrustManagerFactoryImpl is not initialized
-                    //TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
         } catch (Exception e) {
             TRUST_MANAGER_FACTORY = null;
         }
@@ -134,10 +176,10 @@ public class ClientConfig {
 
     private boolean debug = Defaults.DEBUG;
 
-    /**
-     * If set to 0, then Netty will decide about thread count.
-     * Default is Runtime.getRuntime().availableProcessors() * 2
-     */
+    private LogLevel debugLogLevel = Defaults.DEFAULT_DEBUG_LOG_LEVEL;
+
+    private boolean epoll = Defaults.EPOLL;
+
     private int threadCount = Defaults.THREAD_COUNT;
 
     private boolean tcpNodelay = Defaults.TCP_NODELAY;
@@ -178,8 +220,6 @@ public class ClientConfig {
 
     private KeyStore trustManagerKeyStore = null;
 
-    private boolean serverNameIdentification = Defaults.USE_SERVER_NAME_IDENTIFICATION;
-
     private ClientAuthMode clientAuthMode = Defaults.SSL_CLIENT_AUTH_MODE;
 
     private InputStream keyCertChainInputStream;
@@ -190,11 +230,23 @@ public class ClientConfig {
 
     private HttpProxyHandler httpProxyHandler;
 
-    private List<HttpAddress> nodes;
+    private List<HttpAddress> poolNodes = new ArrayList<>();
 
-    private Integer nodeConnectionLimit;
+    private Integer poolNodeConnectionLimit;
 
-    private Integer retriesPerNode;
+    private Integer retriesPerPoolNode = Defaults.RETRIES_PER_NODE;
+
+    private HttpVersion poolVersion = Defaults.POOL_VERSION;
+
+    private Boolean poolSecure = Defaults.POOL_SECURE;
+
+    private List<String> serverNamesForIdentification = new ArrayList<>();
+
+    private Http2Settings http2Settings = Defaults.HTTP2_SETTINGS;
+
+    private WriteBufferWaterMark writeBufferWaterMark = Defaults.WRITE_BUFFER_WATER_MARK;
+
+    private BackOff backOff = Defaults.BACK_OFF;
 
     public ClientConfig setDebug(boolean debug) {
         this.debug = debug;
@@ -213,6 +265,29 @@ public class ClientConfig {
 
     public boolean isDebug() {
         return debug;
+    }
+
+    public ClientConfig setDebugLogLevel(LogLevel debugLogLevel) {
+        this.debugLogLevel = debugLogLevel;
+        return this;
+    }
+
+    public LogLevel getDebugLogLevel() {
+        return debugLogLevel;
+    }
+
+    public ClientConfig enableEpoll() {
+        this.epoll = true;
+        return this;
+    }
+
+    public ClientConfig disableEpoll() {
+        this.epoll = false;
+        return this;
+    }
+
+    public boolean isEpoll() {
+        return epoll;
     }
 
     public ClientConfig setThreadCount(int threadCount) {
@@ -341,6 +416,15 @@ public class ClientConfig {
         return enableGzip;
     }
 
+    public ClientConfig setHttp2Settings(Http2Settings http2Settings) {
+        this.http2Settings = http2Settings;
+        return this;
+    }
+
+    public Http2Settings getHttp2Settings() {
+        return http2Settings;
+    }
+
     public ClientConfig setSslProvider(SslProvider sslProvider) {
         this.sslProvider = sslProvider;
         return this;
@@ -413,15 +497,6 @@ public class ClientConfig {
         return keyPassword;
     }
 
-    public ClientConfig setServerNameIdentification(boolean serverNameIdentification) {
-        this.serverNameIdentification = serverNameIdentification;
-        return this;
-    }
-
-    public boolean isServerNameIdentification() {
-        return serverNameIdentification;
-    }
-
     public ClientConfig setClientAuthMode(ClientAuthMode clientAuthMode) {
         this.clientAuthMode = clientAuthMode;
         return this;
@@ -458,31 +533,81 @@ public class ClientConfig {
         return httpProxyHandler;
     }
 
-    public ClientConfig setNodes(List<HttpAddress> nodes) {
-        this.nodes = nodes;
+    public ClientConfig setPoolNodes(List<HttpAddress> poolNodes) {
+        this.poolNodes = poolNodes;
         return this;
     }
 
-    public List<HttpAddress> getNodes() {
-        return nodes;
+    public List<HttpAddress> getPoolNodes() {
+        return poolNodes;
     }
 
-    public ClientConfig setNodeConnectionLimit(Integer nodeConnectionLimit) {
-        this.nodeConnectionLimit = nodeConnectionLimit;
+    public ClientConfig addPoolNode(HttpAddress poolNodeAddress) {
+        this.poolNodes.add(poolNodeAddress);
         return this;
     }
 
-    public Integer getNodeConnectionLimit() {
-        return nodeConnectionLimit;
-    }
-
-    public ClientConfig setRetriesPerNode(Integer retriesPerNode) {
-        this.retriesPerNode = retriesPerNode;
+    public ClientConfig setPoolNodeConnectionLimit(Integer poolNodeConnectionLimit) {
+        this.poolNodeConnectionLimit = poolNodeConnectionLimit;
         return this;
     }
 
-    public Integer getRetriesPerNode() {
-        return retriesPerNode;
+    public Integer getPoolNodeConnectionLimit() {
+        return poolNodeConnectionLimit;
+    }
+
+    public ClientConfig setRetriesPerPoolNode(Integer retriesPerPoolNode) {
+        this.retriesPerPoolNode = retriesPerPoolNode;
+        return this;
+    }
+
+    public Integer getRetriesPerPoolNode() {
+        return retriesPerPoolNode;
+    }
+
+    public ClientConfig setPoolVersion(HttpVersion poolVersion) {
+        this.poolVersion = poolVersion;
+        return this;
+    }
+
+    public HttpVersion getPoolVersion() {
+        return  poolVersion;
+    }
+
+    public ClientConfig setPoolSecure(boolean poolSecure) {
+        this.poolSecure = poolSecure;
+        return this;
+    }
+
+    public boolean isPoolSecure() {
+        return poolSecure;
+    }
+
+    public ClientConfig addServerNameForIdentification(String serverNameForIdentification) {
+        this.serverNamesForIdentification.add(serverNameForIdentification);
+        return this;
+    }
+
+    public List<String> getServerNamesForIdentification() {
+        return serverNamesForIdentification;
+    }
+
+    public ClientConfig setWriteBufferWaterMark(WriteBufferWaterMark writeBufferWaterMark) {
+        this.writeBufferWaterMark = writeBufferWaterMark;
+        return this;
+    }
+
+    public WriteBufferWaterMark getWriteBufferWaterMark() {
+        return writeBufferWaterMark;
+    }
+
+    public ClientConfig setBackOff(BackOff backOff) {
+        this.backOff = backOff;
+        return this;
+    }
+
+    public BackOff getBackOff() {
+        return backOff;
     }
 
     @Override
@@ -491,7 +616,5 @@ public class ClientConfig {
         sb.append("SSL=").append(sslProvider)
                 .append(",SSL context provider=").append(sslContextProvider != null ? sslContextProvider.getName() : "<none>");
         return sb.toString();
-
-
     }
 }

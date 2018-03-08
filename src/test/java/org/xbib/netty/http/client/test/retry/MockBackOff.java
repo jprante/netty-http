@@ -23,11 +23,13 @@ public class MockBackOff implements BackOff {
     /** Number of tries so far. */
     private int numTries;
 
-    public void reset() throws IOException {
+    @Override
+    public void reset() {
         numTries = 0;
     }
 
-    public long nextBackOffMillis() throws IOException {
+    @Override
+    public long nextBackOffMillis() {
         if (numTries >= maxTries || backOffMillis == STOP) {
             return STOP;
         }

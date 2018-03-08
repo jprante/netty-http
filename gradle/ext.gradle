@@ -1,9 +1,0 @@
-
-ext {
-    user = 'jprante'
-    name = 'netty-http-client'
-    description = 'A java client for Elasticsearch'
-    scmUrl = 'https://github.com/' + user + '/' + name
-    scmConnection = 'scm:git:git://github.com/' + user + '/' + name + '.git'
-    scmDeveloperConnection = 'scm:git:git://github.com/' + user + '/' + name + '.git'
-}

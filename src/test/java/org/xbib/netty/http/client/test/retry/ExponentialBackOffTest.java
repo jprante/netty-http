@@ -3,7 +3,6 @@ package org.xbib.netty.http.client.test.retry;
 import org.junit.Test;
 import org.xbib.netty.http.client.retry.BackOff;
 import org.xbib.netty.http.client.retry.ExponentialBackOff;
-import org.xbib.netty.http.client.retry.NanoClock;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -136,7 +135,7 @@ public class ExponentialBackOffTest {
         assertEquals(testMaxInterval, backOffPolicy.getCurrentIntervalMillis());
     }
 
-    static class MyNanoClock implements NanoClock {
+    static class MyNanoClock implements ExponentialBackOff.NanoClock {
 
         private int i = 0;
         private long startSeconds;

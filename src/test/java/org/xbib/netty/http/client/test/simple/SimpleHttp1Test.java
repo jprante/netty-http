@@ -1,11 +1,9 @@
 package org.xbib.netty.http.client.test.simple;
 
 import io.netty.bootstrap.Bootstrap;
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -20,11 +18,8 @@ import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.codec.http2.Http2Settings;
-import io.netty.handler.codec.http2.HttpConversionUtil;
-import io.netty.handler.logging.LogLevel;
-import io.netty.handler.logging.LoggingHandler;
 import io.netty.util.AttributeKey;
+import org.junit.After;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -32,6 +27,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -46,17 +42,26 @@ public class SimpleHttp1Test {
 
     private static final Logger logger = Logger.getLogger(SimpleHttp1Test.class.getName());
 
+    @After
+    public void checkThreads() {
+        Set<Thread> threadSet = Thread.getAllStackTraces().keySet();
+        logger.log(Level.INFO, "threads = " + threadSet.size() );
+        threadSet.forEach( thread -> {
+            if (thread.getName().equals("ObjectCleanerThread")) {
+                logger.log(Level.INFO, thread.toString());
+            }
+        });
+    }
+
     @Test
     public void testHttp1() throws Exception {
         Client client = new Client();
         try {
-            HttpTransport transport = client.newTransport("fl.hbz-nrw.de", 80);
+            HttpTransport transport = client.newTransport("xbib.org", 80);
             transport.onResponse(string -> logger.log(Level.INFO, "got messsage: " + string));
             transport.connect();
-            transport.awaitSettings();
             sendRequest(transport);
-            transport.awaitResponses();
-            transport.close();
+            transport.awaitResponse();
         } finally {
             client.shutdown();
         }
@@ -67,20 +72,18 @@ public class SimpleHttp1Test {
         if (channel == null) {
             return;
         }
-        Integer streamId = transport.nextStream();
         String host = transport.inetSocketAddress().getHostString();
         int port = transport.inetSocketAddress().getPort();
-        String uri = "https://" + host + ":" + port;
+        String uri = "http://" + host + ":" + port;
         FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, uri);
         request.headers().add(HttpHeaderNames.HOST, host + ":" + port);
         request.headers().add(HttpHeaderNames.USER_AGENT, "Java");
         request.headers().add(HttpHeaderNames.ACCEPT_ENCODING, HttpHeaderValues.GZIP);
         request.headers().add(HttpHeaderNames.ACCEPT_ENCODING, HttpHeaderValues.DEFLATE);
-        if (streamId != null) {
-            request.headers().add(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), Integer.toString(streamId));
-        }
         logger.log(Level.INFO, () -> "writing request = " + request);
-        channel.writeAndFlush(request);
+        if (channel.isWritable()) {
+            channel.writeAndFlush(request);
+        }
     }
 
     private AttributeKey<HttpTransport> TRANSPORT_ATTRIBUTE_KEY = AttributeKey.valueOf("transport");
@@ -115,16 +118,14 @@ public class SimpleHttp1Test {
             return bootstrap;
         }
 
-        Initializer initializer() {
-            return initializer;
-        }
-
-        HttpResponseHandler responseHandler() {
-            return httpResponseHandler;
-        }
-
         void shutdown() {
+            close();
             eventLoopGroup.shutdownGracefully();
+            try {
+                eventLoopGroup.awaitTermination(10L, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                logger.log(Level.WARNING, e.getMessage(), e);
+            }
         }
 
         HttpTransport newTransport(String host, int port) {
@@ -133,18 +134,11 @@ public class SimpleHttp1Test {
             return transport;
         }
 
-        List<HttpTransport> transports() {
-            return transports;
-        }
-
-        void close(HttpTransport transport) {
-            transports.remove(transport);
-        }
-
-        void close() {
+        synchronized void close() {
             for (HttpTransport transport : transports) {
                 transport.close();
             }
+            transports.clear();
         }
     }
 
@@ -165,10 +159,6 @@ public class SimpleHttp1Test {
             this.inetSocketAddress = inetSocketAddress;
         }
 
-        Client client() {
-            return client;
-        }
-
         InetSocketAddress inetSocketAddress() {
             return inetSocketAddress;
         }
@@ -176,50 +166,31 @@ public class SimpleHttp1Test {
         void connect() throws InterruptedException {
             channel = client.bootstrap().connect(inetSocketAddress).sync().await().channel();
             channel.attr(TRANSPORT_ATTRIBUTE_KEY).set(this);
+            promise = new CompletableFuture<>();
         }
 
         Channel channel() {
             return channel;
         }
 
-        Integer nextStream() {
-            promise = new CompletableFuture<>();
-            return null;
-        }
-
         void onResponse(ResponseWriter responseWriter) {
             this.responseWriter = responseWriter;
         }
 
-        void settingsReceived(Channel channel, Http2Settings http2Settings) {
-        }
-
-        void awaitSettings() {
-        }
-
-        void responseReceived(Integer streamId, String message) {
-            if (promise == null) {
-                logger.log(Level.WARNING, "message received for unknown stream id " + streamId);
-            } else {
-                if (responseWriter != null) {
-                    responseWriter.write(message);
-                }
+        void responseReceived(FullHttpResponse msg) {
+            if (responseWriter != null) {
+                responseWriter.write(msg.content().toString(StandardCharsets.UTF_8));
             }
         }
-        void awaitResponse(Integer streamId) {
+
+        void awaitResponse() {
             if (promise != null) {
                 try {
-                    logger.log(Level.INFO, "waiting for response");
                     promise.get(5, TimeUnit.SECONDS);
-                    logger.log(Level.INFO, "response received");
                 } catch (InterruptedException | ExecutionException | TimeoutException e) {
                     logger.log(Level.WARNING, e.getMessage(), e);
                 }
             }
-        }
-
-        void awaitResponses() {
-            awaitResponse(null);
         }
 
         void complete() {
@@ -238,7 +209,6 @@ public class SimpleHttp1Test {
             if (channel != null) {
                 channel.close();
             }
-            client.close(this);
         }
     }
 
@@ -252,7 +222,6 @@ public class SimpleHttp1Test {
 
         @Override
         protected void initChannel(SocketChannel ch) {
-            ch.pipeline().addLast(new TrafficLoggingHandler());
             ch.pipeline().addLast(new HttpClientCodec());
             ch.pipeline().addLast(new HttpObjectAggregator(1048576));
             ch.pipeline().addLast(httpResponseHandler);
@@ -265,7 +234,7 @@ public class SimpleHttp1Test {
         protected void channelRead0(ChannelHandlerContext ctx, FullHttpResponse msg) {
             HttpTransport transport = ctx.channel().attr(TRANSPORT_ATTRIBUTE_KEY).get();
             if (msg.content().isReadable()) {
-                transport.responseReceived(null, msg.content().toString(StandardCharsets.UTF_8));
+                transport.responseReceived(msg);
             }
         }
 
@@ -288,37 +257,6 @@ public class SimpleHttp1Test {
             HttpTransport transport = ctx.channel().attr(TRANSPORT_ATTRIBUTE_KEY).get();
             transport.fail(cause);
             ctx.channel().close();
-        }
-    }
-
-    class TrafficLoggingHandler extends LoggingHandler {
-
-        TrafficLoggingHandler() {
-            super("client", LogLevel.INFO);
-        }
-
-        @Override
-        public void channelRegistered(ChannelHandlerContext ctx) {
-            ctx.fireChannelRegistered();
-        }
-
-        @Override
-        public void channelUnregistered(ChannelHandlerContext ctx) {
-            ctx.fireChannelUnregistered();
-        }
-
-        @Override
-        public void flush(ChannelHandlerContext ctx) {
-            ctx.flush();
-        }
-
-        @Override
-        public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-            if (msg instanceof ByteBuf && !((ByteBuf) msg).isReadable()) {
-                ctx.write(msg, promise);
-            } else {
-                super.write(ctx, msg, promise);
-            }
         }
     }
 }

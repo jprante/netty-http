@@ -16,6 +16,7 @@ import io.netty.util.AsciiString;
 import org.xbib.net.QueryParameters;
 import org.xbib.net.URL;
 import org.xbib.net.URLSyntaxException;
+import org.xbib.netty.http.client.retry.BackOff;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -44,7 +45,7 @@ public class RequestBuilder {
 
     private static final boolean DEFAULT_FOLLOW_REDIRECT = true;
 
-    private static final int DEFAULT_TIMEOUT_MILLIS = 5000;
+    private static final long DEFAULT_TIMEOUT_MILLIS = -1L;
 
     private static final int DEFAULT_MAX_REDIRECT = 10;
 
@@ -74,11 +75,15 @@ public class RequestBuilder {
 
     private ByteBuf content;
 
-    private int timeout;
+    private long timeoutInMillis;
 
     private boolean followRedirect;
 
     private int maxRedirects;
+
+    private boolean enableBackOff;
+
+    private BackOff backOff;
 
     RequestBuilder() {
         httpMethod = DEFAULT_METHOD;
@@ -87,7 +92,7 @@ public class RequestBuilder {
         gzip = DEFAULT_GZIP;
         keepalive = DEFAULT_KEEPALIVE;
         url = DEFAULT_URL;
-        timeout = DEFAULT_TIMEOUT_MILLIS;
+        timeoutInMillis = DEFAULT_TIMEOUT_MILLIS;
         followRedirect = DEFAULT_FOLLOW_REDIRECT;
         maxRedirects = DEFAULT_MAX_REDIRECT;
         headers = new DefaultHttpHeaders();
@@ -121,8 +126,8 @@ public class RequestBuilder {
         return this;
     }
 
-    public RequestBuilder setTimeout(int timeout) {
-        this.timeout = timeout;
+    public RequestBuilder setTimeoutInMillis(long timeoutInMillis) {
+        this.timeoutInMillis = timeoutInMillis;
         return this;
     }
 
@@ -207,6 +212,16 @@ public class RequestBuilder {
         return this;
     }
 
+    public RequestBuilder enableBackOff(boolean enableBackOff) {
+        this.enableBackOff = enableBackOff;
+        return this;
+    }
+
+    public RequestBuilder setBackOff(BackOff backOff) {
+        this.backOff = backOff;
+        return this;
+    }
+
     public RequestBuilder setUserAgent(String userAgent) {
         this.userAgent = userAgent;
         return this;
@@ -255,14 +270,10 @@ public class RequestBuilder {
             throw new IllegalStateException("host in URL not defined: " + url);
         }
         if (uri != null) {
-            if (this.url != null) {
-                try {
-                    url = URL.base(url).resolve(uri);
-                } catch (URLSyntaxException e) {
-                    throw new IllegalArgumentException(e);
-                }
-            } else {
-                url(uri);
+            try {
+                url = URL.base(url).resolve(uri);
+            } catch (URLSyntaxException e) {
+                throw new IllegalArgumentException(e);
             }
         }
         // add explicit parameters to URL
@@ -320,7 +331,7 @@ public class RequestBuilder {
             validatedHeaders.remove(headerName);
         }
         return new Request(url, httpVersion, httpMethod, validatedHeaders, cookies, uri, content,
-                timeout, followRedirect, maxRedirects, 0);
+                timeoutInMillis, followRedirect, maxRedirects, 0, enableBackOff, backOff);
     }
 
     private void addHeader(AsciiString name, Object value) {

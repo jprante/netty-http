@@ -26,7 +26,7 @@ public class CookieSetterHttpBinTest extends LoggingBase {
      *     }
      *   }
      * </pre>
-     * @throws Exception
+     * @throws IOException if test fails
      */
     @Test
     public void testHttpBinCookies() throws IOException {

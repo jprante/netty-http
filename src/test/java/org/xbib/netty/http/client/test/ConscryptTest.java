@@ -17,15 +17,14 @@ public class ConscryptTest extends LoggingBase {
     @Test
     public void testConscrypt() throws IOException {
         Client client = Client.builder()
-                .enableDebug()
                 .setJdkSslProvider()
                 .setSslContextProvider(Conscrypt.newProvider())
                 .build();
         logger.log(Level.INFO, client.getClientConfig().toString());
         try {
             Request request = Request.get()
-                    .url("https://fl-test.hbz-nrw.de")
-                    .setVersion("HTTP/2.0")
+                    .url("https://xbib.org")
+                    .setVersion("HTTP/1.1")
                     .build()
                     .setResponseListener(fullHttpResponse -> {
                         String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);

@@ -137,22 +137,19 @@ public class ExponentialBackOff implements BackOff {
     /**
      * @param builder builder
      */
-    protected ExponentialBackOff(Builder builder) {
+    private ExponentialBackOff(Builder builder) {
         initialIntervalMillis = builder.initialIntervalMillis;
         randomizationFactor = builder.randomizationFactor;
         multiplier = builder.multiplier;
         maxIntervalMillis = builder.maxIntervalMillis;
         maxElapsedTimeMillis = builder.maxElapsedTimeMillis;
         nanoClock = builder.nanoClock;
-        //Preconditions.checkArgument(initialIntervalMillis > 0);
-        //Preconditions.checkArgument(0 <= randomizationFactor && randomizationFactor < 1);
-        //Preconditions.checkArgument(multiplier >= 1);
-        //Preconditions.checkArgument(maxIntervalMillis >= initialIntervalMillis);
-        //Preconditions.checkArgument(maxElapsedTimeMillis > 0);
         reset();
     }
 
-    /** Sets the interval back to the initial retry interval and restarts the timer. */
+    /**
+     * Sets the interval back to the initial retry interval and restarts the timer.
+     */
     public final void reset() {
         currentIntervalMillis = initialIntervalMillis;
         startTimeNanos = nanoClock.nanoTime();
@@ -276,6 +273,29 @@ public class ExponentialBackOff implements BackOff {
     }
 
     /**
+     * Nano clock which can be used to measure elapsed time in nanoseconds.
+     *
+     * <p>
+     * The default system implementation can be accessed at {@link #SYSTEM}. Alternative implementations
+     * may be used for testing.
+     * </p>
+     *
+     */
+    public interface NanoClock {
+
+        /**
+         * Returns the current value of the most precise available system timer, in nanoseconds for use to
+         * measure elapsed time, to match the behavior of {@link System#nanoTime()}.
+         */
+        long nanoTime();
+
+        /**
+         * Provides the default System implementation of a nano clock by using {@link System#nanoTime()}.
+         */
+        NanoClock SYSTEM = System::nanoTime;
+    }
+
+    /**
      * Builder for {@link ExponentialBackOff}.
      *
      * <p>
@@ -285,7 +305,7 @@ public class ExponentialBackOff implements BackOff {
     public static class Builder {
 
         /** The initial retry interval in milliseconds. */
-        int initialIntervalMillis = DEFAULT_INITIAL_INTERVAL_MILLIS;
+        private int initialIntervalMillis = DEFAULT_INITIAL_INTERVAL_MILLIS;
 
         /**
          * The randomization factor to use for creating a range around the retry interval.
@@ -295,32 +315,53 @@ public class ExponentialBackOff implements BackOff {
          * above the retry interval.
          * </p>
          */
-        double randomizationFactor = DEFAULT_RANDOMIZATION_FACTOR;
+        private double randomizationFactor = DEFAULT_RANDOMIZATION_FACTOR;
 
-        /** The value to multiply the current interval with for each retry attempt. */
-        double multiplier = DEFAULT_MULTIPLIER;
+        /**
+         * The value to multiply the current interval with for each retry attempt.
+         */
+        private double multiplier = DEFAULT_MULTIPLIER;
 
         /**
          * The maximum value of the back off period in milliseconds. Once the retry interval reaches
          * this value it stops increasing.
          */
-        int maxIntervalMillis = DEFAULT_MAX_INTERVAL_MILLIS;
+        private int maxIntervalMillis = DEFAULT_MAX_INTERVAL_MILLIS;
 
         /**
          * The maximum elapsed time in milliseconds after instantiating {@link ExponentialBackOff} or
          * calling {@link #reset()} after which {@link #nextBackOffMillis()} returns
          * {@link BackOff#STOP}.
          */
-        int maxElapsedTimeMillis = DEFAULT_MAX_ELAPSED_TIME_MILLIS;
+        private int maxElapsedTimeMillis = DEFAULT_MAX_ELAPSED_TIME_MILLIS;
 
-        /** Nano clock. */
-        NanoClock nanoClock = NanoClock.SYSTEM;
+        /**
+         * Nano clock.
+         */
+        private NanoClock nanoClock = NanoClock.SYSTEM;
 
         public Builder() {
         }
 
-        /** Builds a new instance of {@link ExponentialBackOff}. */
+        /**
+         * Builds a new instance of {@link ExponentialBackOff}.
+         * */
         public ExponentialBackOff build() {
+            if (initialIntervalMillis <= 0) {
+                throw new IllegalArgumentException();
+            }
+            if (!(0 <= randomizationFactor && randomizationFactor < 1)) {
+                throw new IllegalArgumentException();
+            }
+            if (multiplier < 1) {
+                throw new IllegalArgumentException();
+            }
+            if ((maxIntervalMillis < initialIntervalMillis)) {
+                throw new IllegalArgumentException();
+            }
+            if (maxElapsedTimeMillis <= 0) {
+                throw new IllegalArgumentException();
+            }
             return new ExponentialBackOff(this);
         }
 
@@ -480,7 +521,9 @@ public class ExponentialBackOff implements BackOff {
          * </p>
          */
         public Builder setNanoClock(NanoClock nanoClock) {
-            this.nanoClock = nanoClock; //Preconditions.checkNotNull(nanoClock);
+            if (nanoClock != null) {
+                this.nanoClock = nanoClock;
+            }
             return this;
         }
     }

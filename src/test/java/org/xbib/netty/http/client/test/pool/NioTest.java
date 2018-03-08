@@ -12,12 +12,13 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.codec.http.HttpVersion;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.xbib.netty.http.client.HttpAddress;
 import org.xbib.netty.http.client.pool.Pool;
-import org.xbib.netty.http.client.pool.SimpleChannelPool;
+import org.xbib.netty.http.client.pool.BoundedChannelPool;
 
 import java.util.Collections;
 import java.util.List;
@@ -72,7 +73,8 @@ public class NioTest {
             .option(ChannelOption.SO_KEEPALIVE, true)
             .option(ChannelOption.SO_REUSEADDR, true)
             .option(ChannelOption.TCP_NODELAY, true);
-        channelPool = new SimpleChannelPool<>(semaphore, NODES, bootstrap, null, 0);
+        channelPool = new BoundedChannelPool<>(semaphore, HttpVersion.HTTP_1_1,false,
+                NODES, bootstrap, null, 0);
         channelPool.prepare(CONCURRENCY);
     }
 

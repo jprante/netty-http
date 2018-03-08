@@ -7,7 +7,6 @@ import io.netty.handler.codec.http.cookie.Cookie;
 import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.util.AttributeKey;
-import org.xbib.netty.http.client.HttpAddress;
 import org.xbib.netty.http.client.Request;
 
 import java.io.IOException;
@@ -18,8 +17,6 @@ import java.util.function.Function;
 public interface Transport {
 
     AttributeKey<Transport> TRANSPORT_ATTRIBUTE_KEY = AttributeKey.valueOf("transport");
-
-    HttpAddress httpAddress();
 
     Transport execute(Request request) throws IOException;
 
@@ -41,7 +38,7 @@ public interface Transport {
 
     void pushPromiseReceived(Integer streamId, Integer promisedStreamId, Http2Headers headers);
 
-    void awaitResponse(Integer streamId);
+    void awaitResponse(Integer streamId) throws IOException;
 
     Transport get();
 
@@ -49,5 +46,9 @@ public interface Transport {
 
     void fail(Throwable throwable);
 
-    void close();
+    boolean isFailed();
+
+    Throwable getFailure();
+
+    void close() throws IOException;
 }

@@ -395,10 +395,8 @@ public class NetworkUtils {
             if (predicate.test(networkInterface)) {
                 networkInterfaces.add(networkInterface);
                 Enumeration<NetworkInterface> subInterfaces = networkInterface.getSubInterfaces();
-                if (subInterfaces.hasMoreElements()) {
-                    while (subInterfaces.hasMoreElements()) {
-                        networkInterfaces.add(subInterfaces.nextElement());
-                    }
+                while (subInterfaces.hasMoreElements()) {
+                    networkInterfaces.add(subInterfaces.nextElement());
                 }
             }
         }

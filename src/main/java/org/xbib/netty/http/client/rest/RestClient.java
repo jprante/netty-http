@@ -36,7 +36,13 @@ public class RestClient {
 
     public String asString() {
         ByteBuf byteBuf = response != null ? response.content() : null;
-        return byteBuf != null && byteBuf.isReadable() ? response.content().toString(StandardCharsets.UTF_8) : null;
+        try {
+            return byteBuf != null && byteBuf.isReadable() ? response.content().toString(StandardCharsets.UTF_8) : null;
+        } finally {
+            if (byteBuf != null) {
+                byteBuf.release();
+            }
+        }
     }
 
     public static RestClient get(String urlString) throws IOException {

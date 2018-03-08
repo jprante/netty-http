@@ -88,11 +88,11 @@ public class XbibTest extends LoggingBase {
     @Test
     public void testXbibOrgWithVeryShortReadTimeout() throws IOException {
         Client httpClient = Client.builder()
-                .setReadTimeoutMillis(50)
                 .build();
         try {
             httpClient.execute(Request.get()
                     .url("http://xbib.org")
+                    .setTimeoutInMillis(10)
                     .build()
                     .setResponseListener(fullHttpResponse -> {
                         String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);

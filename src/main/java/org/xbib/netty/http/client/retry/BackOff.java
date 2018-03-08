@@ -14,7 +14,7 @@ public interface BackOff {
     /**
      * Reset to initial state.
      */
-    void reset() throws IOException;
+    void reset();
 
     /**
      * Gets the number of milliseconds to wait before retrying the operation or {@link #STOP} to
@@ -33,7 +33,7 @@ public interface BackOff {
      }
      * </pre>
      */
-    long nextBackOffMillis() throws IOException;
+    long nextBackOffMillis();
 
     /**
      * Fixed back-off policy whose back-off time is always zero, meaning that the operation is retried

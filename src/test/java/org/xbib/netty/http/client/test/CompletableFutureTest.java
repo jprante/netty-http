@@ -26,7 +26,7 @@ public class CompletableFutureTest {
             final Function<FullHttpResponse, String> httpResponseStringFunction = response ->
                     response.content().toString(StandardCharsets.UTF_8);
             Request request = Request.get()
-                    .url("http://alkmene.hbz-nrw.de/repository/org/xbib/content/2.0.0-SNAPSHOT/maven-metadata-local.xml")
+                    .url("https://repo.maven.apache.org/maven2/org/xbib/netty-http-client/maven-metadata.xml.sha1")
                     .build();
             CompletableFuture<String> completableFuture = client.execute(request, httpResponseStringFunction)
                     .exceptionally(Throwable::getMessage)

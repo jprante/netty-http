@@ -6,14 +6,18 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.pool.ChannelPoolHandler;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.util.AttributeKey;
 
 import java.net.ConnectException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
@@ -22,11 +26,15 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class SimpleChannelPool<K extends PoolKey> implements Pool<Channel> {
+public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
 
-    private static final Logger logger = Logger.getLogger(SimpleChannelPool.class.getName());
+    private static final Logger logger = Logger.getLogger(BoundedChannelPool.class.getName());
 
     private final Semaphore semaphore;
+
+    private final HttpVersion httpVersion;
+
+    private final boolean isSecure;
 
     private final ChannelPoolHandler channelPoolhandler;
 
@@ -52,6 +60,8 @@ public class SimpleChannelPool<K extends PoolKey> implements Pool<Channel> {
 
     /**
      * @param semaphore the concurrency level
+     * @param httpVersion  the HTTP version of the pool connections
+     * @param isSecure if this pool has secure connections
      * @param nodes the endpoint nodes, any element may contain the port (followed after ":")
      *             to override the defaultPort argument
      * @param bootstrap bootstrap instance
@@ -59,16 +69,19 @@ public class SimpleChannelPool<K extends PoolKey> implements Pool<Channel> {
      * @param retriesPerNode the max count of the subsequent connection failures to the node before
      *                       the node will be excluded from the pool. If set to 0, the value is ignored.
      */
-    public SimpleChannelPool(Semaphore semaphore, List<K> nodes, Bootstrap bootstrap,
-                             ChannelPoolHandler channelPoolHandler, int retriesPerNode) {
+    public BoundedChannelPool(Semaphore semaphore, HttpVersion httpVersion, boolean isSecure,
+                              List<K> nodes, Bootstrap bootstrap,
+                              ChannelPoolHandler channelPoolHandler, int retriesPerNode) {
         this.semaphore = semaphore;
+        this.httpVersion = httpVersion;
+        this.isSecure = isSecure;
         this.channelPoolhandler = channelPoolHandler;
         this.nodes = nodes;
         this.retriesPerNode = retriesPerNode;
         this.lock = new ReentrantLock();
         this.attributeKey = AttributeKey.valueOf("poolKey");
         if (nodes == null || nodes.isEmpty()) {
-            throw new IllegalArgumentException("empty nodes array argument");
+            throw new IllegalArgumentException("nodes must not be empty");
         }
         this.numberOfNodes = nodes.size();
         bootstraps = new HashMap<>(numberOfNodes);
@@ -77,46 +90,48 @@ public class SimpleChannelPool<K extends PoolKey> implements Pool<Channel> {
         counts = new HashMap<>(numberOfNodes);
         failedCounts = new HashMap<>(numberOfNodes);
         for (K node : nodes) {
+            ChannelPoolInitializer initializer = new ChannelPoolInitializer(node, channelPoolHandler);
             bootstraps.put(node, bootstrap.clone().remoteAddress(node.getInetSocketAddress())
-                .handler(new ChannelInitializer<Channel>() {
-                    @Override
-                    protected void initChannel(Channel channel) throws Exception {
-                        if(!channel.eventLoop().inEventLoop()) {
-                            throw new IllegalStateException();
-                        }
-                        if (channelPoolHandler != null) {
-                            channelPoolHandler.channelCreated(channel);
-                        }
-                    }
-                }));
+                .handler(initializer));
             availableChannels.put(node, new ConcurrentLinkedQueue<>());
             counts.put(node, 0);
             failedCounts.put(node, 0);
         }
     }
 
+    public HttpVersion getVersion() {
+        return httpVersion;
+    }
+
+    public boolean isSecure() {
+        return isSecure;
+    }
+
+    public AttributeKey<K> getAttributeKey() {
+        return attributeKey;
+    }
+
     @Override
-    public void prepare(int count) throws ConnectException {
-        if (count > 0) {
-            for (int i = 0; i < count; i ++) {
-                Channel channel = connectToAnyNode();
-                if (channel == null) {
-                    throw new ConnectException("failed to prepare the connections");
-                }
-                K nodeAddr = channel.attr(attributeKey).get();
-                if (channel.isActive()) {
-                    Queue<Channel> channelQueue = availableChannels.get(nodeAddr);
-                    if (channelQueue != null) {
-                        channelQueue.add(channel);
-                    }
-                } else {
-                    channel.close();
-                }
-            }
-            logger.log(Level.FINE,"prepared " + count + " connections");
-        } else {
-            throw new IllegalArgumentException("Connection count should be > 0, but got " + count);
+    public void prepare(int channelCount) throws ConnectException {
+        if (channelCount <= 0) {
+            throw new IllegalArgumentException("channel count must be greater zero, but got " + channelCount);
         }
+        for (int i = 0; i < channelCount; i++) {
+            Channel channel = newConnection();
+            if (channel == null) {
+                throw new ConnectException("failed to prepare");
+            }
+            K key = channel.attr(attributeKey).get();
+            if (channel.isActive()) {
+                Queue<Channel> channelQueue = availableChannels.get(key);
+                if (channelQueue != null) {
+                    channelQueue.add(channel);
+                }
+            } else {
+                channel.close();
+            }
+        }
+        logger.log(Level.FINE,"prepared " + channelCount + " channels");
     }
 
     @Override
@@ -124,7 +139,7 @@ public class SimpleChannelPool<K extends PoolKey> implements Pool<Channel> {
         Channel channel = null;
         if (semaphore.tryAcquire()) {
             if ((channel = poll()) == null) {
-                channel = connectToAnyNode();
+                channel = newConnection();
             }
             if (channel == null) {
                 semaphore.release();
@@ -150,7 +165,7 @@ public class SimpleChannelPool<K extends PoolKey> implements Pool<Channel> {
         Channel channel;
         for (int i = 0; i < availableCount; i ++) {
             if (null == (channel = poll())) {
-                channel = connectToAnyNode();
+                channel = newConnection();
             }
             if (channel == null) {
                 semaphore.release(availableCount - i);
@@ -167,18 +182,23 @@ public class SimpleChannelPool<K extends PoolKey> implements Pool<Channel> {
 
     @Override
     public void release(Channel channel) throws Exception {
-        K nodeAddr = channel.attr(attributeKey).get();
-        if (channel.isActive()) {
-            Queue<Channel> channelQueue = availableChannels.get(nodeAddr);
-            if (channelQueue != null) {
-                channelQueue.add(channel);
+        try {
+            if (channel != null) {
+                if (channel.isActive()) {
+                    K key = channel.attr(attributeKey).get();
+                    Queue<Channel> channelQueue = availableChannels.get(key);
+                    if (channelQueue != null) {
+                        channelQueue.add(channel);
+                    }
+                } else if (channel.isOpen()) {
+                    channel.close();
+                }
+                if (channelPoolhandler != null) {
+                    channelPoolhandler.channelReleased(channel);
+                }
             }
+        } finally {
             semaphore.release();
-        } else {
-            channel.close();
-        }
-        if (channelPoolhandler != null) {
-            channelPoolhandler.channelReleased(channel);
         }
     }
 
@@ -193,65 +213,63 @@ public class SimpleChannelPool<K extends PoolKey> implements Pool<Channel> {
     public void close() {
         lock.lock();
         try {
-            int closedConnCount = 0;
-            for (K nodeAddr : availableChannels.keySet()) {
-                for (Channel conn : availableChannels.get(nodeAddr)) {
-                    if (conn.isOpen()) {
-                        conn.close();
-                        closedConnCount++;
-                    }
+            int count = 0;
+            Set<Channel> channelSet = new HashSet<>();
+            for (Map.Entry<K, Queue<Channel>> entry : availableChannels.entrySet()) {
+                channelSet.addAll(entry.getValue());
+            }
+            for (Map.Entry<K, List<Channel>> entry : channels.entrySet()) {
+                channelSet.addAll(entry.getValue());
+            }
+            for (Channel channel : channelSet) {
+                if (channel != null && channel.isOpen()) {
+                    logger.log(Level.FINE, "closing channel " + channel);
+                    channel.close();
+                    count++;
                 }
             }
             availableChannels.clear();
-            for (K nodeAddr : channels.keySet()) {
-                for (Channel channel : channels.get(nodeAddr)) {
-                    if (channel != null && channel.isOpen()) {
-                        channel.close();
-                        closedConnCount++;
-                    }
-                }
-            }
             channels.clear();
             bootstraps.clear();
             counts.clear();
-            logger.log(Level.FINE, "closed " + closedConnCount + " connections");
+            logger.log(Level.FINE, "closed " + count + " connections");
         } finally {
             lock.unlock();
         }
     }
 
-    private Channel connectToAnyNode() throws ConnectException {
+    private Channel newConnection() throws ConnectException {
         Channel channel = null;
-        K nodeAddr = null;
-        K nextNodeAddr;
+        K key = null;
+        K nextKey;
         int min = Integer.MAX_VALUE;
         int next;
         int i = ThreadLocalRandom.current().nextInt(numberOfNodes);
         for (int j = i; j < numberOfNodes; j ++) {
-            nextNodeAddr = nodes.get(j % numberOfNodes);
-            next = counts.get(nextNodeAddr);
-            if(next == 0) {
-                nodeAddr = nextNodeAddr;
+            nextKey = nodes.get(j % numberOfNodes);
+            next = counts.get(nextKey);
+            if (next == 0) {
+                key = nextKey;
                 break;
             } else if (next < min) {
                 min = next;
-                nodeAddr = nextNodeAddr;
+                key = nextKey;
             }
         }
-        if (nodeAddr != null) {
-            logger.log(Level.FINE, "trying connection to " + nodeAddr);
+        if (key != null) {
+            logger.log(Level.FINE, "trying connection to " + key);
             try {
-                channel = connect(nodeAddr);
+                channel = connect(key);
             } catch (Exception e) {
-                logger.log(Level.WARNING, "failed to create a new connection to " + nodeAddr + ": " + e.toString());
+                logger.log(Level.WARNING, "failed to create a new connection to " + key + ": " + e.toString());
                 if (retriesPerNode > 0) {
-                    int selectedNodeFailedConnAttemptsCount = failedCounts.get(nodeAddr) + 1;
-                    failedCounts.put(nodeAddr, selectedNodeFailedConnAttemptsCount);
+                    int selectedNodeFailedConnAttemptsCount = failedCounts.get(key) + 1;
+                    failedCounts.put(key, selectedNodeFailedConnAttemptsCount);
                     if (selectedNodeFailedConnAttemptsCount > retriesPerNode) {
-                        logger.log(Level.WARNING, "failed to connect to the node " + nodeAddr + " "
+                        logger.log(Level.WARNING, "failed to connect to the node " + key + " "
                                         + selectedNodeFailedConnAttemptsCount + " times, "
                                         + "excluding the node from the connection pool");
-                        counts.put(nodeAddr, Integer.MAX_VALUE);
+                        counts.put(key, Integer.MAX_VALUE);
                         boolean allNodesExcluded = true;
                         for (K node : nodes) {
                             if (counts.get(node) < Integer.MAX_VALUE) {
@@ -272,22 +290,22 @@ public class SimpleChannelPool<K extends PoolKey> implements Pool<Channel> {
             }
         }
         if (channel != null) {
-            channel.closeFuture().addListener(new CloseChannelListener(nodeAddr, channel));
-            channel.attr(attributeKey).set(nodeAddr);
-            channels.computeIfAbsent(nodeAddr, node -> new ArrayList<>()).add(channel);
+            channel.closeFuture().addListener(new CloseChannelListener(key, channel));
+            channel.attr(attributeKey).set(key);
+            channels.computeIfAbsent(key, node -> new ArrayList<>()).add(channel);
             synchronized (counts) {
-                counts.put(nodeAddr, counts.get(nodeAddr) + 1);
+                counts.put(key, counts.get(key) + 1);
             }
-            if(retriesPerNode > 0) {
-                failedCounts.put(nodeAddr, 0);
+            if (retriesPerNode > 0) {
+                failedCounts.put(key, 0);
             }
-            logger.log(Level.FINE,"new connection to " + nodeAddr + " created");
+            logger.log(Level.FINE,"new connection to " + key + " created");
         }
         return channel;
     }
 
-    private Channel connect(K addr) throws Exception {
-        Bootstrap bootstrap = bootstraps.get(addr);
+    private Channel connect(K key) throws Exception {
+        Bootstrap bootstrap = bootstraps.get(key);
         if (bootstrap != null) {
             return bootstrap.connect().sync().channel();
         }
@@ -312,26 +330,26 @@ public class SimpleChannelPool<K extends PoolKey> implements Pool<Channel> {
 
     private class CloseChannelListener implements ChannelFutureListener {
 
-        private final K nodeAddr;
+        private final K key;
         private final Channel channel;
 
-        private CloseChannelListener(K nodeAddr, Channel channel) {
-            this.nodeAddr = nodeAddr;
+        private CloseChannelListener(K key, Channel channel) {
+            this.key = key;
             this.channel = channel;
         }
 
         @Override
         public void operationComplete(ChannelFuture future) {
-            logger.log(Level.FINE,"connection to " + nodeAddr + " closed");
+            logger.log(Level.FINE,"connection to " + key + " closed");
             lock.lock();
             try {
                 synchronized (counts) {
-                    if (counts.containsKey(nodeAddr)) {
-                        counts.put(nodeAddr, counts.get(nodeAddr) - 1);
+                    if (counts.containsKey(key)) {
+                        counts.put(key, counts.get(key) - 1);
                     }
                 }
                 synchronized (channels) {
-                    List<Channel> channels = SimpleChannelPool.this.channels.get(nodeAddr);
+                    List<Channel> channels = BoundedChannelPool.this.channels.get(key);
                     if (channels != null) {
                         channels.remove(channel);
                     }
@@ -339,6 +357,29 @@ public class SimpleChannelPool<K extends PoolKey> implements Pool<Channel> {
                 semaphore.release();
             } finally {
                 lock.unlock();
+            }
+        }
+    }
+
+    class ChannelPoolInitializer extends ChannelInitializer<SocketChannel> {
+
+        private final K key;
+
+        private final ChannelPoolHandler channelPoolHandler;
+
+        ChannelPoolInitializer(K key, ChannelPoolHandler channelPoolHandler) {
+            this.key = key;
+            this.channelPoolHandler = channelPoolHandler;
+        }
+
+        @Override
+        protected void initChannel(SocketChannel channel) throws Exception {
+            if (!channel.eventLoop().inEventLoop()) {
+                throw new IllegalStateException();
+            }
+            channel.attr(attributeKey).set(key);
+            if (channelPoolHandler != null) {
+                channelPoolHandler.channelCreated(channel);
             }
         }
     }

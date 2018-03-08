@@ -2,10 +2,14 @@ package org.xbib.netty.http.client;
 
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.WriteBufferWaterMark;
 import io.netty.channel.socket.SocketChannel;
+import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.ssl.CipherSuiteFilter;
 import io.netty.handler.ssl.SslProvider;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 
 import javax.net.ssl.TrustManagerFactory;
 import java.io.InputStream;
@@ -155,11 +159,6 @@ public class ClientBuilder {
         return this;
     }
 
-    public ClientBuilder setTrustManagerFactory(TrustManagerFactory trustManagerFactory) {
-        clientConfig.setTrustManagerFactory(trustManagerFactory);
-        return this;
-    }
-
     public ClientBuilder setKeyCert(InputStream keyCertChainInputStream, InputStream keyInputStream) {
         clientConfig.setKeyCert(keyCertChainInputStream, keyInputStream);
         return this;
@@ -171,8 +170,13 @@ public class ClientBuilder {
         return this;
     }
 
-    public ClientBuilder setServerNameIdentification(boolean serverNameIdentification) {
-        clientConfig.setServerNameIdentification(serverNameIdentification);
+    public ClientBuilder setTrustManagerFactory(TrustManagerFactory trustManagerFactory) {
+        clientConfig.setTrustManagerFactory(trustManagerFactory);
+        return this;
+    }
+
+    public ClientBuilder trustInsecure() {
+        clientConfig.setTrustManagerFactory(InsecureTrustManagerFactory.INSTANCE);
         return this;
     }
 
@@ -183,6 +187,46 @@ public class ClientBuilder {
 
     public ClientBuilder setHttpProxyHandler(HttpProxyHandler httpProxyHandler) {
         clientConfig.setHttpProxyHandler(httpProxyHandler);
+        return this;
+    }
+
+    public ClientBuilder addPoolNode(HttpAddress httpAddress) {
+        clientConfig.addPoolNode(httpAddress);
+        return this;
+    }
+
+    public ClientBuilder setPoolNodeConnectionLimit(int nodeConnectionLimit) {
+        clientConfig.setPoolNodeConnectionLimit(nodeConnectionLimit);
+        return this;
+    }
+
+    public ClientBuilder setRetriesPerPoolNode(int retriesPerNode) {
+        clientConfig.setRetriesPerPoolNode(retriesPerNode);
+        return this;
+    }
+
+    public ClientBuilder setPoolVersion(HttpVersion poolVersion) {
+        clientConfig.setPoolVersion(poolVersion);
+        return this;
+    }
+
+    public ClientBuilder setPoolSecure(boolean poolSecure) {
+        clientConfig.setPoolSecure(poolSecure);
+        return this;
+    }
+
+    public ClientBuilder addServerNameForIdentification(String serverName) {
+        clientConfig.addServerNameForIdentification(serverName);
+        return this;
+    }
+
+    public ClientBuilder setHttp2Settings(Http2Settings http2Settings) {
+        clientConfig.setHttp2Settings(http2Settings);
+        return this;
+    }
+
+    public ClientBuilder setWriteBufferWaterMark(WriteBufferWaterMark writeBufferWaterMark) {
+        clientConfig.setWriteBufferWaterMark(writeBufferWaterMark);
         return this;
     }
 

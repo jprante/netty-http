@@ -17,7 +17,7 @@ public class LoggingBase {
         Handler handler = new ConsoleHandler();
         handler.setFormatter(new SimpleFormatter());
         rootLogger.addHandler(handler);
-        rootLogger.setLevel(Level.INFO);
+        rootLogger.setLevel(Level.ALL);
         for (Handler h : rootLogger.getHandlers()) {
             handler.setFormatter(new SimpleFormatter());
             h.setLevel(Level.ALL);

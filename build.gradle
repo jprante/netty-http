@@ -2,6 +2,7 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
 plugins {
+    id "com.github.spotbugs" version "1.6.1"
     id "org.sonarqube" version "2.6.1"
     id "io.codearte.nexus-staging" version "0.11.0"
     id "org.xbib.gradle.plugin.asciidoctor" version "1.6.0.0"
@@ -23,9 +24,9 @@ printf "Date: %s\nHost: %s\nOS: %s %s %s\nJVM: %s %s %s %s\nGradle: %s Groovy: %
 apply plugin: 'java'
 apply plugin: 'maven'
 apply plugin: 'signing'
+apply plugin: "com.github.spotbugs"
 apply plugin: "io.codearte.nexus-staging"
 apply plugin: 'org.xbib.gradle.plugin.asciidoctor'
-
 
 configurations {
     alpnagent
@@ -37,7 +38,7 @@ dependencies {
     compile "org.xbib:net-url:${project.property('xbib-net-url.version')}"
     compile "io.netty:netty-codec-http2:${project.property('netty.version')}"
     compile "io.netty:netty-handler-proxy:${project.property('netty.version')}"
-    testCompile "io.netty:netty-transport-native-epoll:${project.property('netty.version')}"
+    compile "io.netty:netty-transport-native-epoll:${project.property('netty.version')}"
     testCompile "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
     testCompile "org.conscrypt:conscrypt-openjdk-uber:${project.property('conscrypt.version')}"
     testCompile "junit:junit:${project.property('junit.version')}"
@@ -66,7 +67,7 @@ test {
         jvmArgs "-javaagent:" + configurations.alpnagent.asPath
     }
     testLogging {
-        showStandardStreams = false
+        showStandardStreams = true
         exceptionFormat = 'full'
     }
 }
@@ -121,5 +122,109 @@ if (project.hasProperty('signing.keyId')) {
     }
 }
 
-apply from: 'gradle/ext.gradle'
-apply from: 'gradle/publish.gradle'
+
+spotbugs {
+    effort = "max"
+    reportLevel = "low"
+    //includeFilter = file("findbugs-exclude.xml")
+}
+
+tasks.withType(com.github.spotbugs.SpotBugsTask) {
+    ignoreFailures = true
+    reports {
+        xml.enabled = false
+        html.enabled = true
+    }
+}
+
+sonarqube {
+    properties {
+        property "sonar.projectName", "${project.group} ${project.name}"
+        property "sonar.sourceEncoding", "UTF-8"
+        property "sonar.tests", "src/test/java"
+        property "sonar.scm.provider", "git"
+        property "sonar.junit.reportsPath", "build/test-results/test/"
+    }
+}
+
+ext {
+    user = 'jprante'
+    name = 'netty-http-client'
+    description = 'A java client for Elasticsearch'
+    scmUrl = 'https://github.com/' + user + '/' + name
+    scmConnection = 'scm:git:git://github.com/' + user + '/' + name + '.git'
+    scmDeveloperConnection = 'scm:git:git://github.com/' + user + '/' + name + '.git'
+}
+
+
+task xbibUpload(type: Upload) {
+    group = 'publish'
+    configuration = configurations.archives
+    uploadDescriptor = true
+    repositories {
+        if (project.hasProperty("xbibUsername")) {
+            mavenDeployer {
+                configuration = configurations.wagon
+                repository(url: 'sftp://xbib.org/repository') {
+                    authentication(userName: xbibUsername, privateKey: xbibPrivateKey)
+                }
+            }
+        }
+    }
+}
+
+task sonaTypeUpload(type: Upload) {
+    group = 'publish'
+    configuration = configurations.archives
+    uploadDescriptor = true
+    repositories {
+        if (project.hasProperty('ossrhUsername')) {
+            mavenDeployer {
+                beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+                repository(url: 'https://oss.sonatype.org/service/local/staging/deploy/maven2') {
+                    authentication(userName: ossrhUsername, password: ossrhPassword)
+                }
+                snapshotRepository(url: 'https://oss.sonatype.org/content/repositories/snapshots') {
+                    authentication(userName: ossrhUsername, password: ossrhPassword)
+                }
+                pom.project {
+                    groupId project.group
+                    artifactId project.name
+                    version project.version
+                    name project.name
+                    description description
+                    packaging 'jar'
+                    inceptionYear '2012'
+                    url scmUrl
+                    organization {
+                        name 'xbib'
+                        url 'http://xbib.org'
+                    }
+                    developers {
+                        developer {
+                            id user
+                            name 'Jörg Prante'
+                            email 'joergprante@gmail.com'
+                            url 'https://github.com/jprante'
+                        }
+                    }
+                    scm {
+                        url scmUrl
+                        connection scmConnection
+                        developerConnection scmDeveloperConnection
+                    }
+                    licenses {
+                        license {
+                            name 'The Apache License, Version 2.0'
+                            url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+nexusStaging {
+    packageGroup = "org.xbib"
+}

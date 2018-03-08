@@ -13,13 +13,14 @@ import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 
+import io.netty.handler.codec.http.HttpVersion;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.xbib.netty.http.client.HttpAddress;
 import org.xbib.netty.http.client.pool.Pool;
-import org.xbib.netty.http.client.pool.SimpleChannelPool;
+import org.xbib.netty.http.client.pool.BoundedChannelPool;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -34,6 +35,7 @@ import java.util.concurrent.atomic.LongAdder;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+@Ignore
 public class EpollTest {
 
     private static final Logger logger = Logger.getLogger(EpollTest.class.getName());
@@ -74,7 +76,8 @@ public class EpollTest {
             .option(ChannelOption.SO_KEEPALIVE, true)
             .option(ChannelOption.SO_REUSEADDR, true)
             .option(ChannelOption.TCP_NODELAY, true);
-        channelPool = new SimpleChannelPool<>(semaphore, NODES, bootstrap, null, 0);
+        channelPool = new BoundedChannelPool<>(semaphore, HttpVersion.HTTP_1_1,false,
+                NODES, bootstrap, null, 0);
         channelPool.prepare(CONCURRENCY);
     }
 
@@ -85,7 +88,6 @@ public class EpollTest {
         mockEpollServer.close();
     }
 
-    @Ignore
     @Test
     public void testPoolEpoll() throws Exception {
         LongAdder longAdder = new LongAdder();

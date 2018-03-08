@@ -10,14 +10,18 @@ import org.xbib.net.URL;
 import org.xbib.netty.http.client.listener.CookieListener;
 import org.xbib.netty.http.client.listener.HttpHeadersListener;
 import org.xbib.netty.http.client.listener.HttpResponseListener;
+import org.xbib.netty.http.client.retry.BackOff;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
 
 /**
- *
+ * HTTP client request.
  */
-public class Request {
+public class Request implements Closeable {
 
     private final URL base;
 
@@ -33,13 +37,19 @@ public class Request {
 
     private final ByteBuf content;
 
-    private final int timeout;
+    private final long timeoutInMillis;
 
     private final boolean followRedirect;
 
     private final int maxRedirects;
 
     private int redirectCount;
+
+    private final boolean isBackOff;
+
+    private final BackOff backOff;
+
+    private CompletableFuture<?> completableFuture;
 
     private HttpResponseListener responseListener;
 
@@ -50,7 +60,8 @@ public class Request {
     Request(URL url, HttpVersion httpVersion, HttpMethod httpMethod,
             HttpHeaders headers, Collection<Cookie> cookies,
             String uri, ByteBuf content,
-            int timeout, boolean followRedirect, int maxRedirect, int redirectCount) {
+            long timeoutInMillis, boolean followRedirect, int maxRedirect, int redirectCount,
+            boolean isBackOff, BackOff backOff) {
         this.base = url;
         this.httpVersion = httpVersion;
         this.httpMethod = httpMethod;
@@ -58,10 +69,12 @@ public class Request {
         this.cookies = cookies;
         this.uri = uri;
         this.content = content;
-        this.timeout = timeout;
+        this.timeoutInMillis = timeoutInMillis;
         this.followRedirect = followRedirect;
         this.maxRedirects = maxRedirect;
         this.redirectCount = redirectCount;
+        this.isBackOff = isBackOff;
+        this.backOff = backOff;
     }
 
     public URL base() {
@@ -92,15 +105,27 @@ public class Request {
         return content;
     }
 
-    public int getTimeout() {
-        return timeout;
+    /**
+     * Return the timeout in milliseconds per request. This overrides the read timeout of the client.
+     * @return timeout timeout in milliseconds
+     */
+    public long getTimeoutInMillis() {
+        return timeoutInMillis;
     }
 
     public boolean isFollowRedirect() {
         return followRedirect;
     }
 
-    public boolean checkRedirect() {
+    public boolean isBackOff() {
+        return isBackOff;
+    }
+
+    public BackOff getBackOff() {
+        return backOff;
+    }
+
+    public boolean canRedirect() {
         if (!followRedirect) {
             return false;
         }
@@ -122,6 +147,15 @@ public class Request {
                 .append(",content=").append(content != null ? content.copy(0,16).toString(StandardCharsets.UTF_8) : "")
                 .append("]");
         return sb.toString();
+    }
+
+    public Request setCompletableFuture(CompletableFuture<?> completableFuture) {
+        this.completableFuture = completableFuture;
+        return this;
+    }
+
+    public CompletableFuture<?> getCompletableFuture() {
+        return completableFuture;
     }
 
     public Request setHeadersListener(HttpHeadersListener httpHeadersListener) {
@@ -189,5 +223,12 @@ public class Request {
 
     public static RequestBuilder builder(HttpMethod httpMethod) {
         return new RequestBuilder().setMethod(httpMethod);
+    }
+
+    @Override
+    public void close() throws IOException {
+        if (content != null) {
+            content.release();
+        }
     }
 }

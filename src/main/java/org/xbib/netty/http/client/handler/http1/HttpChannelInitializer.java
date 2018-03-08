@@ -6,87 +6,59 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http.HttpContentDecompressor;
 import io.netty.handler.codec.http.HttpObjectAggregator;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.SslHandler;
 import org.xbib.netty.http.client.ClientConfig;
 import org.xbib.netty.http.client.HttpAddress;
-import org.xbib.netty.http.client.handler.TrafficLoggingHandler;
 
-import javax.net.ssl.SNIHostName;
-import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLException;
-import javax.net.ssl.SSLParameters;
-import java.util.Collections;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class HttpChannelInitializer extends ChannelInitializer<SocketChannel> {
+
+    private static final Logger logger = Logger.getLogger(HttpChannelInitializer.class.getName());
 
     private final ClientConfig clientConfig;
 
     private final HttpAddress httpAddress;
 
+    private final SslHandler sslHandler;
+
     private final HttpResponseHandler httpResponseHandler;
 
-    public HttpChannelInitializer(ClientConfig clientConfig, HttpAddress httpAddress, HttpResponseHandler httpResponseHandler) {
+    public HttpChannelInitializer(ClientConfig clientConfig,
+                                  HttpAddress httpAddress,
+                                  SslHandler sslHandler,
+                                  HttpResponseHandler httpResponseHandler) {
         this.clientConfig = clientConfig;
         this.httpAddress = httpAddress;
+        this.sslHandler = sslHandler;
         this.httpResponseHandler = httpResponseHandler;
     }
 
     @Override
-    protected void initChannel(SocketChannel ch) {
+    public void initChannel(SocketChannel channel) {
         if (clientConfig.isDebug()) {
-            ch.pipeline().addLast(new TrafficLoggingHandler());
+            channel.pipeline().addLast(new TrafficLoggingHandler(LogLevel.DEBUG));
         }
         if (httpAddress.isSecure()) {
-            configureEncryptedHttp1(ch);
+            configureEncrypted(channel);
         } else {
-            configureCleartextHttp1(ch);
+            configureCleartext(channel);
+        }
+        if (clientConfig.isDebug()) {
+            logger.log(Level.FINE, "HTTP 1 channel initialized: " + channel.pipeline().names());
         }
     }
 
-    private void configureEncryptedHttp1(SocketChannel ch)  {
-        ChannelPipeline pipeline = ch.pipeline();
-        try {
-            SslContextBuilder sslContextBuilder = SslContextBuilder.forClient()
-                    .sslProvider(clientConfig.getSslProvider())
-                    .keyManager(clientConfig.getKeyCertChainInputStream(), clientConfig.getKeyInputStream(),
-                            clientConfig.getKeyPassword())
-                    .ciphers(clientConfig.getCiphers(), clientConfig.getCipherSuiteFilter());
-            if (clientConfig.getSslContextProvider() != null) {
-                sslContextBuilder.sslContextProvider(clientConfig.getSslContextProvider());
-            }
-            if (clientConfig.getTrustManagerFactory() != null) {
-                sslContextBuilder.trustManager(clientConfig.getTrustManagerFactory());
-            }
-            SslContext sslContext = sslContextBuilder.build();
-            SslHandler sslHandler = sslContext.newHandler(ch.alloc());
-            SSLEngine engine = sslHandler.engine();
-            if (clientConfig.isServerNameIdentification()) {
-                String fullQualifiedHostname = httpAddress.getInetSocketAddress().getHostName();
-                SSLParameters params = engine.getSSLParameters();
-                params.setServerNames(Collections.singletonList(new SNIHostName(fullQualifiedHostname)));
-                engine.setSSLParameters(params);
-            }
-            pipeline.addLast(sslHandler);
-            switch (clientConfig.getClientAuthMode()) {
-                case NEED:
-                    engine.setNeedClientAuth(true);
-                    break;
-                case WANT:
-                    engine.setWantClientAuth(true);
-                    break;
-                default:
-                    break;
-            }
-        } catch (SSLException e) {
-            throw new IllegalStateException("unable to configure SSL: " + e.getMessage(), e);
-        }
-        configureCleartextHttp1(ch);
+    private void configureEncrypted(SocketChannel channel)  {
+        ChannelPipeline pipeline = channel.pipeline();
+        pipeline.addLast(sslHandler);
+        configureCleartext(channel);
     }
 
-    private void configureCleartextHttp1(SocketChannel ch) {
-        ChannelPipeline pipeline = ch.pipeline();
+    private void configureCleartext(SocketChannel channel) {
+        ChannelPipeline pipeline = channel.pipeline();
         pipeline.addLast(new HttpClientCodec(clientConfig.getMaxInitialLineLength(),
                  clientConfig.getMaxHeadersSize(), clientConfig.getMaxChunkSize()));
         if (clientConfig.isEnableGzip()) {

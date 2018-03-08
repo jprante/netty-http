@@ -83,7 +83,7 @@ public class ElasticsearchTest extends LoggingBase {
                 .build()
                 .setResponseListener(fullHttpResponse ->
                     logger.log(Level.FINE, "status = " + fullHttpResponse.status() +
-                            " counter = " + count.incrementAndGet() +
+                            " counter = " + count.getAndIncrement() +
                             " response body = " + fullHttpResponse.content().toString(StandardCharsets.UTF_8)));
     }
 

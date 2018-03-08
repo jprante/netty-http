@@ -1,4 +1,4 @@
-package org.xbib.netty.http.client.handler;
+package org.xbib.netty.http.client.handler.http1;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandler;
@@ -13,8 +13,8 @@ import io.netty.handler.logging.LoggingHandler;
 @ChannelHandler.Sharable
 public class TrafficLoggingHandler extends LoggingHandler {
 
-    public TrafficLoggingHandler() {
-        super("client", LogLevel.TRACE);
+    public TrafficLoggingHandler(LogLevel level) {
+        super("client", level);
     }
 
     @Override

@@ -2,6 +2,14 @@ package org.xbib.netty.http.client.test.pool;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
+import io.netty.handler.codec.http.HttpVersion;
+import io.netty.util.AttributeKey;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.xbib.netty.http.client.HttpAddress;
+import org.xbib.netty.http.client.pool.BoundedChannelPool;
+import org.xbib.netty.http.client.pool.Pool;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,21 +25,13 @@ import java.util.concurrent.atomic.LongAdder;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import io.netty.util.AttributeKey;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.xbib.netty.http.client.HttpAddress;
-import org.xbib.netty.http.client.pool.Pool;
-import org.xbib.netty.http.client.pool.SimpleChannelPool;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 @RunWith(Parameterized.class)
-public class SimplePoolTest {
+public class PoolTest {
 
-    private static final Logger logger = Logger.getLogger(SimplePoolTest.class.getName());
+    private static final Logger logger = Logger.getLogger(PoolTest.class.getName());
 
     private static final int TEST_STEP_TIME_SECONDS = 50;
 
@@ -51,14 +51,14 @@ public class SimplePoolTest {
                 });
     }
 
-    public SimplePoolTest(int concurrencyLevel, int nodeCount) {
+    public PoolTest(int concurrencyLevel, int nodeCount) {
         this.nodeCount = nodeCount;
         List<HttpAddress> nodes = new ArrayList<>();
         for (int i = 0; i < nodeCount; i ++) {
             nodes.add(HttpAddress.http1("localhost" + i));
         }
-        try (Pool<Channel> pool = new SimpleChannelPool<>(new Semaphore(concurrencyLevel), nodes, new Bootstrap(),
-                        null, 0)) {
+        try (Pool<Channel> pool = new BoundedChannelPool<>(new Semaphore(concurrencyLevel), HttpVersion.HTTP_1_1, false,
+                nodes, new Bootstrap(), null, 0)) {
             int n = Runtime.getRuntime().availableProcessors();
             ExecutorService executorService = Executors.newFixedThreadPool(n);
             for(int i = 0; i < n; i ++) {
