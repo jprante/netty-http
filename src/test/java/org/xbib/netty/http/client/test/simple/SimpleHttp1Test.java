@@ -46,7 +46,7 @@ public class SimpleHttp1Test {
     private static final Logger logger = Logger.getLogger(SimpleHttp1Test.class.getName());
 
     static {
-        System.setProperty("io.netty.leakDetection.level", "advanced");
+        System.setProperty("io.netty.leakDetection.level", "paranoid");
         System.setProperty("io.netty.noKeySetOptimization", Boolean.toString(true));
 
         System.setProperty("java.util.logging.SimpleFormatter.format",

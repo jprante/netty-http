@@ -75,7 +75,7 @@ public final class Client {
             System.setProperty("io.netty.recycler.maxCapacity", Integer.toString(0));
         }
         if (System.getProperty("io.netty.leakDetection.level") == null) {
-            System.setProperty("io.netty.leakDetection.level", "advanced");
+            System.setProperty("io.netty.leakDetection.level", "paranoid");
         }
     }
 
