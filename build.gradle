@@ -21,107 +21,182 @@ printf "Date: %s\nHost: %s\nOS: %s %s %s\nJVM: %s %s %s %s\nGradle: %s Groovy: %
         System.getProperty("java.vm.name"),
         gradle.gradleVersion, GroovySystem.getVersion(), JavaVersion.current()
 
-apply plugin: 'java'
-apply plugin: 'maven'
-apply plugin: 'signing'
-apply plugin: "com.github.spotbugs"
 apply plugin: "io.codearte.nexus-staging"
-apply plugin: 'org.xbib.gradle.plugin.asciidoctor'
 
-configurations {
-    alpnagent
-    asciidoclet
-    wagon
-}
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'maven'
+    apply plugin: 'signing'
+    apply plugin: "com.github.spotbugs"
+    apply plugin: 'org.xbib.gradle.plugin.asciidoctor'
 
-dependencies {
-    compile "org.xbib:net-url:${project.property('xbib-net-url.version')}"
-    compile "io.netty:netty-codec-http2:${project.property('netty.version')}"
-    compile "io.netty:netty-handler-proxy:${project.property('netty.version')}"
-    compile "io.netty:netty-transport-native-epoll:${project.property('netty.version')}"
-    testCompile "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
-    testCompile "org.conscrypt:conscrypt-openjdk-uber:${project.property('conscrypt.version')}"
-    testCompile "junit:junit:${project.property('junit.version')}"
-    testCompile "com.fasterxml.jackson.core:jackson-databind:${project.property('jackson.version')}"
-    alpnagent "org.mortbay.jetty.alpn:jetty-alpn-agent:${project.property('alpnagent.version')}"
-    asciidoclet "org.xbib:asciidoclet:${project.property('asciidoclet.version')}"
-    wagon "org.apache.maven.wagon:wagon-ssh:${project.property('wagon.version')}"
-}
-
-sourceCompatibility = JavaVersion.VERSION_1_8
-targetCompatibility = JavaVersion.VERSION_1_8
-
-[compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
-tasks.withType(JavaCompile) {
-    options.compilerArgs << "-Xlint:all,-serial"
-}
-
-jar {
-    manifest {
-        attributes('Implementation-Version': project.version)
+    configurations {
+        alpnagent
+        asciidoclet
+        wagon
     }
-}
 
-test {
-    if (JavaVersion.current() == JavaVersion.VERSION_1_8) {
-        jvmArgs "-javaagent:" + configurations.alpnagent.asPath
+    dependencies {
+        alpnagent "org.mortbay.jetty.alpn:jetty-alpn-agent:${project.property('alpnagent.version')}"
+        asciidoclet "org.xbib:asciidoclet:${project.property('asciidoclet.version')}"
+        wagon "org.apache.maven.wagon:wagon-ssh:${project.property('wagon.version')}"
     }
-    testLogging {
-        showStandardStreams = false
-        exceptionFormat = 'full'
+
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+
+    [compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
+    tasks.withType(JavaCompile) {
+        options.compilerArgs << "-Xlint:all,-serial"
     }
-}
 
-clean {
-    delete 'out'
-}
-
-asciidoctor {
-    attributes toc: 'left',
-            doctype: 'book',
-            icons: 'font',
-            encoding: 'utf-8',
-            sectlink: true,
-            sectanchors: true,
-            linkattrs: true,
-            imagesdir: 'img',
-            'source-highlighter': 'coderay'
-}
-
-javadoc {
-    options.docletpath = configurations.asciidoclet.files.asType(List)
-    options.doclet = "org.xbib.asciidoclet.Asciidoclet"
-    options.overview = "src/docs/asciidoclet/overview.adoc"
-    options.addStringOption "-base-dir", "${projectDir}"
-    options.addStringOption "-attribute",
-            "name=${project.name},version=${project.version},title-link=https://github.com/jprante/${project.name}"
-    configure(options) {
-        noTimestamp = true
+    jar {
+        manifest {
+            attributes('Implementation-Version': project.version)
+        }
     }
-}
 
-task javadocJar(type: Jar, dependsOn: classes) {
-    from javadoc
-    into "build/tmp"
-    classifier 'javadoc'
-}
-
-task sourcesJar(type: Jar, dependsOn: classes) {
-    from sourceSets.main.allSource
-    into "build/tmp"
-    classifier 'sources'
-}
-
-artifacts {
-    archives javadocJar, sourcesJar
-}
-
-if (project.hasProperty('signing.keyId')) {
-    signing {
-        sign configurations.archives
+    test {
+        if (JavaVersion.current() == JavaVersion.VERSION_1_8) {
+            jvmArgs "-javaagent:" + configurations.alpnagent.asPath
+        }
+        testLogging {
+            showStandardStreams = false
+            exceptionFormat = 'full'
+        }
     }
-}
 
+    clean {
+        delete 'out'
+    }
+
+    asciidoctor {
+        attributes toc: 'left',
+                doctype: 'book',
+                icons: 'font',
+                encoding: 'utf-8',
+                sectlink: true,
+                sectanchors: true,
+                linkattrs: true,
+                imagesdir: 'img',
+                'source-highlighter': 'coderay'
+    }
+
+    javadoc {
+        options.docletpath = configurations.asciidoclet.files.asType(List)
+        options.doclet = "org.xbib.asciidoclet.Asciidoclet"
+        options.overview = "src/docs/asciidoclet/overview.adoc"
+        options.addStringOption "-base-dir", "${projectDir}"
+        options.addStringOption "-attribute",
+                "name=${project.name},version=${project.version},title-link=https://github.com/jprante/${project.name}"
+        configure(options) {
+            noTimestamp = true
+        }
+    }
+
+    task javadocJar(type: Jar, dependsOn: classes) {
+        from javadoc
+        into "build/tmp"
+        classifier 'javadoc'
+    }
+
+    task sourcesJar(type: Jar, dependsOn: classes) {
+        from sourceSets.main.allSource
+        into "build/tmp"
+        classifier 'sources'
+    }
+
+    artifacts {
+        archives javadocJar, sourcesJar
+    }
+
+    if (project.hasProperty('signing.keyId')) {
+        signing {
+            sign configurations.archives
+        }
+    }
+
+
+    ext {
+        user = 'jprante'
+        name = 'netty-http-client'
+        description = 'A java client for Elasticsearch'
+        scmUrl = 'https://github.com/' + user + '/' + name
+        scmConnection = 'scm:git:git://github.com/' + user + '/' + name + '.git'
+        scmDeveloperConnection = 'scm:git:git://github.com/' + user + '/' + name + '.git'
+    }
+
+
+    task xbibUpload(type: Upload) {
+        group = 'publish'
+        configuration = configurations.archives
+        uploadDescriptor = true
+        repositories {
+            if (project.hasProperty("xbibUsername")) {
+                mavenDeployer {
+                    configuration = configurations.wagon
+                    repository(url: 'sftp://xbib.org/repository') {
+                        authentication(userName: xbibUsername, privateKey: xbibPrivateKey)
+                    }
+                }
+            }
+        }
+    }
+
+    task sonaTypeUpload(type: Upload) {
+        group = 'publish'
+        configuration = configurations.archives
+        uploadDescriptor = true
+        repositories {
+            if (project.hasProperty('ossrhUsername')) {
+                mavenDeployer {
+                    beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+                    repository(url: 'https://oss.sonatype.org/service/local/staging/deploy/maven2') {
+                        authentication(userName: ossrhUsername, password: ossrhPassword)
+                    }
+                    snapshotRepository(url: 'https://oss.sonatype.org/content/repositories/snapshots') {
+                        authentication(userName: ossrhUsername, password: ossrhPassword)
+                    }
+                    pom.project {
+                        groupId project.group
+                        artifactId project.name
+                        version project.version
+                        name project.name
+                        description description
+                        packaging 'jar'
+                        inceptionYear '2012'
+                        url scmUrl
+                        organization {
+                            name 'xbib'
+                            url 'http://xbib.org'
+                        }
+                        developers {
+                            developer {
+                                id user
+                                name 'Jörg Prante'
+                                email 'joergprante@gmail.com'
+                                url 'https://github.com/jprante'
+                            }
+                        }
+                        scm {
+                            url scmUrl
+                            connection scmConnection
+                            developerConnection scmDeveloperConnection
+                        }
+                        licenses {
+                            license {
+                                name 'The Apache License, Version 2.0'
+                                url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
+}
 
 spotbugs {
     effort = "max"
@@ -144,84 +219,6 @@ sonarqube {
         property "sonar.tests", "src/test/java"
         property "sonar.scm.provider", "git"
         property "sonar.junit.reportsPath", "build/test-results/test/"
-    }
-}
-
-ext {
-    user = 'jprante'
-    name = 'netty-http-client'
-    description = 'A java client for Elasticsearch'
-    scmUrl = 'https://github.com/' + user + '/' + name
-    scmConnection = 'scm:git:git://github.com/' + user + '/' + name + '.git'
-    scmDeveloperConnection = 'scm:git:git://github.com/' + user + '/' + name + '.git'
-}
-
-
-task xbibUpload(type: Upload) {
-    group = 'publish'
-    configuration = configurations.archives
-    uploadDescriptor = true
-    repositories {
-        if (project.hasProperty("xbibUsername")) {
-            mavenDeployer {
-                configuration = configurations.wagon
-                repository(url: 'sftp://xbib.org/repository') {
-                    authentication(userName: xbibUsername, privateKey: xbibPrivateKey)
-                }
-            }
-        }
-    }
-}
-
-task sonaTypeUpload(type: Upload) {
-    group = 'publish'
-    configuration = configurations.archives
-    uploadDescriptor = true
-    repositories {
-        if (project.hasProperty('ossrhUsername')) {
-            mavenDeployer {
-                beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
-                repository(url: 'https://oss.sonatype.org/service/local/staging/deploy/maven2') {
-                    authentication(userName: ossrhUsername, password: ossrhPassword)
-                }
-                snapshotRepository(url: 'https://oss.sonatype.org/content/repositories/snapshots') {
-                    authentication(userName: ossrhUsername, password: ossrhPassword)
-                }
-                pom.project {
-                    groupId project.group
-                    artifactId project.name
-                    version project.version
-                    name project.name
-                    description description
-                    packaging 'jar'
-                    inceptionYear '2012'
-                    url scmUrl
-                    organization {
-                        name 'xbib'
-                        url 'http://xbib.org'
-                    }
-                    developers {
-                        developer {
-                            id user
-                            name 'Jörg Prante'
-                            email 'joergprante@gmail.com'
-                            url 'https://github.com/jprante'
-                        }
-                    }
-                    scm {
-                        url scmUrl
-                        connection scmConnection
-                        developerConnection scmDeveloperConnection
-                    }
-                    licenses {
-                        license {
-                            name 'The Apache License, Version 2.0'
-                            url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-                        }
-                    }
-                }
-            }
-        }
     }
 }
 

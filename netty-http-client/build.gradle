@@ -1,0 +1,10 @@
+
+dependencies {
+    compile project(":netty-http-common")
+    compile "io.netty:netty-handler-proxy:${project.property('netty.version')}"
+    compile "io.netty:netty-transport-native-epoll:${project.property('netty.version')}"
+    testCompile "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
+    testCompile "org.conscrypt:conscrypt-openjdk-uber:${project.property('conscrypt.version')}"
+    testCompile "junit:junit:${project.property('junit.version')}"
+    testCompile "com.fasterxml.jackson.core:jackson-databind:${project.property('jackson.version')}"
+}

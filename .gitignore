@@ -8,6 +8,6 @@
 /.classpath
 /.project
 /.gradle
-/build
+build
 out
 *~
