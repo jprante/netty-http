@@ -1,23 +1,38 @@
 package org.xbib.netty.http.client.transport;
 
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.codec.http.cookie.ClientCookieDecoder;
+import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
+import io.netty.handler.codec.http.cookie.Cookie;
+import io.netty.handler.codec.http2.DefaultHttp2DataFrame;
+import io.netty.handler.codec.http2.DefaultHttp2Headers;
+import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame;
 import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2Settings;
+import io.netty.handler.codec.http2.Http2StreamChannel;
+import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
+import io.netty.handler.codec.http2.HttpConversionUtil;
 import org.xbib.net.URLSyntaxException;
 import org.xbib.netty.http.client.Client;
+import org.xbib.netty.http.client.handler.http2.Http2ResponseHandler;
+import org.xbib.netty.http.client.handler.http2.Http2StreamFrameToHttpObjectCodec;
+import org.xbib.netty.http.client.listener.CookieListener;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.Request;
-import org.xbib.netty.http.client.listener.HttpResponseListener;
+import org.xbib.netty.http.client.listener.ResponseListener;
 
 import java.io.IOException;
-import java.util.SortedMap;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -27,33 +42,76 @@ public class Http2Transport extends BaseTransport {
 
     private CompletableFuture<Boolean> settingsPromise;
 
-    private final AtomicInteger streamIdCounter;
-
-    private SortedMap<Integer, CompletableFuture<Boolean>> streamidPromiseMap;
+    private final ChannelInitializer<Channel> initializer;
 
     public Http2Transport(Client client, HttpAddress httpAddress) {
         super(client, httpAddress);
-        streamIdCounter = new AtomicInteger(3);
-        streamidPromiseMap = new ConcurrentSkipListMap<>();
-        settingsPromise = (httpAddress != null /*&& httpAddress.isSecure() */) ||
-                (client.hasPooledConnections() && client.getPool().isSecure()) ?
-                new CompletableFuture<>() : null;
+        this.settingsPromise = httpAddress != null ? new CompletableFuture<>() : null;
+        final Transport transport = this;
+        this.initializer = new ChannelInitializer<Channel>() {
+            @Override
+            protected void initChannel(Channel ch)  {
+                ch.attr(TRANSPORT_ATTRIBUTE_KEY).set(transport);
+                ChannelPipeline p = ch.pipeline();
+                p.addLast("child-client-frame-converter",
+                        new Http2StreamFrameToHttpObjectCodec(false));
+                p.addLast("child-client-chunk-aggregator",
+                        new HttpObjectAggregator(client.getClientConfig().getMaxContentLength()));
+                p.addLast("child-client-response-handler",
+                        new Http2ResponseHandler());
+            }
+        };
     }
 
     @Override
-    public Integer nextStream() {
-        Integer streamId = streamIdCounter.getAndAdd(2);
-        if (streamId == Integer.MIN_VALUE) {
-            // reset if overflow, Java wraps atomic integers to Integer.MIN_VALUE
-            streamIdCounter.set(3);
-            streamId = 3;
+    public Transport execute(Request request) throws IOException {
+        Channel channel = mapChannel(request);
+        if (throwable != null) {
+            return this;
         }
-        streamidPromiseMap.put(streamId, new CompletableFuture<>());
-        return streamId;
+        final String channelId = channel.id().toString();
+        channelFlowMap.putIfAbsent(channelId, new Flow());
+        Http2StreamChannel childChannel = new Http2StreamChannelBootstrap(channel)
+                .handler(initializer).open().syncUninterruptibly().getNow();
+        String authority = request.url().getHost() + (request.url().getPort() != null ? ":" + request.url().getPort() : "");
+        String path = request.url().getPath() != null && !request.url().getPath().isEmpty() ?
+                request.url().getPath() : "/";
+        Http2Headers http2Headers = new DefaultHttp2Headers()
+                .method(request.httpMethod().asciiName())
+                .scheme(request.url().getScheme())
+                .authority(authority)
+                .path(path);
+        final Integer streamId = channelFlowMap.get(channelId).nextStreamId();
+        if (streamId == null) {
+            throw new IllegalStateException();
+        }
+        requests.put(getRequestKey(channelId, streamId), request);
+        http2Headers.setInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), streamId);
+        // add matching cookies from box (previous requests) and new cookies from request builder
+        Collection<Cookie> cookies = new ArrayList<>();
+        cookies.addAll(matchCookiesFromBox(request));
+        cookies.addAll(matchCookies(request));
+        if (!cookies.isEmpty()) {
+            request.headers().set(HttpHeaderNames.COOKIE, ClientCookieEncoder.STRICT.encode(cookies));
+        }
+        // add stream-id and cookie headers
+        HttpConversionUtil.toHttp2Headers(request.headers(), http2Headers);
+        boolean hasContent = request.content() != null && request.content().readableBytes() > 0;
+        DefaultHttp2HeadersFrame headersFrame = new DefaultHttp2HeadersFrame(http2Headers, !hasContent);
+        childChannel.write(headersFrame);
+        if (hasContent) {
+            DefaultHttp2DataFrame dataFrame = new DefaultHttp2DataFrame(request.content(), true);
+            childChannel.write(dataFrame);
+        }
+        childChannel.flush();
+        if (client.hasPooledConnections()) {
+            client.releaseChannel(channel, false);
+        }
+        return this;
     }
 
     @Override
-    public void settingsReceived(Channel channel, Http2Settings http2Settings) {
+    public void settingsReceived(Http2Settings http2Settings) {
         if (settingsPromise != null) {
             settingsPromise.complete(true);
         } else {
@@ -62,138 +120,88 @@ public class Http2Transport extends BaseTransport {
     }
 
     @Override
-    public void awaitSettings() {
+    public void waitForSettings() {
         if (settingsPromise != null) {
             try {
-                logger.log(Level.FINE, "waiting for settings");
                 settingsPromise.get(client.getClientConfig().getReadTimeoutMillis(), TimeUnit.MILLISECONDS);
             } catch (TimeoutException e) {
-                logger.log(Level.WARNING, "settings timeout");
+                logger.log(Level.WARNING, "timeout in client while waiting for settings");
                 settingsPromise.completeExceptionally(e);
             } catch (InterruptedException | ExecutionException e) {
                 settingsPromise.completeExceptionally(e);
             }
-        } else {
-            logger.log(Level.WARNING, "settings promise is null");
         }
     }
 
     @Override
-    public void responseReceived(Integer streamId, FullHttpResponse fullHttpResponse) {
+    public void responseReceived(Channel channel, Integer streamId, FullHttpResponse fullHttpResponse) {
+        if (throwable != null) {
+            logger.log(Level.WARNING, "throwable not null for response " + fullHttpResponse, throwable);
+            return;
+        }
         if (streamId == null) {
-            logger.log(Level.WARNING, "no stream ID, unexpected message received: " + fullHttpResponse);
+            logger.log(Level.WARNING, "stream ID is null for response " + fullHttpResponse);
             return;
         }
-        CompletableFuture<Boolean> promise = streamidPromiseMap.get(streamId);
-        if (promise == null) {
-            logger.log(Level.WARNING, "response received for stream ID " + streamId + " but found no promise");
+        // format of childchan channel ID is <parent channel ID> "/" <substream ID>
+        String channelId = channel.id().toString();
+        int pos = channelId.indexOf('/');
+        channelId = pos > 0 ? channelId.substring(0, pos) : channelId;
+        Flow flow = channelFlowMap.get(channelId);
+        if (flow == null) {
             return;
         }
-        Request request = fromStreamId(streamId);
-        if (request != null) {
-            HttpResponseListener responseListener = request.getResponseListener();
-            if (responseListener != null) {
-                responseListener.onResponse(fullHttpResponse);
-            }
-            try {
-                Request retryRequest = retry(request, fullHttpResponse);
-                if (retryRequest != null) {
-                    // retry transport, wait for completion
-                    client.retry(this, retryRequest);
-                } else {
-                    Request continueRequest = continuation(request, fullHttpResponse);
-                    if (continueRequest != null) {
-                        // continue with new transport, synchronous call here, wait for completion
-                        client.continuation(this, continueRequest);
+        String requestKey = getRequestKey(channelId, streamId);
+        CompletableFuture<Boolean> promise = flow.get(streamId);
+        if (promise != null) {
+            Request request = requests.get(requestKey);
+            if (request == null) {
+                promise.completeExceptionally(new IllegalStateException());
+            } else {
+                for (String cookieString : fullHttpResponse.headers().getAll(HttpHeaderNames.SET_COOKIE)) {
+                    Cookie cookie = ClientCookieDecoder.STRICT.decode(cookieString);
+                    addCookie(cookie);
+                    CookieListener cookieListener = request.getCookieListener();
+                    if (cookieListener != null) {
+                        cookieListener.onCookie(cookie);
                     }
                 }
-            } catch (URLSyntaxException | IOException e) {
-                logger.log(Level.WARNING, e.getMessage(), e);
-            }
-        }
-        promise.complete(true);
-    }
-
-    @Override
-    public void pushPromiseReceived(Integer streamId, Integer promisedStreamId, Http2Headers headers) {
-        streamidPromiseMap.put(promisedStreamId, new CompletableFuture<>());
-        requests.put(promisedStreamId, fromStreamId(streamId));
-    }
-
-    @Override
-    public void awaitResponse(Integer streamId) throws IOException {
-        if (streamId == null) {
-            return;
-        }
-        if (throwable != null) {
-            return;
-        }
-        CompletableFuture<Boolean> promise = streamidPromiseMap.get(streamId);
-        if (promise != null) {
-            try {
-                long millis = client.getClientConfig().getReadTimeoutMillis();
-                Request request = fromStreamId(streamId);
-                if (request != null && request.getTimeoutInMillis() > 0) {
-                    millis = request.getTimeoutInMillis();
+                ResponseListener responseListener = request.getResponseListener();
+                if (responseListener != null) {
+                    responseListener.onResponse(fullHttpResponse);
                 }
-                promise.get(millis, TimeUnit.MILLISECONDS);
-            } catch (InterruptedException | ExecutionException | TimeoutException e) {
-                this.throwable = e;
-                throw new IOException(e);
-            } finally {
-                streamidPromiseMap.remove(streamId);
+                try {
+                    Request retryRequest = retry(request, fullHttpResponse);
+                    if (retryRequest != null) {
+                        // retry transport, wait for completion
+                        client.retry(this, retryRequest);
+                    } else {
+                        Request continueRequest = continuation(request, fullHttpResponse);
+                        if (continueRequest != null) {
+                            // continue with new transport, synchronous call here, wait for completion
+                            client.continuation(this, continueRequest);
+                        }
+                    }
+                    promise.complete(true);
+                } catch (URLSyntaxException | IOException e) {
+                    promise.completeExceptionally(e);
+                }
             }
         }
+        channelFlowMap.get(channelId).remove(streamId);
+        requests.remove(requestKey);
     }
 
     @Override
-    public Transport get() {
-        for (Integer streamId : streamidPromiseMap.keySet()) {
-            try {
-                awaitResponse(streamId);
-            } catch (IOException e) {
-                notifyRequest(streamId, e);
-            }
-        }
-        if (throwable != null) {
-            streamidPromiseMap.clear();
-        }
-        return this;
+    public void pushPromiseReceived(Channel channel, Integer streamId, Integer promisedStreamId, Http2Headers headers) {
+        String channelId = channel.id().toString();
+        channelFlowMap.get(channelId).put(promisedStreamId, new CompletableFuture<>());
+        String requestKey = getRequestKey(channel.id().toString(), promisedStreamId);
+        requests.put(requestKey, requests.get(requestKey));
     }
 
     @Override
-    public  void success() {
-        for (CompletableFuture<Boolean> promise : streamidPromiseMap.values()) {
-            promise.complete(true);
-        }
-    }
-
-    /**
-     * The underlying network layer failed, not possible to know the request.
-     * So we fail all (open) promises.
-     * @param throwable the exception
-     */
-    @Override
-    public void fail(Throwable throwable) {
-        // fail fast, do not fail more than once
-        if (this.throwable != null) {
-            return;
-        }
-        this.throwable = throwable;
-        for (CompletableFuture<Boolean> promise : streamidPromiseMap.values()) {
-            promise.completeExceptionally(throwable);
-        }
-    }
-
-    /**
-     * Try to notify request about failure.
-     * @param streamId stream ID
-     * @param throwable the exception
-     */
-    private void notifyRequest(Integer streamId, Throwable throwable) {
-        Request request = fromStreamId(streamId);
-        if (request != null && request.getCompletableFuture() != null) {
-            request.getCompletableFuture().completeExceptionally(throwable);
-        }
+    protected String getRequestKey(String channelId, Integer streamId) {
+        return channelId + "#" + streamId;
     }
 }

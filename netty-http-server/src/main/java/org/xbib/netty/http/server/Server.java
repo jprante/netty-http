@@ -22,9 +22,9 @@ import io.netty.util.DomainNameMapping;
 import io.netty.util.DomainNameMappingBuilder;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.context.VirtualServer;
-import org.xbib.netty.http.server.handler.http1.HttpChannelInitializer;
+import org.xbib.netty.http.server.handler.http.HttpChannelInitializer;
 import org.xbib.netty.http.server.handler.http2.Http2ChannelInitializer;
-import org.xbib.netty.http.server.transport.Http1ServerTransport;
+import org.xbib.netty.http.server.transport.HttpServerTransport;
 import org.xbib.netty.http.server.transport.Http2ServerTransport;
 import org.xbib.netty.http.server.transport.ServerTransport;
 import org.xbib.netty.http.server.util.NetworkUtils;
@@ -49,7 +49,9 @@ public final class Server {
 
     static {
         // extend Java system properties by detected network interfaces
-        //NetworkUtils.extendSystemProperties();
+        if (System.getProperty("xbib.netty.http.client.extendsystemproperties") != null) {
+            NetworkUtils.extendSystemProperties();
+        }
         // change Netty defaults to safer ones, but still allow override from arg line
         if (System.getProperty("io.netty.noUnsafe") == null) {
             System.setProperty("io.netty.noUnsafe", Boolean.toString(true));
@@ -57,12 +59,6 @@ public final class Server {
         if (System.getProperty("io.netty.noKeySetOptimization") == null) {
             System.setProperty("io.netty.noKeySetOptimization", Boolean.toString(true));
         }
-        if (System.getProperty("io.netty.recycler.maxCapacity") == null) {
-            System.setProperty("io.netty.recycler.maxCapacity", Integer.toString(0));
-        }
-        //if (System.getProperty("io.netty.leakDetection.level") == null) {
-        //    System.setProperty("io.netty.leakDetection.level", "paranoid");
-        //}
     }
 
     private final ServerConfig serverConfig;
@@ -83,6 +79,12 @@ public final class Server {
 
     /**
      * Create a new HTTP server. Use {@link #builder()} to build HTTP client instance.
+     * @param serverConfig server configuration
+     * @param byteBufAllocator byte buf allocator
+     * @param parentEventLoopGroup parent event loop group
+     * @param childEventLoopGroup child event loop group
+     * @param socketChannelClass socket channel class
+     * @throws SSLException if SSL can not be configured
      */
     public Server(ServerConfig serverConfig,
                   ByteBufAllocator byteBufAllocator,
@@ -112,7 +114,6 @@ public final class Server {
                 .childOption(ChannelOption.SO_RCVBUF, serverConfig.getTcpReceiveBufferSize())
                 .childOption(ChannelOption.CONNECT_TIMEOUT_MILLIS, serverConfig.getConnectTimeoutMillis())
                 .childOption(ChannelOption.WRITE_BUFFER_WATER_MARK, serverConfig.getWriteBufferWaterMark());
-
         if (serverConfig.isDebug()) {
             bootstrap.handler(new LoggingHandler("bootstrap-server", serverConfig.getDebugLogLevel()));
         }
@@ -178,6 +179,7 @@ public final class Server {
 
     /**
      * Start accepting incoming connections.
+     * @return the channel future
      */
     public ChannelFuture accept() {
         logger.log(Level.INFO, () -> "trying to bind to " + serverConfig.getAddress());
@@ -198,7 +200,7 @@ public final class Server {
     }
 
     public ServerTransport newTransport(HttpVersion httpVersion) {
-        return httpVersion.majorVersion() == 1 ? new Http1ServerTransport(this) : new Http2ServerTransport(this);
+        return httpVersion.majorVersion() == 1 ? new HttpServerTransport(this) : new Http2ServerTransport(this);
     }
 
     public synchronized void shutdownGracefully() throws IOException {

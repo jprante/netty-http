@@ -163,6 +163,8 @@ public class ClientConfig {
          * Default for backoff.
          */
         BackOff BACK_OFF = BackOff.ZERO_BACKOFF;
+
+        Boolean ENABLE_NEGOTIATION = false;
     }
 
     private static TrustManagerFactory TRUST_MANAGER_FACTORY;
@@ -248,6 +250,8 @@ public class ClientConfig {
     private WriteBufferWaterMark writeBufferWaterMark = Defaults.WRITE_BUFFER_WATER_MARK;
 
     private BackOff backOff = Defaults.BACK_OFF;
+
+    private boolean enableNegotiation = Defaults.ENABLE_NEGOTIATION;
 
     public ClientConfig setDebug(boolean debug) {
         this.debug = debug;
@@ -609,6 +613,15 @@ public class ClientConfig {
 
     public BackOff getBackOff() {
         return backOff;
+    }
+
+    public ClientConfig setEnableNegotiation(boolean enableNegotiation) {
+        this.enableNegotiation = enableNegotiation;
+        return this;
+    }
+
+    public boolean isEnableNegotiation() {
+        return enableNegotiation;
     }
 
     @Override

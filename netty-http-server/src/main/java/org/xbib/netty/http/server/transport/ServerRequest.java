@@ -15,15 +15,18 @@ public class ServerRequest {
 
     private final FullHttpRequest httpRequest;
 
+    private final Integer sequenceId;
+
     private final Integer streamId;
 
     private final Integer requestId;
 
-    public ServerRequest(VirtualServer virtualServer, HttpAddress httpAddress, FullHttpRequest httpRequest,
-                         Integer streamId, Integer requestId) {
+    public ServerRequest(VirtualServer virtualServer, HttpAddress httpAddress,
+                         FullHttpRequest httpRequest, Integer sequenceId, Integer streamId, Integer requestId) {
         this.virtualServer = virtualServer;
         this.httpAddress = httpAddress;
         this.httpRequest = httpRequest;
+        this.sequenceId = sequenceId;
         this.streamId = streamId;
         this.requestId = requestId;
     }
@@ -38,6 +41,10 @@ public class ServerRequest {
 
     public FullHttpRequest getRequest() {
         return httpRequest;
+    }
+
+    public Integer getSequenceId() {
+        return sequenceId;
     }
 
     public Integer streamId() {

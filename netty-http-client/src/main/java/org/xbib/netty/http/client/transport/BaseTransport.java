@@ -1,16 +1,10 @@
 package org.xbib.netty.http.client.transport;
 
 import io.netty.channel.Channel;
-import io.netty.handler.codec.http.DefaultFullHttpRequest;
-import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
-import io.netty.handler.codec.http.cookie.ClientCookieDecoder;
-import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import io.netty.handler.codec.http.cookie.Cookie;
-import io.netty.handler.codec.http2.HttpConversionUtil;
 import org.xbib.net.PercentDecoder;
 import org.xbib.net.URL;
 import org.xbib.net.URLSyntaxException;
@@ -18,8 +12,6 @@ import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.client.RequestBuilder;
-import org.xbib.netty.http.client.listener.CookieListener;
-import org.xbib.netty.http.client.listener.HttpHeadersListener;
 import org.xbib.netty.http.client.retry.BackOff;
 
 import java.io.IOException;
@@ -27,15 +19,15 @@ import java.net.ConnectException;
 import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnmappableCharacterException;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -49,62 +41,24 @@ abstract class BaseTransport implements Transport {
 
     protected final HttpAddress httpAddress;
 
-    protected Channel channel;
-
-    protected SortedMap<Integer, Request> requests;
-
     protected Throwable throwable;
+
+    private static final Request DUMMY = Request.builder(HttpMethod.GET).build();
+
+    private final Map<Request, Channel> channels;
+
+    final Map<String, Flow> channelFlowMap;
+
+    final SortedMap<String, Request> requests;
 
     private Map<Cookie, Boolean> cookieBox;
 
     BaseTransport(Client client, HttpAddress httpAddress) {
         this.client = client;
         this.httpAddress = httpAddress;
+        this.channels = new ConcurrentHashMap<>();
+        this.channelFlowMap = new ConcurrentHashMap<>();
         this.requests = new ConcurrentSkipListMap<>();
-    }
-
-    @Override
-    public Transport execute(Request request) throws IOException {
-        ensureConnect();
-        if (throwable != null) {
-            return this;
-        }
-        // Some HTTP 1 servers do not understand URIs in HTTP command line in spite of RFC 7230.
-        // The "origin form" requires a "Host" header.
-        // Our algorithm is: use always "origin form" for HTTP 1, use absolute form for HTTP 2.
-        // The reason is that Netty derives the HTTP/2 scheme header from the absolute form.
-        String uri = request.httpVersion().majorVersion() == 1 ?
-                request.url().relativeReference() : request.url().toString();
-        FullHttpRequest fullHttpRequest = request.content() == null ?
-                new DefaultFullHttpRequest(request.httpVersion(), request.httpMethod(), uri) :
-                new DefaultFullHttpRequest(request.httpVersion(), request.httpMethod(), uri,
-                        request.content());
-        Integer streamId = nextStream();
-        if (streamId != null && streamId > 0) {
-            request.headers().set(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), Integer.toString(streamId));
-        } else {
-            if (request.httpVersion().majorVersion() == 2) {
-                logger.log(Level.WARNING, "no streamId but HTTP/2 request. Strange!!! " + getClass().getName());
-            }
-        }
-        // add matching cookies from box (previous requests) and new cookies from request builder
-        Collection<Cookie> cookies = new ArrayList<>();
-        cookies.addAll(matchCookiesFromBox(request));
-        cookies.addAll(matchCookies(request));
-        if (!cookies.isEmpty()) {
-            request.headers().set(HttpHeaderNames.COOKIE, ClientCookieEncoder.STRICT.encode(cookies));
-        }
-        // add stream-id and cookie headers
-        fullHttpRequest.headers().set(request.headers());
-        if (streamId != null) {
-            requests.put(streamId, request);
-        }
-        // flush after putting request into requests map
-        if (channel.isWritable()) {
-            channel.writeAndFlush(fullHttpRequest);
-
-        }
-        return this;
     }
 
     /**
@@ -124,9 +78,8 @@ abstract class BaseTransport implements Transport {
     }
 
     @Override
-    public synchronized void close() throws IOException {
+    public synchronized void close() {
         get();
-        client.releaseChannel(channel);
     }
 
     @Override
@@ -139,53 +92,130 @@ abstract class BaseTransport implements Transport {
         return throwable;
     }
 
+    /**
+     * The underlying network layer failed, not possible to know the request.
+     * So we fail all (open) promises.
+     * @param throwable the exception
+     */
     @Override
-    public void headersReceived(Integer streamId, HttpHeaders httpHeaders) {
-        Request request =  fromStreamId(streamId);
-        if (request != null) {
-            HttpHeadersListener httpHeadersListener = request.getHeadersListener();
-            if (httpHeadersListener != null) {
-                httpHeadersListener.onHeaders(httpHeaders);
-            }
-            for (String cookieString : httpHeaders.getAll(HttpHeaderNames.SET_COOKIE)) {
-                Cookie cookie = ClientCookieDecoder.STRICT.decode(cookieString);
-                addCookie(cookie);
-                CookieListener cookieListener = request.getCookieListener();
-                if (cookieListener != null) {
-                    cookieListener.onCookie(cookie);
-                }
-            }
+    public void fail(Throwable throwable) {
+        // do not fail more than once
+        if (this.throwable != null) {
+            return;
+        }
+        logger.log(Level.SEVERE, "failing: " + throwable.getMessage(), throwable);
+        this.throwable = throwable;
+        for (Flow flow : channelFlowMap.values()) {
+            flow.fail(throwable);
         }
     }
 
-    private void ensureConnect() throws IOException {
-        if (channel == null) {
-            channel = client.newChannel(httpAddress);
-            if (channel != null) {
-                channel.attr(TRANSPORT_ATTRIBUTE_KEY).set(this);
-                awaitSettings();
+    @Override
+    public Transport get() {
+        return get(client.getClientConfig().getReadTimeoutMillis(), TimeUnit.MILLISECONDS);
+    }
+
+    @Override
+    public Transport get(long value, TimeUnit timeUnit) {
+        for (Map.Entry<String, Flow> entry : channelFlowMap.entrySet()) {
+            Flow flow = entry.getValue();
+            for (Integer key : flow.keys()) {
+                try {
+                    flow.get(key).get(value, timeUnit);
+                } catch (Exception e) {
+                    String requestKey = getRequestKey(entry.getKey(), key);
+                    Request request = requests.get(requestKey);
+                    if (request != null && request.getCompletableFuture() != null) {
+                        request.getCompletableFuture().completeExceptionally(e);
+                    }
+                    flow.fail(e);
+                } finally {
+                    flow.remove(key);
+                }
+            }
+            flow.close();
+        }
+        channels.values().forEach(channel -> {
+            try {
+                client.releaseChannel(channel, true);
+            } catch (IOException e) {
+                logger.log(Level.WARNING, e.getMessage(), e);
+            }
+        });
+        channelFlowMap.clear();
+        channels.clear();
+        requests.clear();
+        return this;
+    }
+
+    @Override
+    public void cancel() {
+        for (Map.Entry<String, Flow> entry : channelFlowMap.entrySet()) {
+            Flow flow = entry.getValue();
+            for (Integer key : flow.keys()) {
+                try {
+                    flow.get(key).cancel(true);
+                } catch (Exception e) {
+                    String requestKey = getRequestKey(entry.getKey(), key);
+                    Request request = requests.get(requestKey);
+                    if (request != null && request.getCompletableFuture() != null) {
+                        request.getCompletableFuture().completeExceptionally(e);
+                    }
+                    flow.fail(e);
+                } finally {
+                    flow.remove(key);
+                }
+            }
+            flow.close();
+        }
+        channels.values().forEach(channel -> {
+            try {
+                client.releaseChannel(channel, true);
+            } catch (IOException e) {
+                logger.log(Level.WARNING, e.getMessage(), e);
+            }
+        });
+        channelFlowMap.clear();
+        channels.clear();
+        requests.clear();
+    }
+
+    protected abstract String getRequestKey(String channelId, Integer streamId);
+
+    Channel mapChannel(Request request) throws IOException {
+        Channel channel;
+        if (!client.hasPooledConnections()) {
+            channel = channels.get(DUMMY);
+            if (channel == null) {
+                channel = switchNextChannel();
+            }
+            channels.put(DUMMY, channel);
+        } else {
+            channel = switchNextChannel();
+            channels.put(request, channel);
+        }
+        return channel;
+    }
+
+    private Channel switchNextChannel() throws IOException {
+        Channel channel = client.newChannel(httpAddress);
+        if (channel != null) {
+            channel.attr(TRANSPORT_ATTRIBUTE_KEY).set(this);
+            waitForSettings();
+        } else {
+            ConnectException connectException;
+            if (httpAddress != null) {
+                connectException = new ConnectException("unable to connect to " + httpAddress);
+            } else if (client.hasPooledConnections()) {
+                connectException = new ConnectException("unable to get channel from pool");
             } else {
-                ConnectException connectException;
-                if (httpAddress != null) {
-                    connectException = new ConnectException("unable to connect to " + httpAddress);
-                } else if (client.hasPooledConnections()){
-                    connectException = new ConnectException("unable to get channel from pool");
-                } else {
-                    // if API misuse
-                    connectException = new ConnectException("unable to get channel");
-                }
-                this.throwable = connectException;
-                this.channel = null;
-                throw connectException;
+                // API misuse
+                connectException = new ConnectException("unable to get channel");
             }
+            this.throwable = connectException;
+            throw connectException;
         }
-    }
-
-    protected Request fromStreamId(Integer streamId) {
-        if (streamId == null) {
-            streamId = requests.lastKey();
-        }
-        return requests.get(streamId);
+        return channel;
     }
 
     protected Request continuation(Request request, FullHttpResponse httpResponse) throws URLSyntaxException {
@@ -224,7 +254,6 @@ abstract class BaseTransport implements Transport {
                             request.cookies().forEach(newHttpRequestBuilder::addCookie);
                             Request newHttpRequest = newHttpRequestBuilder.build();
                             newHttpRequest.setResponseListener(request.getResponseListener());
-                            newHttpRequest.setHeadersListener(request.getHeadersListener());
                             newHttpRequest.setCookieListener(request.getCookieListener());
                             StringBuilder hostAndPort = new StringBuilder();
                             hostAndPort.append(redirUrl.getHost());
@@ -235,6 +264,7 @@ abstract class BaseTransport implements Transport {
                             logger.log(Level.FINE, "redirect url: " + redirUrl +
                                     " old request: " + request.toString() +
                                     " new request: " + newHttpRequest.toString());
+                            request.release();
                             return newHttpRequest;
                         }
                         break;
@@ -297,20 +327,20 @@ abstract class BaseTransport implements Transport {
         return cookieBox;
     }
 
-    private void addCookie(Cookie cookie) {
+    void addCookie(Cookie cookie) {
         if (cookieBox == null) {
             this.cookieBox = Collections.synchronizedMap(new LRUCache<Cookie, Boolean>(32));
         }
         cookieBox.put(cookie, true);
     }
 
-    private List<Cookie> matchCookiesFromBox(Request request) {
+    List<Cookie> matchCookiesFromBox(Request request) {
         return cookieBox == null ? Collections.emptyList() : cookieBox.keySet().stream().filter(cookie ->
                 matchCookie(request.url(), cookie)
         ).collect(Collectors.toList());
     }
 
-    private List<Cookie> matchCookies(Request request) {
+    List<Cookie> matchCookies(Request request) {
         return request.cookies().stream().filter(cookie ->
                 matchCookie(request.url(), cookie)
         ).collect(Collectors.toList());

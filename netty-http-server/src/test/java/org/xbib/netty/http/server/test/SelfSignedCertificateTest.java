@@ -7,8 +7,6 @@ import org.xbib.netty.http.server.security.tls.SelfSignedCertificate;
 import java.security.Security;
 import java.util.logging.Logger;
 
-/**
- */
 public class SelfSignedCertificateTest {
 
     @Test

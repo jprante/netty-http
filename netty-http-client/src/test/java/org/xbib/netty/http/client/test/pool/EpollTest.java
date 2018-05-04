@@ -1,15 +1,18 @@
 package org.xbib.netty.http.client.test.pool;
 
 import io.netty.bootstrap.Bootstrap;
+import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.epoll.EpollEventLoopGroup;
+import io.netty.channel.epoll.EpollServerSocketChannel;
 import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 
@@ -25,12 +28,14 @@ import org.xbib.netty.http.client.pool.BoundedChannelPool;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import java.io.Closeable;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -76,8 +81,8 @@ public class EpollTest {
             .option(ChannelOption.SO_KEEPALIVE, true)
             .option(ChannelOption.SO_REUSEADDR, true)
             .option(ChannelOption.TCP_NODELAY, true);
-        channelPool = new BoundedChannelPool<>(semaphore, HttpVersion.HTTP_1_1,false,
-                NODES, bootstrap, null, 0);
+        channelPool = new BoundedChannelPool<>(semaphore, HttpVersion.HTTP_1_1,
+                NODES, bootstrap, null, 0, BoundedChannelPool.PoolKeySelectorType.ROUNDROBIN);
         channelPool.prepare(CONCURRENCY);
     }
 
@@ -101,7 +106,7 @@ public class EpollTest {
                             Thread.sleep(1); // very short?
                         }
                         channel.writeAndFlush(PAYLOAD.retain()).sync();
-                        channelPool.release(channel);
+                        channelPool.release(channel, false);
                         longAdder.increment();
                     } catch (InterruptedException e) {
                         break;
@@ -131,4 +136,48 @@ public class EpollTest {
         }
     }
 
+    class MockEpollServer implements Closeable {
+
+        private final EventLoopGroup dispatchGroup;
+
+        private final EventLoopGroup workerGroup;
+
+        private final ChannelFuture bindFuture;
+
+        private final AtomicLong reqCounter;
+
+        public MockEpollServer(int port, int dropEveryRequest) throws InterruptedException {
+            dispatchGroup = new EpollEventLoopGroup();
+            workerGroup = new EpollEventLoopGroup();
+            reqCounter = new AtomicLong(0);
+            ServerBootstrap bootstrap = new ServerBootstrap()
+                    .group(dispatchGroup, workerGroup)
+                    .channel(EpollServerSocketChannel.class)
+                    .childHandler(new ChannelInitializer<SocketChannel>() {
+                        @Override
+                        public void initChannel(SocketChannel ch) {
+                            if (dropEveryRequest > 0) {
+                                ch.pipeline().addLast(new SimpleChannelInboundHandler<Object>() {
+                                    @Override
+                                    protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
+                                        if (reqCounter.incrementAndGet() % dropEveryRequest == 0) {
+                                            Channel channel = ctx.channel();
+                                            logger.log(Level.INFO,"dropping the connection " + channel);
+                                            channel.close();
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    });
+            bindFuture = bootstrap.bind(port).sync();
+        }
+
+        @Override
+        public void close() {
+            bindFuture.channel().close();
+            workerGroup.shutdownGracefully();
+            dispatchGroup.shutdownGracefully();
+        }
+    }
 }

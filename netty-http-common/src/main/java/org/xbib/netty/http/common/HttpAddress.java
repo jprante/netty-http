@@ -39,10 +39,18 @@ public class HttpAddress implements PoolKey {
     }
 
     public static HttpAddress http2(String host) {
-        return new HttpAddress(host, 443, HTTP_2_0, true);
+        return new HttpAddress(host, 443, HTTP_2_0, false);
     }
 
     public static HttpAddress http2(String host, int port) {
+        return new HttpAddress(host, port, HTTP_2_0, false);
+    }
+
+    public static HttpAddress secureHttp2(String host) {
+        return new HttpAddress(host, 443, HTTP_2_0, true);
+    }
+
+    public static HttpAddress secureHttp2(String host, int port) {
         return new HttpAddress(host, port, HTTP_2_0, true);
     }
 

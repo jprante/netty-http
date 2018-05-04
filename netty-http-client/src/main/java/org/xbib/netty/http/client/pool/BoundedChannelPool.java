@@ -5,12 +5,15 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelPromise;
 import io.netty.channel.pool.ChannelPoolHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http2.DefaultHttp2GoAwayFrame;
 import io.netty.util.AttributeKey;
 import org.xbib.netty.http.common.PoolKey;
 
+import java.io.IOException;
 import java.net.ConnectException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -21,6 +24,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.Lock;
@@ -35,8 +39,6 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
     private final Semaphore semaphore;
 
     private final HttpVersion httpVersion;
-
-    private final boolean isSecure;
 
     private final ChannelPoolHandler channelPoolhandler;
 
@@ -60,26 +62,36 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
 
     private final AttributeKey<K> attributeKey;
 
+    private PoolKeySelector<K> poolKeySelector;
+
     /**
      * @param semaphore the concurrency level
      * @param httpVersion  the HTTP version of the pool connections
-     * @param isSecure if this pool has secure connections
      * @param nodes the endpoint nodes, any element may contain the port (followed after ":")
      *             to override the defaultPort argument
      * @param bootstrap bootstrap instance
      * @param channelPoolHandler channel pool handler being notified upon new connection is created
      * @param retriesPerNode the max count of the subsequent connection failures to the node before
      *                       the node will be excluded from the pool. If set to 0, the value is ignored.
+     * @param poolKeySelectorType pool key selector type
      */
-    public BoundedChannelPool(Semaphore semaphore, HttpVersion httpVersion, boolean isSecure,
+    public BoundedChannelPool(Semaphore semaphore, HttpVersion httpVersion,
                               List<K> nodes, Bootstrap bootstrap,
-                              ChannelPoolHandler channelPoolHandler, int retriesPerNode) {
+                              ChannelPoolHandler channelPoolHandler, int retriesPerNode,
+                              PoolKeySelectorType poolKeySelectorType) {
         this.semaphore = semaphore;
         this.httpVersion = httpVersion;
-        this.isSecure = isSecure;
         this.channelPoolhandler = channelPoolHandler;
         this.nodes = nodes;
         this.retriesPerNode = retriesPerNode;
+        switch (poolKeySelectorType) {
+            case RANDOM:
+                this.poolKeySelector = new RandomPoolKeySelector();
+                break;
+            case ROUNDROBIN:
+                this.poolKeySelector = new RoundRobinKeySelector();
+                break;
+        }
         this.lock = new ReentrantLock();
         this.attributeKey = AttributeKey.valueOf("poolKey");
         if (nodes == null || nodes.isEmpty()) {
@@ -105,10 +117,6 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
         return httpVersion;
     }
 
-    public boolean isSecure() {
-        return isSecure;
-    }
-
     public AttributeKey<K> getAttributeKey() {
         return attributeKey;
     }
@@ -121,7 +129,7 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
         for (int i = 0; i < channelCount; i++) {
             Channel channel = newConnection();
             if (channel == null) {
-                throw new ConnectException("failed to prepare");
+                throw new ConnectException("failed to prepare channels");
             }
             K key = channel.attr(attributeKey).get();
             if (channel.isActive()) {
@@ -133,7 +141,7 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
                 channel.close();
             }
         }
-        logger.log(Level.FINE,"prepared " + channelCount + " channels");
+        logger.log(Level.FINE,"prepared " + channelCount + " channels: " + availableChannels);
     }
 
     @Override
@@ -156,35 +164,7 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
     }
 
     @Override
-    public int acquire(List<Channel> channels, int maxCount) throws Exception {
-        int availableCount = semaphore.drainPermits();
-        if (availableCount == 0) {
-            return availableCount;
-        }
-        if (availableCount > maxCount) {
-            semaphore.release(availableCount - maxCount);
-            availableCount = maxCount;
-        }
-        Channel channel;
-        for (int i = 0; i < availableCount; i ++) {
-            if ((channel = poll()) == null) {
-                channel = newConnection();
-            }
-            if (channel == null) {
-                semaphore.release(availableCount - i);
-                throw new ConnectException();
-            } else {
-                if (channelPoolhandler != null) {
-                    channelPoolhandler.channelAcquired(channel);
-                }
-                channels.add(channel);
-            }
-        }
-        return availableCount;
-    }
-
-    @Override
-    public void release(Channel channel) throws Exception {
+    public void release(Channel channel, boolean close) throws Exception {
         try {
             if (channel != null) {
                 if (channel.isActive()) {
@@ -193,10 +173,9 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
                     if (channelQueue != null) {
                         channelQueue.add(channel);
                     }
-                } else if (channel.isOpen()) {
+                } else if (channel.isOpen() && close) {
+                    logger.log(Level.FINE, "trying to close channel " + channel);
                     channel.close();
-                } else {
-                    logger.log(Level.WARNING, "channel not active or open while release");
                 }
                 if (channelPoolhandler != null) {
                     channelPoolhandler.channelReleased(channel);
@@ -208,16 +187,10 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
     }
 
     @Override
-    public void release(List<Channel> channels) throws Exception {
-        for (Channel channel : channels) {
-            release(channel);
-        }
-    }
-
-    @Override
-    public void close() {
+    public void close() throws IOException {
         lock.lock();
         try {
+            logger.log(Level.FINE, "closing pool");
             int count = 0;
             Set<Channel> channelSet = new HashSet<>();
             for (Map.Entry<K, Queue<Channel>> entry : availableChannels.entrySet()) {
@@ -228,7 +201,21 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
             }
             for (Channel channel : channelSet) {
                 if (channel != null && channel.isOpen()) {
-                    logger.log(Level.FINE, "closing channel " + channel);
+                    logger.log(Level.FINE, "trying to abort channel " + channel);
+                    if (httpVersion.majorVersion() == 2) {
+                        // be polite, send a go away frame
+                        DefaultHttp2GoAwayFrame goAwayFrame = new DefaultHttp2GoAwayFrame(0);
+                        ChannelPromise channelPromise = channel.newPromise();
+                        channel.writeAndFlush(goAwayFrame, channelPromise);
+                        try {
+                            channelPromise.get();
+                            logger.log(Level.FINE, "goaway frame sent to " + channel);
+                        } catch (ExecutionException e) {
+                            // ignore error if goaway can not be sent
+                        } catch (InterruptedException e) {
+                            throw new IOException(e);
+                        }
+                    }
                     channel.close();
                     count++;
                 }
@@ -237,7 +224,7 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
             channels.clear();
             bootstraps.clear();
             counts.clear();
-            logger.log(Level.FINE, "closed " + count + " connections");
+            logger.log(Level.FINE, "closed pool (found " + count + " connections open)");
         } finally {
             lock.unlock();
         }
@@ -246,17 +233,13 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
     private Channel newConnection() throws ConnectException {
         Channel channel = null;
         K key = null;
-        K nextKey;
-        int min = Integer.MAX_VALUE;
-        int next;
-        int i = ThreadLocalRandom.current().nextInt(numberOfNodes);
-        for (int j = i; j < numberOfNodes; j ++) {
-            nextKey = nodes.get(j % numberOfNodes);
-            if (counts == null) {
-                throw new ConnectException("strange");
-            }
+        Integer min = Integer.MAX_VALUE;
+        Integer next;
+        //int r = ThreadLocalRandom.current().nextInt(numberOfNodes);
+        for (int j = 0; j < numberOfNodes; j++) {
+            K nextKey = poolKeySelector.key(); //nodes.get(j % numberOfNodes);
             next = counts.get(nextKey);
-            if (next == 0) {
+            if (next == null || next == 0) {
                 key = nextKey;
                 break;
             } else if (next < min) {
@@ -305,7 +288,6 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
             if (retriesPerNode > 0) {
                 failedCounts.put(key, 0);
             }
-            logger.log(Level.FINE,"new connection to " + key + " created");
         }
         return channel;
     }
@@ -319,19 +301,11 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
     }
 
     private Channel poll() {
-        int i = ThreadLocalRandom.current().nextInt(numberOfNodes);
         Queue<Channel> channelQueue;
         Channel channel;
-        for(int j = i; j < i + numberOfNodes; j ++) {
-            K key = nodes.get(j % numberOfNodes);
-            // for HTTP/2, use channel list
-            logger.log(Level.FINE, "pool version = " + httpVersion);
-            if (httpVersion.majorVersion() == 2) {
-                List<Channel> list = channels.get(key);
-                if (!list.isEmpty()) {
-                    logger.log(Level.INFO, "we have a channel " + list);
-                }
-            }
+        //int r = ThreadLocalRandom.current().nextInt(numberOfNodes);
+        for (int j = 0; j < numberOfNodes; j++) {
+            K key = poolKeySelector.key();   //nodes.get(j % numberOfNodes);
             channelQueue = availableChannels.get(key);
             if (channelQueue != null) {
                 channel = channelQueue.poll();
@@ -339,10 +313,37 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
                     return channel;
                 }
             } else {
-                logger.log(Level.FINE, "channelqueue is null");
+                logger.log(Level.WARNING, "channel queue is null?");
             }
         }
         return null;
+    }
+
+    public enum PoolKeySelectorType {
+        RANDOM, ROUNDROBIN
+    }
+
+    private interface PoolKeySelector<K extends PoolKey> {
+        K key();
+    }
+
+    private class RandomPoolKeySelector implements PoolKeySelector<K> {
+
+        @Override
+        public K key() {
+            int r = ThreadLocalRandom.current().nextInt(numberOfNodes);
+            return nodes.get(r % numberOfNodes);
+        }
+    }
+
+    private class RoundRobinKeySelector implements PoolKeySelector<K> {
+
+        int r = 0;
+
+        @Override
+        public K key() {
+            return nodes.get(r++ % numberOfNodes);
+        }
     }
 
     private class CloseChannelListener implements ChannelFutureListener {

@@ -1,5 +1,6 @@
 package org.xbib.netty.http.server.transport;
 
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpVersion;
@@ -14,8 +15,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 abstract class BaseServerTransport implements ServerTransport {
+
+    private static final Logger logger = Logger.getLogger(BaseServerTransport.class.getName());
 
     protected static final AtomicInteger requestCounter = new AtomicInteger();
 
@@ -25,6 +30,11 @@ abstract class BaseServerTransport implements ServerTransport {
 
     protected BaseServerTransport(Server server) {
         this.server = server;
+    }
+
+    @Override
+    public void exceptionReceived(ChannelHandlerContext ctx, Throwable throwable) throws IOException {
+        logger.log(Level.WARNING, throwable.getMessage(), throwable);
     }
 
     /**
@@ -92,9 +102,9 @@ abstract class BaseServerTransport implements ServerTransport {
             // "*" is a special server-wide (no-context) request supported by OPTIONS
             boolean isServerOptions = path.equals("*") && method.equals("OPTIONS");
             methods.addAll(isServerOptions ? virtualServer.getMethods() : handlers.keySet());
-            serverResponse.getHeaders().add(HttpHeaderNames.ALLOW, String.join(", ", methods));
+            serverResponse.setHeader(HttpHeaderNames.ALLOW, String.join(", ", methods));
             if (method.equals("OPTIONS")) { // default OPTIONS handler
-                serverResponse.getHeaders().add(HttpHeaderNames.CONTENT_LENGTH, "0"); // RFC2616#9.2
+                serverResponse.setHeader(HttpHeaderNames.CONTENT_LENGTH, "0"); // RFC2616#9.2
                 serverResponse.write(200);
             } else if (virtualServer.getMethods().contains(method)) {
                 serverResponse.write(405); // supported by server, but not this context (nor built-in)

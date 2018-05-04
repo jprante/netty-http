@@ -10,8 +10,7 @@ import io.netty.handler.codec.http.cookie.Cookie;
 
 import org.xbib.net.URL;
 import org.xbib.netty.http.client.listener.CookieListener;
-import org.xbib.netty.http.client.listener.HttpHeadersListener;
-import org.xbib.netty.http.client.listener.HttpResponseListener;
+import org.xbib.netty.http.client.listener.ResponseListener;
 import org.xbib.netty.http.client.retry.BackOff;
 
 import java.nio.charset.StandardCharsets;
@@ -51,9 +50,7 @@ public class Request {
 
     private CompletableFuture<?> completableFuture;
 
-    private HttpResponseListener responseListener;
-
-    private HttpHeadersListener headersListener;
+    private ResponseListener responseListener;
 
     private CookieListener cookieListener;
 
@@ -136,6 +133,12 @@ public class Request {
         return true;
     }
 
+    public void release() {
+        if (content != null) {
+            content.release();
+        }
+    }
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
@@ -160,14 +163,6 @@ public class Request {
         return completableFuture;
     }
 
-    public Request setHeadersListener(HttpHeadersListener httpHeadersListener) {
-        this.headersListener = httpHeadersListener;
-        return this;
-    }
-
-    public HttpHeadersListener getHeadersListener() {
-        return headersListener;
-    }
 
     public Request setCookieListener(CookieListener cookieListener) {
         this.cookieListener = cookieListener;
@@ -178,12 +173,12 @@ public class Request {
         return cookieListener;
     }
 
-    public Request setResponseListener(HttpResponseListener httpResponseListener) {
-        this.responseListener = httpResponseListener;
+    public Request setResponseListener(ResponseListener responseListener) {
+        this.responseListener = responseListener;
         return this;
     }
 
-    public HttpResponseListener getResponseListener() {
+    public ResponseListener getResponseListener() {
         return responseListener;
     }
 
@@ -224,7 +219,7 @@ public class Request {
     }
 
     public static RequestBuilder builder(HttpMethod httpMethod) {
-        return new RequestBuilder(PooledByteBufAllocator.DEFAULT).setMethod(httpMethod);
+        return builder(PooledByteBufAllocator.DEFAULT, httpMethod);
     }
 
     public static RequestBuilder builder(ByteBufAllocator allocator, HttpMethod httpMethod) {

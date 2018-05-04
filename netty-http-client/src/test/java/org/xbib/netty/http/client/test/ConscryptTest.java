@@ -1,8 +1,8 @@
 package org.xbib.netty.http.client.test;
 
 import org.conscrypt.Conscrypt;
-import org.junit.Ignore;
 import org.junit.Test;
+import org.xbib.TestBase;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.Request;
 
@@ -11,7 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class ConscryptTest extends LoggingBase {
+public class ConscryptTest extends TestBase {
 
     private static final Logger logger = Logger.getLogger("");
 

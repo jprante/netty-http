@@ -1,7 +1,6 @@
 package org.xbib.netty.http.client.pool;
 
 import java.io.Closeable;
-import java.util.List;
 
 public interface Pool<T> extends Closeable {
 
@@ -9,9 +8,5 @@ public interface Pool<T> extends Closeable {
 
     T acquire() throws Exception;
 
-    int acquire(List<T> list, int maxCount) throws Exception;
-
-    void release(T t) throws Exception;
-
-    void release(List<T> list) throws Exception;
+    void release(T t, boolean close) throws Exception;
 }

@@ -32,7 +32,7 @@ public class CompletableFutureTest {
                     .exceptionally(Throwable::getMessage)
                     .thenCompose(content -> {
                         logger.log(Level.INFO, content);
-                        // POST is not allowed, we don't care
+                        // POST is not allowed, will give a 405. We don't care
                         try {
                             return client.execute(Request.post()
                                     .url("http://google.com/")

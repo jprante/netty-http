@@ -13,11 +13,8 @@ import org.xbib.netty.http.client.transport.Transport;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.logging.Logger;
 
 public class RestClient {
-
-    private static final Logger logger = Logger.getLogger(RestClient.class.getName());
 
     private Client client;
 
@@ -70,6 +67,4 @@ public class RestClient {
         transport.execute(requestBuilder.build().setResponseListener(restClient::setResponse)).get();
         return restClient;
     }
-
-
 }

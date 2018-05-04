@@ -1,6 +1,7 @@
 package org.xbib.netty.http.client.test;
 
 import org.junit.Test;
+import org.xbib.TestBase;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.Request;
 
@@ -11,7 +12,7 @@ import java.util.logging.Logger;
 
 /**
  */
-public class CookieSetterHttpBinTest extends LoggingBase {
+public class CookieSetterHttpBinTest extends TestBase {
 
     private static final Logger logger = Logger.getLogger(CookieSetterHttpBinTest.class.getName());
 
@@ -36,7 +37,6 @@ public class CookieSetterHttpBinTest extends LoggingBase {
                     .url("http://httpbin.org/cookies/set?name=value")
                     .build()
                     .setCookieListener(cookie -> logger.log(Level.INFO, "this is the cookie: " + cookie.toString()))
-                    .setHeadersListener(headers -> logger.log(Level.INFO, "headers = " + headers.entries().toString()))
                     .setResponseListener(fullHttpResponse -> {
                         String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
                         logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);

@@ -222,6 +222,11 @@ public class ClientBuilder {
         return this;
     }
 
+    public ClientBuilder enableNegotiation(boolean enableNegotiation) {
+        clientConfig.setEnableNegotiation(enableNegotiation);
+        return this;
+    }
+
     public Client build() {
         return new Client(clientConfig, byteBufAllocator, eventLoopGroup, socketChannelClass);
     }

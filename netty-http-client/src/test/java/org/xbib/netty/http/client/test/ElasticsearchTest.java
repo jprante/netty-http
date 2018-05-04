@@ -2,6 +2,7 @@ package org.xbib.netty.http.client.test;
 
 import org.junit.Ignore;
 import org.junit.Test;
+import org.xbib.TestBase;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.Request;
@@ -20,7 +21,7 @@ import java.util.logging.Logger;
 import static org.junit.Assert.assertEquals;
 
 @Ignore
-public class ElasticsearchTest extends LoggingBase {
+public class ElasticsearchTest extends TestBase {
 
     private static final Logger logger = Logger.getLogger(ElasticsearchTest.class.getName());
 
@@ -103,7 +104,7 @@ public class ElasticsearchTest extends LoggingBase {
                     }
                     try {
                         for (int i = 0; i < max; i++) {
-                            client.pooledExecute(queries.get(i)).get();
+                            client.newTransport().execute(queries.get(i)).get();
                         }
                     } catch (IOException e) {
                         logger.log(Level.WARNING, e.getMessage(), e);

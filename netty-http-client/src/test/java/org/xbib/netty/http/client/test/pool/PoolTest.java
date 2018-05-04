@@ -1,7 +1,12 @@
 package org.xbib.netty.http.client.test.pool;
 
 import io.netty.bootstrap.Bootstrap;
+import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.util.AttributeKey;
 import org.junit.Test;
@@ -44,21 +49,42 @@ public class PoolTest {
     @Parameterized.Parameters
     public static Collection<Object[]> generateData() {
         return Arrays.asList(new Object[][] {
-                        {1, 1},
-                        {10, 1}, {10, 2}, {10, 5}, {10, 10},
-                        {100, 1}, {100, 2}, {100, 5}, {100, 10},
-                        {1000, 1}, {1000, 2}, {1000, 5}, {1000, 10}
-                });
+                {1, 1},
+                {10, 1},
+                {10, 2},
+                //{10, 5},
+                //{10, 10},
+                {100, 1},
+                {100, 2},
+                //{100, 5},
+                //{100, 10},
+                //{1000, 1},
+                //{1000, 2},
+                //{1000, 5},
+                //{1000, 10}
+        });
     }
 
-    public PoolTest(int concurrencyLevel, int nodeCount) {
+    public PoolTest(int concurrencyLevel, int nodeCount) throws InterruptedException {
+
+        ServerBootstrap serverBootstrap = new ServerBootstrap()
+                .group(new NioEventLoopGroup())
+                .channel(NioServerSocketChannel.class)
+                .childHandler(new ChannelInitializer<Channel>() {
+                        @Override
+                        protected void initChannel(Channel ch) {
+                        }
+                });
+        Channel serverChannel = serverBootstrap.bind("localhost", 8008).sync().channel();
+
         this.nodeCount = nodeCount;
         List<HttpAddress> nodes = new ArrayList<>();
         for (int i = 0; i < nodeCount; i ++) {
-            nodes.add(HttpAddress.http1("localhost" + i));
+            nodes.add(HttpAddress.http1("localhost", 8008));
         }
-        try (Pool<Channel> pool = new BoundedChannelPool<>(new Semaphore(concurrencyLevel), HttpVersion.HTTP_1_1, false,
-                nodes, new Bootstrap(), null, 0)) {
+        try (Pool<Channel> pool = new BoundedChannelPool<>(new Semaphore(concurrencyLevel), HttpVersion.HTTP_1_1,
+                nodes, new Bootstrap().group(new NioEventLoopGroup()).channel(NioSocketChannel.class),
+                null, 0, BoundedChannelPool.PoolKeySelectorType.ROUNDROBIN)) {
             int n = Runtime.getRuntime().availableProcessors();
             ExecutorService executorService = Executors.newFixedThreadPool(n);
             for(int i = 0; i < n; i ++) {
@@ -80,7 +106,7 @@ public class PoolTest {
                                 channels.add(channel);
                             }
                             for (k = 0; k < j; k ++) {
-                                pool.release(channels.get(k));
+                                pool.release(channels.get(k), false);
                             }
                             channels.clear();
                         }
@@ -99,6 +125,7 @@ public class PoolTest {
         } catch (Throwable t) {
             logger.log(Level.WARNING, t.getMessage(), t);
         } finally {
+            serverChannel.close();
             long connCountSum = nodeFreq.values().stream().mapToLong(LongAdder::sum).sum();
             logger.log(Level.INFO, "concurrency = " + concurrencyLevel + ", nodes = " + nodeCount + " -> rate: " +
                             connCountSum / TEST_STEP_TIME_SECONDS);

@@ -350,7 +350,8 @@ public class RequestBuilder {
     }
 
     private void content(byte[] buf, AsciiString contentType) {
-        content(allocator.buffer().writeBytes(buf), contentType);
+        ByteBuf byteBuf = allocator.buffer();
+        content(byteBuf.writeBytes(buf), contentType);
     }
 
     private void content(ByteBuf body, AsciiString contentType) {

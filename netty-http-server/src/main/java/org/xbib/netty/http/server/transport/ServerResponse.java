@@ -1,7 +1,7 @@
 package org.xbib.netty.http.server.transport;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.util.AsciiString;
 
 import java.nio.charset.Charset;
 
@@ -10,7 +10,7 @@ import java.nio.charset.Charset;
  */
 public interface ServerResponse {
 
-    HttpHeaders getHeaders();
+    void setHeader(AsciiString name, String value);
 
     void write(String text);
 

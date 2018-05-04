@@ -1,7 +1,5 @@
 package org.xbib.netty.http.client.retry;
 
-import java.io.IOException;
-
 /**
  * Back-off policy when retrying an operation.
  */
@@ -19,6 +17,8 @@ public interface BackOff {
     /**
      * Gets the number of milliseconds to wait before retrying the operation or {@link #STOP} to
      * indicate that no retries should be made.
+     *
+     * @return milliseconds before operation retry
      *
      * <p>
      * Example usage:

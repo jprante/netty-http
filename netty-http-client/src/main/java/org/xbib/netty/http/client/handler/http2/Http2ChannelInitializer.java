@@ -1,26 +1,35 @@
 package org.xbib.netty.http.client.handler.http2;
 
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
-import io.netty.channel.socket.SocketChannel;
-import io.netty.handler.codec.http2.DefaultHttp2Connection;
-import io.netty.handler.codec.http2.Http2Connection;
+import io.netty.channel.ChannelPipeline;
+import io.netty.handler.codec.http2.DefaultHttp2SettingsFrame;
+import io.netty.handler.codec.http2.Http2ConnectionAdapter;
+import io.netty.handler.codec.http2.Http2ConnectionDecoder;
+import io.netty.handler.codec.http2.Http2ConnectionEncoder;
 import io.netty.handler.codec.http2.Http2ConnectionHandler;
+import io.netty.handler.codec.http2.Http2ConnectionPrefaceAndSettingsFrameWrittenEvent;
+import io.netty.handler.codec.http2.Http2Exception;
+import io.netty.handler.codec.http2.Http2FrameAdapter;
+import io.netty.handler.codec.http2.Http2FrameCodec;
 import io.netty.handler.codec.http2.Http2FrameLogger;
-import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder;
-import io.netty.handler.codec.http2.InboundHttp2ToHttpAdapterBuilder;
+import io.netty.handler.codec.http2.Http2Headers;
+import io.netty.handler.codec.http2.Http2MultiplexCodec;
+import io.netty.handler.codec.http2.Http2MultiplexCodecBuilder;
+import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.logging.LogLevel;
-import io.netty.handler.ssl.ApplicationProtocolNames;
-import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslHandler;
 import org.xbib.netty.http.client.ClientConfig;
-import org.xbib.netty.http.client.handler.http1.TrafficLoggingHandler;
+import org.xbib.netty.http.client.handler.http.TrafficLoggingHandler;
+import org.xbib.netty.http.client.transport.Transport;
 import org.xbib.netty.http.common.HttpAddress;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
+public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
 
     private static final Logger logger = Logger.getLogger(Http2ChannelInitializer.class.getName());
 
@@ -30,29 +39,16 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
 
     private final SslHandler sslHandler;
 
-    private final Http2SettingsHandler http2SettingsHandler;
-
-    private final Http2ResponseHandler http2ResponseHandler;
-
     public Http2ChannelInitializer(ClientConfig clientConfig,
                             HttpAddress httpAddress,
-                            SslHandler sslHandler,
-                            Http2SettingsHandler http2SettingsHandler,
-                            Http2ResponseHandler http2ResponseHandler) {
+                            SslHandler sslHandler) {
         this.clientConfig = clientConfig;
         this.httpAddress = httpAddress;
         this.sslHandler = sslHandler;
-        this.http2SettingsHandler = http2SettingsHandler;
-        this.http2ResponseHandler = http2ResponseHandler;
     }
 
-    /**
-     * The channel initialization for HTTP/2.
-     *
-     * @param channel socket channel
-     */
     @Override
-    public void initChannel(SocketChannel channel) {
+    public void initChannel(Channel channel) {
         if (clientConfig.isDebug()) {
             channel.pipeline().addLast(new TrafficLoggingHandler(LogLevel.DEBUG));
         }
@@ -66,44 +62,73 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
         }
     }
 
-    private void configureEncrypted(SocketChannel channel) {
+    private void configureEncrypted(Channel channel) {
         channel.pipeline().addLast(sslHandler);
-        ApplicationProtocolNegotiationHandler negotiationHandler = new ApplicationProtocolNegotiationHandler("") {
-            @Override
-            protected void configurePipeline(ChannelHandlerContext ctx, String protocol) {
-                if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
-                    ctx.pipeline().addLast(newConnectionHandler(), http2SettingsHandler, http2ResponseHandler);
-                    if (clientConfig.isDebug()) {
-                        logger.log(Level.FINE, "after negotiation: " + ctx.pipeline().names());
-                    }
-                    return;
-                }
-                // we do not fall back to HTTP1
-                ctx.close();
-                throw new IllegalStateException("protocol not accepted: " + protocol);
-            }
-        };
-        channel.pipeline().addLast(negotiationHandler);
-}
-
-    private void configureCleartext(SocketChannel ch) {
-        ch.pipeline().addLast(newConnectionHandler(), http2SettingsHandler, http2ResponseHandler);
+        configureCleartext(channel);
     }
 
-    private Http2ConnectionHandler newConnectionHandler() {
-        Http2Connection http2Connection = new DefaultHttp2Connection(false);
-        HttpToHttp2ConnectionHandlerBuilder http2ConnectionHandlerBuilder = new HttpToHttp2ConnectionHandlerBuilder()
-                .initialSettings(clientConfig.getHttp2Settings())
-                .connection(http2Connection)
-                .frameListener(new Http2PushPromiseHandler(http2Connection,
-                        new InboundHttp2ToHttpAdapterBuilder(http2Connection)
-                                .maxContentLength(clientConfig.getMaxContentLength())
-                                .propagateSettings(true)
-                                .build()));
+    public void configureCleartext(Channel ch) {
+        ChannelInitializer<Channel> initializer = new ChannelInitializer<Channel>() {
+            @Override
+            protected void initChannel(Channel ch) {
+                throw new IllegalStateException();
+            }
+        };
+        Http2MultiplexCodecBuilder clientMultiplexCodecBuilder = Http2MultiplexCodecBuilder.forClient(initializer)
+                .initialSettings(clientConfig.getHttp2Settings());
         if (clientConfig.isDebug()) {
-            Http2FrameLogger http2FrameLogger = new Http2FrameLogger(clientConfig.getDebugLogLevel(), "client");
-            http2ConnectionHandlerBuilder.frameLogger(http2FrameLogger);
+            clientMultiplexCodecBuilder.frameLogger(new Http2FrameLogger(LogLevel.DEBUG, "client"));
         }
-        return http2ConnectionHandlerBuilder.build();
+        Http2MultiplexCodec http2MultiplexCodec = clientMultiplexCodecBuilder.build();
+        ChannelPipeline p = ch.pipeline();
+        p.addLast("client-codec", http2MultiplexCodec);
+        //p.addLast("client-push-promise", new PushPromiseHandler());
+        p.addLast("client-messages", new ClientMessages());
+    }
+
+    class ClientMessages extends ChannelInboundHandlerAdapter {
+
+        @Override
+        public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+            if (msg instanceof DefaultHttp2SettingsFrame) {
+                DefaultHttp2SettingsFrame settingsFrame = (DefaultHttp2SettingsFrame) msg;
+                Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
+                if (transport != null) {
+                    transport.settingsReceived(settingsFrame.settings());
+                }
+            }
+        }
+
+        @Override
+        public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+            if (evt instanceof Http2ConnectionPrefaceAndSettingsFrameWrittenEvent) {
+                Http2ConnectionPrefaceAndSettingsFrameWrittenEvent event =
+                        (Http2ConnectionPrefaceAndSettingsFrameWrittenEvent)evt;
+                Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
+                if (transport != null) {
+                    transport.settingsReceived(null);
+                }
+            }
+            ctx.fireUserEventTriggered(evt);
+        }
+
+        @Override
+        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+            Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
+            if (transport != null) {
+                transport.fail(cause);
+            }
+        }
+    }
+
+    class PushPromiseHandler extends Http2FrameAdapter {
+
+        @Override
+        public void onPushPromiseRead(ChannelHandlerContext ctx, int streamId, int promisedStreamId,
+                                      Http2Headers headers, int padding) throws Http2Exception {
+            super.onPushPromiseRead(ctx, streamId, promisedStreamId, headers, padding);
+            Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
+            transport.pushPromiseReceived(ctx.channel(), streamId, promisedStreamId, headers);
+        }
     }
 }

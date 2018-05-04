@@ -13,6 +13,9 @@ public interface ServerTransport {
 
     void requestReceived(ChannelHandlerContext ctx, FullHttpRequest fullHttpRequest) throws IOException;
 
+    void requestReceived(ChannelHandlerContext ctx, FullHttpRequest fullHttpRequest, Integer sequenceId) throws IOException;
+
     void settingsReceived(ChannelHandlerContext ctx, Http2Settings http2Settings) throws Exception;
 
+    void exceptionReceived(ChannelHandlerContext ctx, Throwable throwable) throws IOException;
 }

@@ -21,15 +21,11 @@ import io.netty.handler.ssl.OpenSsl;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslHandler;
-import org.xbib.net.URL;
-import org.xbib.netty.http.client.handler.http1.HttpChannelInitializer;
-import org.xbib.netty.http.client.handler.http1.HttpResponseHandler;
+import org.xbib.netty.http.client.handler.http.HttpChannelInitializer;
 import org.xbib.netty.http.client.handler.http2.Http2ChannelInitializer;
-import org.xbib.netty.http.client.handler.http2.Http2ResponseHandler;
-import org.xbib.netty.http.client.handler.http2.Http2SettingsHandler;
 import org.xbib.netty.http.client.pool.BoundedChannelPool;
 import org.xbib.netty.http.client.transport.Http2Transport;
-import org.xbib.netty.http.client.transport.Http1Transport;
+import org.xbib.netty.http.client.transport.HttpTransport;
 import org.xbib.netty.http.client.transport.Transport;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.NetworkUtils;
@@ -73,12 +69,6 @@ public final class Client {
         if (System.getProperty("io.netty.noKeySetOptimization") == null) {
             System.setProperty("io.netty.noKeySetOptimization", Boolean.toString(true));
         }
-        if (System.getProperty("io.netty.recycler.maxCapacity") == null) {
-            System.setProperty("io.netty.recycler.maxCapacity", Integer.toString(0));
-        }
-        if (System.getProperty("io.netty.leakDetection.level") == null) {
-            System.setProperty("io.netty.leakDetection.level", "paranoid");
-        }
     }
 
     private final ClientConfig clientConfig;
@@ -91,15 +81,7 @@ public final class Client {
 
     private final Bootstrap bootstrap;
 
-    private final HttpResponseHandler httpResponseHandler;
-
-    private final Http2SettingsHandler http2SettingsHandler;
-
-    private final Http2ResponseHandler http2ResponseHandler;
-
     private final List<Transport> transports;
-
-    private TransportListener transportListener;
 
     private BoundedChannelPool<HttpAddress> pool;
 
@@ -126,7 +108,7 @@ public final class Client {
         this.bootstrap = new Bootstrap()
                 .group(this.eventLoopGroup)
                 .channel(this.socketChannelClass)
-                //.option(ChannelOption.ALLOCATOR, byteBufAllocator)
+                .option(ChannelOption.ALLOCATOR, byteBufAllocator)
                 .option(ChannelOption.TCP_NODELAY, clientConfig.isTcpNodelay())
                 .option(ChannelOption.SO_KEEPALIVE, clientConfig.isKeepAlive())
                 .option(ChannelOption.SO_REUSEADDR, clientConfig.isReuseAddr())
@@ -134,9 +116,6 @@ public final class Client {
                 .option(ChannelOption.SO_RCVBUF, clientConfig.getTcpReceiveBufferSize())
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, clientConfig.getConnectTimeoutMillis())
                 .option(ChannelOption.WRITE_BUFFER_WATER_MARK, clientConfig.getWriteBufferWaterMark());
-        this.httpResponseHandler = new HttpResponseHandler();
-        this.http2SettingsHandler = new Http2SettingsHandler();
-        this.http2ResponseHandler = new Http2ResponseHandler();
         this.transports = new CopyOnWriteArrayList<>();
         if (!clientConfig.getPoolNodes().isEmpty()) {
             List<HttpAddress> nodes = clientConfig.getPoolNodes();
@@ -151,7 +130,8 @@ public final class Client {
             }
             ClientChannelPoolHandler clientChannelPoolHandler = new ClientChannelPoolHandler();
             this.pool = new BoundedChannelPool<>(semaphore, clientConfig.getPoolVersion(),
-                    clientConfig.isPoolSecure(), nodes, bootstrap, clientChannelPoolHandler, retries);
+                    nodes, bootstrap, clientChannelPoolHandler, retries,
+                    BoundedChannelPool.PoolKeySelectorType.ROUNDROBIN);
             Integer nodeConnectionLimit = clientConfig.getPoolNodeConnectionLimit();
             if (nodeConnectionLimit == null || nodeConnectionLimit == 0) {
                 nodeConnectionLimit = nodes.size();
@@ -176,20 +156,8 @@ public final class Client {
         return byteBufAllocator;
     }
 
-    public EventLoopGroup getEventLoopGroup() {
-        return eventLoopGroup;
-    }
-
-    public void setTransportListener(TransportListener transportListener) {
-        this.transportListener = transportListener;
-    }
-
     public boolean hasPooledConnections() {
         return pool != null && !clientConfig.getPoolNodes().isEmpty();
-    }
-
-    public BoundedChannelPool<HttpAddress> getPool() {
-        return pool;
     }
 
     public void logDiagnostics(Level level) {
@@ -206,29 +174,22 @@ public final class Client {
         return newTransport(null);
     }
 
-    public Transport newTransport(URL url, HttpVersion httpVersion) {
-        return newTransport(HttpAddress.of(url, httpVersion));
-    }
-
     public Transport newTransport(HttpAddress httpAddress) {
-        Transport transport = null;
+        Transport transport;
         if (httpAddress != null) {
             if (httpAddress.getVersion().majorVersion() == 1) {
-                transport = new Http1Transport(this, httpAddress);
+                transport = new HttpTransport(this, httpAddress);
             } else {
                 transport = new Http2Transport(this, httpAddress);
             }
         } else if (hasPooledConnections()) {
             if (pool.getVersion().majorVersion() == 1) {
-                transport = new Http1Transport(this, null);
+                transport = new HttpTransport(this, null);
             } else {
                 transport = new Http2Transport(this, null);
             }
         } else {
-            throw new IllegalStateException();
-        }
-        if (transportListener != null) {
-            transportListener.onOpen(transport);
+            throw new IllegalStateException("no address given to connect to");
         }
         transports.add(transport);
         return transport;
@@ -238,14 +199,13 @@ public final class Client {
         Channel channel;
         if (httpAddress != null) {
             HttpVersion httpVersion = httpAddress.getVersion();
-            ChannelInitializer<SocketChannel> initializer;
+            ChannelInitializer<Channel> initializer;
             SslHandler sslHandler = newSslHandler(clientConfig, byteBufAllocator, httpAddress);
             if (httpVersion.majorVersion() == 1) {
-                initializer = new HttpChannelInitializer(clientConfig, httpAddress,
-                        sslHandler, httpResponseHandler);
+                initializer = new HttpChannelInitializer(clientConfig, httpAddress, sslHandler,
+                        new Http2ChannelInitializer(clientConfig, httpAddress, sslHandler));
             } else {
-                initializer = new Http2ChannelInitializer(clientConfig, httpAddress,
-                        sslHandler, http2SettingsHandler, http2ResponseHandler);
+                initializer = new Http2ChannelInitializer(clientConfig, httpAddress, sslHandler);
             }
             try {
                 channel = bootstrap.handler(initializer)
@@ -267,21 +227,18 @@ public final class Client {
         return channel;
     }
 
-    public Channel newChannel() throws IOException {
-        return newChannel(null);
-    }
-
-    public void releaseChannel(Channel channel) throws IOException{
-        if (channel != null) {
-            if (hasPooledConnections()) {
-                try {
-                    pool.release(channel);
-                } catch (Exception e) {
-                    throw new IOException(e);
-                }
-            } else {
-               channel.close();
+    public void releaseChannel(Channel channel, boolean close) throws IOException{
+        if (channel == null) {
+            return;
+        }
+        if (hasPooledConnections()) {
+            try {
+                pool.release(channel, close);
+            } catch (Exception e) {
+                throw new IOException(e);
             }
+        } else if (close) {
+           channel.close();
         }
     }
 
@@ -293,19 +250,15 @@ public final class Client {
 
     public <T> CompletableFuture<T> execute(Request request,
                                             Function<FullHttpResponse, T> supplier) throws IOException {
-        return newTransport(HttpAddress.of(request.url(), request.httpVersion())).execute(request, supplier);
-    }
-
-    public Transport pooledExecute(Request request) throws IOException {
-        Transport transport = newTransport();
-        transport.execute(request);
-        return transport;
+        return newTransport(HttpAddress.of(request.url(), request.httpVersion()))
+                .execute(request, supplier);
     }
 
     /**
      * For following redirects, construct a new transport.
      * @param transport the previous transport
      * @param request the new request for continuing the request.
+     * @throws IOException if continuation fails
      */
     public void continuation(Transport transport, Request request) throws IOException {
         Transport nextTransport = newTransport(HttpAddress.of(request.url(), request.httpVersion()));
@@ -328,14 +281,7 @@ public final class Client {
         close(transport);
     }
 
-    public Transport prepareRequest(Request request) {
-        return newTransport(HttpAddress.of(request.url(), request.httpVersion()));
-    }
-
     public void close(Transport transport) throws IOException {
-        if (transportListener != null) {
-            transportListener.onClose(transport);
-        }
         transport.close();
         transports.remove(transport);
     }
@@ -344,12 +290,13 @@ public final class Client {
         for (Transport transport : transports) {
             close(transport);
         }
-    }
-
-    public void shutdownGracefully() throws IOException {
+        // how to wait for all responses for the pool?
         if (hasPooledConnections()) {
             pool.close();
         }
+    }
+
+    public void shutdownGracefully() throws IOException {
         close();
         shutdown();
     }
@@ -439,13 +386,6 @@ public final class Client {
                         ApplicationProtocolNames.HTTP_2);
     }
 
-    public interface TransportListener {
-
-        void onOpen(Transport transport);
-
-        void onClose(Transport transport);
-    }
-
     static class HttpClientThreadFactory implements ThreadFactory {
 
         private int number = 0;
@@ -474,17 +414,12 @@ public final class Client {
             HttpVersion httpVersion = httpAddress.getVersion();
             SslHandler sslHandler = newSslHandler(clientConfig, byteBufAllocator, httpAddress);
             if (httpVersion.majorVersion() == 1) {
-                HttpChannelInitializer initializer = new HttpChannelInitializer(clientConfig, httpAddress,
-                        sslHandler, httpResponseHandler);
-                if (channel instanceof SocketChannel) {
-                    initializer.initChannel((SocketChannel) channel);
-                }
+                HttpChannelInitializer initializer = new HttpChannelInitializer(clientConfig, httpAddress, sslHandler,
+                        new Http2ChannelInitializer(clientConfig, httpAddress, sslHandler));
+                initializer.initChannel(channel);
             } else {
-                Http2ChannelInitializer initializer = new Http2ChannelInitializer(clientConfig, httpAddress,
-                        sslHandler, http2SettingsHandler, http2ResponseHandler);
-                if (channel instanceof SocketChannel) {
-                    initializer.initChannel((SocketChannel) channel);
-                }
+                Http2ChannelInitializer initializer = new Http2ChannelInitializer(clientConfig, httpAddress, sslHandler);
+                initializer.initChannel(channel);
             }
         }
     }

@@ -3,6 +3,7 @@ package org.xbib.netty.http.client.test;
 import io.netty.handler.codec.http.HttpMethod;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.xbib.TestBase;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.Request;
 
@@ -11,7 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class Http2Test extends LoggingBase {
+public class Http2Test extends TestBase {
 
     private static final Logger logger = Logger.getLogger(Http2Test.class.getName());
 

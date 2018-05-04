@@ -38,7 +38,6 @@ subprojects {
 
     dependencies {
         alpnagent "org.mortbay.jetty.alpn:jetty-alpn-agent:${project.property('alpnagent.version')}"
-        asciidoclet "org.xbib:asciidoclet:${project.property('asciidoclet.version')}"
         wagon "org.apache.maven.wagon:wagon-ssh:${project.property('wagon.version')}"
     }
 
@@ -61,7 +60,7 @@ subprojects {
             jvmArgs "-javaagent:" + configurations.alpnagent.asPath
         }
         testLogging {
-            showStandardStreams = false
+            showStandardStreams = true
             exceptionFormat = 'full'
         }
     }
@@ -82,7 +81,7 @@ subprojects {
                 'source-highlighter': 'coderay'
     }
 
-    javadoc {
+    /*javadoc {
         options.docletpath = configurations.asciidoclet.files.asType(List)
         options.doclet = "org.xbib.asciidoclet.Asciidoclet"
         options.overview = "src/docs/asciidoclet/overview.adoc"
@@ -92,7 +91,7 @@ subprojects {
         configure(options) {
             noTimestamp = true
         }
-    }
+    }*/
 
     task javadocJar(type: Jar, dependsOn: classes) {
         from javadoc
@@ -116,7 +115,6 @@ subprojects {
         }
     }
 
-
     ext {
         user = 'jprante'
         name = 'netty-http-client'
@@ -125,7 +123,6 @@ subprojects {
         scmConnection = 'scm:git:git://github.com/' + user + '/' + name + '.git'
         scmDeveloperConnection = 'scm:git:git://github.com/' + user + '/' + name + '.git'
     }
-
 
     task xbibUpload(type: Upload) {
         group = 'publish'
@@ -195,18 +192,20 @@ subprojects {
         }
     }
 
-
-}
-
-spotbugs {
-    effort = "max"
-    reportLevel = "low"
-    //includeFilter = file("findbugs-exclude.xml")
-}
-
-tasks.withType(com.github.spotbugs.SpotBugsTask) {
-    ignoreFailures = true
-    reports {
+    spotbugs {
+        toolVersion = '3.1.3'
+        sourceSets = [sourceSets.main]
+        ignoreFailures = true
+        effort = "max"
+        reportLevel = "high"
+        // includeFilter = file("config/findbugs/findbugs-include.xml")
+        // excludeFilter = file("config/findbugs/findbugs-excludes.xml")
+    }
+    spotbugsMain.reports {
+        xml.enabled = false
+        html.enabled = true
+    }
+    spotbugsTest.reports {
         xml.enabled = false
         html.enabled = true
     }
