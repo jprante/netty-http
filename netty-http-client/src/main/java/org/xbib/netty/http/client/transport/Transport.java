@@ -29,7 +29,7 @@ public interface Transport {
 
     void responseReceived(Channel channel, Integer streamId, FullHttpResponse fullHttpResponse) throws IOException;
 
-    void pushPromiseReceived(Channel channel, Integer streamId, Integer promisedStreamId, Http2Headers headers) throws Http2Exception;
+    void pushPromiseReceived(Channel channel, Integer streamId, Integer promisedStreamId, Http2Headers headers);
 
     void setCookieBox(Map<Cookie, Boolean> cookieBox);
 

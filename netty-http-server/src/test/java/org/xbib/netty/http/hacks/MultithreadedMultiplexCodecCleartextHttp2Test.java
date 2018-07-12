@@ -172,8 +172,8 @@ public class MultithreadedMultiplexCodecCleartextHttp2Test extends TestBase {
                                 .path("/foobar/" + t + "/" + j)
                                 .scheme("http")
                                 .authority(inetSocketAddress.getHostName());
-                        childChannel.write(new DefaultHttp2HeadersFrame(request, true));
-                        //do not close child channel after write, a response is expected
+                        childChannel.writeAndFlush(new DefaultHttp2HeadersFrame(request, true));
+                        //do not close child chqannel after write, a response is expected
                     }
                     clientChannel.flush();
                 });

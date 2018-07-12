@@ -6,19 +6,11 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.http2.DefaultHttp2SettingsFrame;
-import io.netty.handler.codec.http2.Http2ConnectionAdapter;
-import io.netty.handler.codec.http2.Http2ConnectionDecoder;
-import io.netty.handler.codec.http2.Http2ConnectionEncoder;
-import io.netty.handler.codec.http2.Http2ConnectionHandler;
 import io.netty.handler.codec.http2.Http2ConnectionPrefaceAndSettingsFrameWrittenEvent;
-import io.netty.handler.codec.http2.Http2Exception;
-import io.netty.handler.codec.http2.Http2FrameAdapter;
-import io.netty.handler.codec.http2.Http2FrameCodec;
 import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2MultiplexCodec;
 import io.netty.handler.codec.http2.Http2MultiplexCodecBuilder;
-import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.SslHandler;
 import org.xbib.netty.http.client.ClientConfig;
@@ -77,12 +69,11 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
         Http2MultiplexCodecBuilder clientMultiplexCodecBuilder = Http2MultiplexCodecBuilder.forClient(initializer)
                 .initialSettings(clientConfig.getHttp2Settings());
         if (clientConfig.isDebug()) {
-            clientMultiplexCodecBuilder.frameLogger(new Http2FrameLogger(LogLevel.DEBUG, "client"));
+            clientMultiplexCodecBuilder.frameLogger(new PushPromiseHandler(LogLevel.DEBUG, "client"));
         }
         Http2MultiplexCodec http2MultiplexCodec = clientMultiplexCodecBuilder.build();
         ChannelPipeline p = ch.pipeline();
         p.addLast("client-codec", http2MultiplexCodec);
-        //p.addLast("client-push-promise", new PushPromiseHandler());
         p.addLast("client-messages", new ClientMessages());
     }
 
@@ -96,6 +87,8 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
                 if (transport != null) {
                     transport.settingsReceived(settingsFrame.settings());
                 }
+            } else {
+                logger.log(Level.FINE, "received msg " + msg.getClass().getName());
             }
         }
 
@@ -121,14 +114,19 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
         }
     }
 
-    class PushPromiseHandler extends Http2FrameAdapter {
+    class PushPromiseHandler extends Http2FrameLogger {
 
-        @Override
-        public void onPushPromiseRead(ChannelHandlerContext ctx, int streamId, int promisedStreamId,
-                                      Http2Headers headers, int padding) throws Http2Exception {
-            super.onPushPromiseRead(ctx, streamId, promisedStreamId, headers, padding);
+        public PushPromiseHandler(LogLevel level, String name) {
+            super(level, name);
+        }
+
+        public void logPushPromise(Direction direction, ChannelHandlerContext ctx, int streamId, int promisedStreamId,
+                                   Http2Headers headers, int padding) {
+            super.logPushPromise(direction, ctx, streamId, promisedStreamId, headers, padding);
             Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
-            transport.pushPromiseReceived(ctx.channel(), streamId, promisedStreamId, headers);
+            if (transport != null) {
+                transport.pushPromiseReceived(ctx.channel(), streamId, promisedStreamId, headers);
+            }
         }
     }
 }

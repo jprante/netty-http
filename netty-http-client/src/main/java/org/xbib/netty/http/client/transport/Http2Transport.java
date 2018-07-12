@@ -196,7 +196,7 @@ public class Http2Transport extends BaseTransport {
     public void pushPromiseReceived(Channel channel, Integer streamId, Integer promisedStreamId, Http2Headers headers) {
         String channelId = channel.id().toString();
         channelFlowMap.get(channelId).put(promisedStreamId, new CompletableFuture<>());
-        String requestKey = getRequestKey(channel.id().toString(), promisedStreamId);
+        String requestKey = getRequestKey(channel.id().toString(), streamId);
         requests.put(requestKey, requests.get(requestKey));
     }
 

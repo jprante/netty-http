@@ -8,7 +8,6 @@ import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.client.RequestBuilder;
-import org.xbib.netty.http.client.transport.Transport;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -16,25 +15,29 @@ import java.nio.charset.StandardCharsets;
 
 public class RestClient {
 
-    private Client client;
-
-    private Transport transport;
+    private static final Client client = new Client();
 
     private FullHttpResponse response;
 
-    private RestClient(Client client, Transport transport) {
-        this.client = client;
-        this.transport = transport;
+    private RestClient() {
     }
 
     public void setResponse(FullHttpResponse response) {
         this.response = response.copy();
     }
 
+    public FullHttpResponse getResponse() {
+        return response;
+    }
+
     public String asString() {
+        return asString(StandardCharsets.UTF_8);
+    }
+
+    public String asString(Charset charset) {
         ByteBuf byteBuf = response != null ? response.content() : null;
         try {
-            return byteBuf != null && byteBuf.isReadable() ? response.content().toString(StandardCharsets.UTF_8) : null;
+            return byteBuf != null && byteBuf.isReadable() ? response.content().toString(charset) : null;
         } finally {
             if (byteBuf != null) {
                 byteBuf.release();
@@ -42,29 +45,56 @@ public class RestClient {
         }
     }
 
+    public void close() throws IOException {
+        client.shutdownGracefully();
+    }
+
     public static RestClient get(String urlString) throws IOException {
         return method(urlString, null, null, HttpMethod.GET);
     }
 
+    public static RestClient delete(String urlString) throws IOException {
+        return method(urlString, null, null, HttpMethod.DELETE);
+    }
+
     public static RestClient post(String urlString, String body) throws IOException {
-        return method(urlString, body, null, HttpMethod.POST);
+        return method(urlString, body, StandardCharsets.UTF_8, HttpMethod.POST);
+    }
+
+    public static RestClient post(String urlString, ByteBuf content) throws IOException {
+        return method(urlString, content, HttpMethod.POST);
+    }
+
+    public static RestClient put(String urlString, String body) throws IOException {
+        return method(urlString, body, StandardCharsets.UTF_8, HttpMethod.PUT);
+    }
+
+    public static RestClient put(String urlString, ByteBuf content) throws IOException {
+        return method(urlString, content, HttpMethod.PUT);
     }
 
     public static RestClient method(String urlString,
                                     String body, Charset charset,
                                     HttpMethod httpMethod) throws IOException {
-        URL url = URL.create(urlString);
-        Client client = new Client();
-        Transport transport = client.newTransport(HttpAddress.http1(url));
-        RestClient restClient = new RestClient(client, transport);
-        RequestBuilder requestBuilder = Request.builder(httpMethod);
-        requestBuilder.url(url);
+        ByteBuf byteBuf = null;
         if (body != null && charset != null) {
-            ByteBuf byteBuf = client.getByteBufAllocator().buffer();
+            byteBuf = client.getByteBufAllocator().buffer();
             byteBuf.writeCharSequence(body, charset);
+        }
+        return method(urlString, byteBuf, httpMethod);
+    }
+
+    public static RestClient method(String urlString,
+                                    ByteBuf byteBuf,
+                                    HttpMethod httpMethod) throws IOException {
+        URL url = URL.create(urlString);
+        RestClient restClient = new RestClient();
+        RequestBuilder requestBuilder = Request.builder(httpMethod).url(url);
+        if (byteBuf != null) {
             requestBuilder.content(byteBuf);
         }
-        transport.execute(requestBuilder.build().setResponseListener(restClient::setResponse)).get();
+        client.newTransport(HttpAddress.http1(url))
+                .execute(requestBuilder.build().setResponseListener(restClient::setResponse)).get();
         return restClient;
     }
 }
