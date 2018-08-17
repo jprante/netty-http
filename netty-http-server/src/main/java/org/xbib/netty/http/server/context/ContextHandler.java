@@ -6,8 +6,7 @@ import org.xbib.netty.http.server.transport.ServerResponse;
 import java.io.IOException;
 
 /**
- * A {@code ContextHandler} is capable of serving content for
- * resources within its context.
+ * A {@code ContextHandler} is capable of serving content for resources within its context.
  *
  * @see VirtualServer#addContext
  */

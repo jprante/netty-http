@@ -21,6 +21,7 @@ printf "Date: %s\nHost: %s\nOS: %s %s %s\nJVM: %s %s %s %s\nGradle: %s Groovy: %
         System.getProperty("java.vm.name"),
         gradle.gradleVersion, GroovySystem.getVersion(), JavaVersion.current()
 
+apply plugin: 'org.xbib.gradle.plugin.asciidoctor'
 apply plugin: "io.codearte.nexus-staging"
 
 subprojects {
@@ -28,7 +29,6 @@ subprojects {
     apply plugin: 'maven'
     apply plugin: 'signing'
     apply plugin: "com.github.spotbugs"
-    apply plugin: 'org.xbib.gradle.plugin.asciidoctor'
 
     configurations {
         alpnagent
@@ -42,8 +42,15 @@ subprojects {
         wagon "org.apache.maven.wagon:wagon-ssh:${project.property('wagon.version')}"
     }
 
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
+    compileJava {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
+    compileTestJava {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
 
     [compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
     tasks.withType(JavaCompile) {
@@ -61,7 +68,8 @@ subprojects {
             jvmArgs "-javaagent:" + configurations.alpnagent.asPath
         }
         testLogging {
-            showStandardStreams = true
+            // set this to 'true' to show lot of debug output
+            showStandardStreams = false
             exceptionFormat = 'full'
         }
     }
