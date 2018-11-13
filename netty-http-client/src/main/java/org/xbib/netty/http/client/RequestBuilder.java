@@ -20,8 +20,11 @@ import org.xbib.net.URLSyntaxException;
 import org.xbib.netty.http.client.retry.BackOff;
 import org.xbib.netty.http.common.HttpAddress;
 
+import java.net.MalformedURLException;
 import java.net.URI;
+import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
+import java.nio.charset.UnmappableCharacterException;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -277,7 +280,7 @@ public class RequestBuilder {
         if (uri != null) {
             try {
                 url = URL.base(url).resolve(uri);
-            } catch (URLSyntaxException e) {
+            } catch (URLSyntaxException | MalformedInputException | UnmappableCharacterException e) {
                 throw new IllegalArgumentException(e);
             }
         }

@@ -4,6 +4,7 @@ dependencies {
     compile "io.netty:netty-transport-native-epoll:${project.property('netty.version')}"
     compile "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
     compile "org.bouncycastle:bcpkix-jdk15on:${project.property('bouncycastle.version')}"
+
     testCompile project(":netty-http-client")
     testCompile "junit:junit:${project.property('junit.version')}"
 }
