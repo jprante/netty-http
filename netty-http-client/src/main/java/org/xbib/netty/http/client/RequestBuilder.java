@@ -14,13 +14,14 @@ import io.netty.handler.codec.http.QueryStringEncoder;
 import io.netty.handler.codec.http.cookie.Cookie;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.util.AsciiString;
+import org.xbib.net.PercentEncoder;
+import org.xbib.net.PercentEncoders;
 import org.xbib.net.QueryParameters;
 import org.xbib.net.URL;
 import org.xbib.net.URLSyntaxException;
 import org.xbib.netty.http.client.retry.BackOff;
 import org.xbib.netty.http.common.HttpAddress;
 
-import java.net.MalformedURLException;
 import java.net.URI;
 import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
@@ -61,6 +62,8 @@ public class RequestBuilder {
     private final List<String> removeHeaders;
 
     private final Collection<Cookie> cookies;
+
+    private final PercentEncoder encoder;
 
     private HttpMethod httpMethod;
 
@@ -106,6 +109,7 @@ public class RequestBuilder {
         headers = new DefaultHttpHeaders();
         removeHeaders = new ArrayList<>();
         cookies = new HashSet<>();
+        encoder = PercentEncoders.getQueryEncoder(StandardCharsets.UTF_8);
         queryParameters = new QueryParameters();
     }
 
@@ -185,7 +189,11 @@ public class RequestBuilder {
 
     public RequestBuilder addParameter(String name, String value) {
         if (queryParameters != null) {
-            queryParameters.add(name, value);
+            try {
+                queryParameters.add(name, encoder.encode(value));
+            } catch (MalformedInputException | UnmappableCharacterException e) {
+                throw new IllegalArgumentException(e);
+            }
         }
         return this;
     }

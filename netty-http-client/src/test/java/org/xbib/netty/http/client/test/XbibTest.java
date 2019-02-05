@@ -51,7 +51,7 @@ public class XbibTest extends TestBase {
                         try {
                             return httpClient.execute(Request.post()
                                     .url("http://google.de")
-                                    .addParameter("query", content)
+                                    .addParameter("query", content.substring(0, 15))
                                     .build(), httpResponseStringFunction);
                         } catch (IOException e) {
                             logger.log(Level.WARNING, e.getMessage(), e);
