@@ -126,8 +126,8 @@ subprojects {
 
     ext {
         user = 'jprante'
-        name = 'netty-http-client'
-        description = 'A java client for Elasticsearch'
+        name = 'netty-http'
+        description = 'HTTP client and server for Netty'
         scmUrl = 'https://github.com/' + user + '/' + name
         scmConnection = 'scm:git:git://github.com/' + user + '/' + name + '.git'
         scmDeveloperConnection = 'scm:git:git://github.com/' + user + '/' + name + '.git'
