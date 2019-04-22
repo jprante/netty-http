@@ -21,6 +21,8 @@ public class ServerRequest {
 
     private final Integer requestId;
 
+    private String contextPath;
+
     public ServerRequest(VirtualServer virtualServer, HttpAddress httpAddress,
                          FullHttpRequest httpRequest, Integer sequenceId, Integer streamId, Integer requestId) {
         this.virtualServer = virtualServer;
@@ -33,6 +35,18 @@ public class ServerRequest {
 
     public VirtualServer getVirtualServer() {
         return virtualServer;
+    }
+
+    public void setContextPath(String contextPath) {
+        this.contextPath = contextPath;
+    }
+
+    public String getContextPath() {
+        return contextPath;
+    }
+
+    public String getRequestPath() {
+        return contextPath != null ? httpRequest.uri().substring(contextPath.length()) : httpRequest.uri();
     }
 
     public HttpAddress getHttpAddress() {

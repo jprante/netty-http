@@ -1,4 +1,4 @@
-package org.xbib.netty.http.hacks;
+package org.xbib.netty.http.server.test.hacks;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
@@ -24,7 +24,7 @@ import org.junit.Test;
 import org.xbib.netty.http.server.handler.http.HttpPipelinedRequest;
 import org.xbib.netty.http.server.handler.http.HttpPipelinedResponse;
 import org.xbib.netty.http.server.handler.http.HttpPipeliningHandler;
-import org.xbib.TestBase;
+import org.xbib.netty.http.server.test.TestBase;
 
 import java.nio.channels.ClosedChannelException;
 import java.nio.charset.StandardCharsets;

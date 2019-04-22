@@ -224,7 +224,7 @@ public class ServerBuilder {
         return this;
     }
 
-    public ServerBuilder addVirtualHost(VirtualServer virtualServer) {
+    public ServerBuilder addVirtualServer(VirtualServer virtualServer) {
         this.serverConfig.addVirtualServer(virtualServer);
         return this;
     }

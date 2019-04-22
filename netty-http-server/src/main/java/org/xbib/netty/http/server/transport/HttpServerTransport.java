@@ -3,6 +3,7 @@ package org.xbib.netty.http.server.transport;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http2.Http2Settings;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
@@ -35,6 +36,8 @@ public class HttpServerTransport extends BaseServerTransport {
         ServerResponse serverResponse = new HttpServerResponse(serverRequest, ctx);
         if (acceptRequest(serverRequest, serverResponse)) {
             handle(serverRequest, serverResponse);
+        } else {
+            serverResponse.write(HttpResponseStatus.NOT_ACCEPTABLE);
         }
     }
 

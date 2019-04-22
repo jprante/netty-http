@@ -80,6 +80,10 @@ public class HttpTransport extends BaseTransport {
             logger.log(Level.WARNING, "throwable not null for response " + fullHttpResponse, throwable);
             return;
         }
+        if (requests.isEmpty()) {
+            logger.log(Level.WARNING, "no request present, can not handle response " + fullHttpResponse);
+            return;
+        }
         // streamID is expected to be null, last request on memory is expected to be current, remove request from memory
         Request request = requests.remove(requests.lastKey());
         if (request != null) {

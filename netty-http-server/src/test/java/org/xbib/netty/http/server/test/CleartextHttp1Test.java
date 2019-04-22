@@ -1,8 +1,8 @@
 package org.xbib.netty.http.server.test;
 
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import org.junit.Test;
-import org.xbib.TestBase;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.client.listener.ResponseListener;
@@ -30,7 +30,7 @@ public class CleartextHttp1Test extends TestBase {
         Server server = Server.builder()
                 .bind(httpAddress).build();
         server.getDefaultVirtualServer().addContext("/", (request, response) ->
-                response.write(200, "text/plain", request.getRequest().content().retain()));
+                response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()));
         server.accept();
         Client client = Client.builder()
                 .build();
@@ -63,7 +63,7 @@ public class CleartextHttp1Test extends TestBase {
                 //.enableDebug()
                 .bind(httpAddress).build();
         server.getDefaultVirtualServer().addContext("/", (request, response) -> {
-             response.write(200, "text/plain", request.getRequest().content().retain());
+             response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain());
         });
         server.accept();
         Client client = Client.builder()
@@ -109,7 +109,7 @@ public class CleartextHttp1Test extends TestBase {
                 //.enableDebug()
                 .bind(httpAddress).build();
         server.getDefaultVirtualServer().addContext("/", (request, response) -> {
-            response.write(200, "text/plain", request.getRequest().content().retain());
+            response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain());
         });
         server.accept();
         Client client = Client.builder()

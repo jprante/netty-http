@@ -1,6 +1,6 @@
 package org.xbib.netty.http.server.context;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -8,12 +8,13 @@ import java.util.Map;
  */
 public class ContextInfo {
 
-    private final Map<String, ContextHandler> handlers = new HashMap<>(2);
-
     private final VirtualServer virtualServer;
+
+    private final Map<String, ContextHandler> methodHandlerMap;
 
     public ContextInfo(VirtualServer virtualServer) {
         this.virtualServer = virtualServer;
+        this.methodHandlerMap = new LinkedHashMap<>();
     }
 
     /**
@@ -21,8 +22,8 @@ public class ContextInfo {
      *
      * @return the map of supported HTTP methods and their corresponding handlers
      */
-    public Map<String, ContextHandler> getHandlers() {
-        return handlers;
+    public Map<String, ContextHandler> getMethodHandlerMap() {
+        return methodHandlerMap;
     }
 
     /**
@@ -33,11 +34,13 @@ public class ContextInfo {
      */
     public void addHandler(ContextHandler handler, String... methods) {
         if (methods.length == 0) {
-            methods = new String[]{"GET"};
-        }
-        for (String method : methods) {
-            handlers.put(method, handler);
-            virtualServer.getMethods().add(method);
+            methodHandlerMap.put("GET", handler);
+            virtualServer.getMethods().add("GET");
+        } else {
+            for (String method : methods) {
+                methodHandlerMap.put(method, handler);
+                virtualServer.getMethods().add(method);
+            }
         }
     }
 }

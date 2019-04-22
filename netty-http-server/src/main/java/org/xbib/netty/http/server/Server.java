@@ -138,7 +138,7 @@ public final class Server {
             DomainNameMappingBuilder<SslContext> mappingBuilder = new DomainNameMappingBuilder<>(sslContext);
             for (VirtualServer virtualServer : serverConfig.getVirtualServers()) {
                 String name = virtualServer.getName();
-                mappingBuilder.add( name == null ? "*" : name, sslContext);
+                mappingBuilder.add(name == null ? "*" : name, sslContext);
             }
             domainNameMapping = mappingBuilder.build();
         }

@@ -2,6 +2,7 @@ package org.xbib.netty.http.server.context;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import org.xbib.netty.http.server.transport.ServerRequest;
 import org.xbib.netty.http.server.transport.ServerResponse;
 
@@ -28,10 +29,9 @@ public class DirectoryContextHandler implements ContextHandler {
         String uri = serverRequest.getRequest().uri();
         Path p = path.resolve(uri);
         ByteBuf byteBuf = read(allocator, p);
-        serverResponse.write(200, "application/octet-stream", byteBuf);
+        serverResponse.write(HttpResponseStatus.OK, "application/octet-stream", byteBuf);
         byteBuf.release();
     }
-
 
     public static ByteBuf read(ByteBufAllocator allocator, Path path)
             throws IOException {

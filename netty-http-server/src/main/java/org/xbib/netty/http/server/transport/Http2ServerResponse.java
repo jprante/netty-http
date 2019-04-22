@@ -41,7 +41,7 @@ public class Http2ServerResponse implements ServerResponse {
 
     @Override
     public void write(String text) {
-        write(200, "text/plain; charset=utf-8", text);
+        write(HttpResponseStatus.OK, "text/plain; charset=utf-8", text);
     }
 
     /**
@@ -50,8 +50,8 @@ public class Http2ServerResponse implements ServerResponse {
      * @param status the response status
      */
     @Override
-    public void writeError(int status) {
-        writeError(status, status < 400 ? ":)" : "sorry it didn't work out :(");
+    public void writeError(HttpResponseStatus status) {
+        writeError(status, status.code() < 400 ? ":)" : "sorry it didn't work out :(");
     }
 
     /**
@@ -64,32 +64,32 @@ public class Http2ServerResponse implements ServerResponse {
      * @param text   the text body (sent as text/html)
      */
     @Override
-    public void writeError(int status, String text) {
+    public void writeError(HttpResponseStatus status, String text) {
         write(status, "text/html; charset=utf-8",
                 String.format("<!DOCTYPE html>%n<html>%n<head><title>%d %s</title></head>%n" +
                                 "<body><h1>%d %s</h1>%n<p>%s</p>%n</body></html>",
-                        status, HttpResponseStatus.valueOf(status).reasonPhrase(),
-                        status, HttpResponseStatus.valueOf(status).reasonPhrase(),
+                        status.code(), status.reasonPhrase(),
+                        status.code(), status.reasonPhrase(),
                         escapeHTML(text)));
     }
 
     @Override
-    public void write(int status) {
+    public void write(HttpResponseStatus status) {
         write(status, null, (ByteBuf) null);
     }
 
     @Override
-    public void write(int status, String contentType, String text) {
+    public void write(HttpResponseStatus status, String contentType, String text) {
         write(status, contentType, ByteBufUtil.writeUtf8(ctx.alloc(), text));
     }
 
     @Override
-    public void write(int status, String contentType, String text, Charset charset) {
+    public void write(HttpResponseStatus status, String contentType, String text, Charset charset) {
         write(status, contentType, ByteBufUtil.encodeString(ctx.alloc(), CharBuffer.allocate(text.length()).append(text), charset));
     }
 
     @Override
-    public void write(int status, String contentType, ByteBuf byteBuf) {
+    public void write(HttpResponseStatus status, String contentType, ByteBuf byteBuf) {
         if (byteBuf != null) {
             CharSequence s = headers.get(HttpHeaderNames.CONTENT_TYPE);
             if (s == null) {
@@ -120,7 +120,7 @@ public class Http2ServerResponse implements ServerResponse {
             }
         }
         Http2Headers http2Headers = new DefaultHttp2Headers()
-                .status(HttpResponseStatus.valueOf(status).codeAsText())
+                .status(status.codeAsText())
                 .add(headers);
         ctx.channel().write(new DefaultHttp2HeadersFrame(http2Headers,byteBuf == null));
         if (byteBuf != null) {

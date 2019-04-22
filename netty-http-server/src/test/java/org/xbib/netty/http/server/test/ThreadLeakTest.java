@@ -3,7 +3,6 @@ package org.xbib.netty.http.server.test;
 import io.netty.buffer.UnpooledByteBufAllocator;
 import org.junit.After;
 import org.junit.Test;
-import org.xbib.TestBase;
 import org.xbib.netty.http.server.Server;
 
 import java.io.IOException;

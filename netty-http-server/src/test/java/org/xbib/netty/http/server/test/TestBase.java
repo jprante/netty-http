@@ -1,4 +1,4 @@
-package org.xbib;
+package org.xbib.netty.http.server.test;
 
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Handler;

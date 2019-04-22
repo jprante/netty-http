@@ -64,13 +64,13 @@ subprojects {
     }
 
     test {
-        if (JavaVersion.current() == JavaVersion.VERSION_1_8) {
-            jvmArgs "-javaagent:" + configurations.alpnagent.asPath
-        }
+        systemProperty 'java.util.logging.config.file', 'src/test/resources/logging.properties'
         testLogging {
-            // set this to 'true' to show lot of debug output
             showStandardStreams = false
             exceptionFormat = 'full'
+        }
+        if (JavaVersion.current() == JavaVersion.VERSION_1_8) {
+            jvmArgs "-javaagent:" + configurations.alpnagent.asPath
         }
     }
 

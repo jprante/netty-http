@@ -3,6 +3,7 @@ package org.xbib.netty.http.server.transport;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.context.ContextHandler;
@@ -33,7 +34,7 @@ abstract class BaseServerTransport implements ServerTransport {
     }
 
     @Override
-    public void exceptionReceived(ChannelHandlerContext ctx, Throwable throwable) throws IOException {
+    public void exceptionReceived(ChannelHandlerContext ctx, Throwable throwable) {
         logger.log(Level.WARNING, throwable.getMessage(), throwable);
     }
 
@@ -54,7 +55,7 @@ abstract class BaseServerTransport implements ServerTransport {
             case 2:
                 if (!reqHeaders.contains(HttpHeaderNames.HOST)) {
                     // RFC2616#14.23: missing Host header gets 400
-                    serverResponse.writeError(400, "missing 'Host' header");
+                    serverResponse.writeError(HttpResponseStatus.BAD_REQUEST, "missing 'Host' header");
                     return false;
                 }
                 // return a continue response before reading body
@@ -65,13 +66,13 @@ abstract class BaseServerTransport implements ServerTransport {
                         //tempResp.sendHeaders(100);
                     } else {
                         // RFC2616#14.20: if unknown expect, send 417
-                        serverResponse.writeError(417);
+                        serverResponse.writeError(HttpResponseStatus.EXPECTATION_FAILED);
                         return false;
                     }
                 }
                 break;
             default:
-                serverResponse.writeError(400, "Unknown version: " + version);
+                serverResponse.writeError(HttpResponseStatus.BAD_REQUEST, "Unknown version: " + version);
                 return false;
         }
         return true;
@@ -88,12 +89,14 @@ abstract class BaseServerTransport implements ServerTransport {
         String method = serverRequest.getRequest().method().name();
         String path = serverRequest.getRequest().uri();
         VirtualServer virtualServer = serverRequest.getVirtualServer();
-        Map<String, ContextHandler> handlers = virtualServer.getContext(path).getHandlers();
+        VirtualServer.ContextPath contextPath = virtualServer.getContextPath(path);
+        serverRequest.setContextPath(contextPath.getHook());
+        Map<String, ContextHandler> methodHandlerMap = contextPath.getContextInfo().getMethodHandlerMap();
         // RFC 2616#5.1.1 - GET and HEAD must be supported
-        if (method.equals("GET") || method.equals("HEAD") || handlers.containsKey(method)) {
-            ContextHandler handler = virtualServer.getContext(path).getHandlers().get(method);
+        if (method.equals("GET") || method.equals("HEAD") || methodHandlerMap.containsKey(method)) {
+            ContextHandler handler = methodHandlerMap.get(method);
             if (handler == null) {
-                serverResponse.writeError(404);
+                serverResponse.writeError(HttpResponseStatus.NOT_FOUND);
             } else {
                 handler.serve(serverRequest, serverResponse);
             }
@@ -101,15 +104,15 @@ abstract class BaseServerTransport implements ServerTransport {
             Set<String> methods = new LinkedHashSet<>(METHODS);
             // "*" is a special server-wide (no-context) request supported by OPTIONS
             boolean isServerOptions = path.equals("*") && method.equals("OPTIONS");
-            methods.addAll(isServerOptions ? virtualServer.getMethods() : handlers.keySet());
+            methods.addAll(isServerOptions ? virtualServer.getMethods() : methodHandlerMap.keySet());
             serverResponse.setHeader(HttpHeaderNames.ALLOW, String.join(", ", methods));
             if (method.equals("OPTIONS")) { // default OPTIONS handler
                 serverResponse.setHeader(HttpHeaderNames.CONTENT_LENGTH, "0"); // RFC2616#9.2
-                serverResponse.write(200);
+                serverResponse.write(HttpResponseStatus.OK);
             } else if (virtualServer.getMethods().contains(method)) {
-                serverResponse.write(405); // supported by server, but not this context (nor built-in)
+                serverResponse.write(HttpResponseStatus.METHOD_NOT_ALLOWED); // supported by server, but not this context (nor built-in)
             } else {
-                serverResponse.writeError(501); // unsupported method
+                serverResponse.writeError(HttpResponseStatus.NOT_IMPLEMENTED); // unsupported method
             }
         }
     }

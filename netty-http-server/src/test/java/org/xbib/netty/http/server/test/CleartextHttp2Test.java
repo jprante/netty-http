@@ -1,7 +1,7 @@
 package org.xbib.netty.http.server.test;
 
+import io.netty.handler.codec.http.HttpResponseStatus;
 import org.junit.Test;
-import org.xbib.TestBase;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.client.listener.ResponseListener;
@@ -31,7 +31,7 @@ public class CleartextHttp2Test extends TestBase {
                 .bind(httpAddress)
                 .build();
         server.getDefaultVirtualServer().addContext("/", (request, response) ->
-                response.write(200, "text/plain", request.getRequest().content().retain()));
+                response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()));
         server.accept();
         Client client = Client.builder()
                 .build();
@@ -71,7 +71,7 @@ public class CleartextHttp2Test extends TestBase {
         Server server = Server.builder()
                 .bind(httpAddress).build();
         server.getDefaultVirtualServer().addContext("/", (request, response) ->
-                response.write(200, "text/plain", request.getRequest().content().retain()));
+                response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()));
         //server.getDefaultVirtualServer().addContext("/", (request, response) ->
         //    response.write(request.getRequest().content().toString(StandardCharsets.UTF_8)));
         server.accept();

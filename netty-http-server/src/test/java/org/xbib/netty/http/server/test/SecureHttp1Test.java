@@ -1,10 +1,9 @@
 package org.xbib.netty.http.server.test;
 
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.junit.Ignore;
 import org.junit.Test;
-import org.xbib.TestBase;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.client.listener.ResponseListener;
@@ -53,7 +52,7 @@ public class SecureHttp1Test extends TestBase {
         };
         try {
             server.getDefaultVirtualServer().addContext("/", (request, response) ->
-                    response.write(200, "text/plain", request.getRequest().content().retain()));
+                    response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()));
             server.accept();
             Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base())
@@ -77,7 +76,7 @@ public class SecureHttp1Test extends TestBase {
                 .setSelfCert()
                 .bind(httpAddress).build();
         server.getDefaultVirtualServer().addContext("/", (request, response) ->
-                response.write(200, "text/plain", request.getRequest().content().retain()));
+                response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()));
         server.accept();
         Client client = Client.builder()
                 .setJdkSslProvider()
@@ -125,7 +124,7 @@ public class SecureHttp1Test extends TestBase {
                 .bind(httpAddress)
                 .build();
         server.getDefaultVirtualServer().addContext("/", (request, response) ->
-                response.write(200, "text/plain", request.getRequest().content().retain())
+                response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain())
         );
         server.accept();
         Client client = Client.builder()

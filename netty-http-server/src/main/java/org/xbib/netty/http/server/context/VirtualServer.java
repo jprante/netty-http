@@ -24,6 +24,10 @@ public class VirtualServer {
 
     private volatile boolean allowGeneratedIndex;
 
+    public VirtualServer() {
+        this(null);
+    }
+
     /**
      * Constructs a VirtualServer with the given name.
      *
@@ -95,25 +99,6 @@ public class VirtualServer {
     }
 
     /**
-     * Returns the context handler for the given path.
-     * If a context is not found for the given path, the search is repeated for
-     * its parent path, and so on until a base context is found. If neither the
-     * given path nor any of its parents has a context, an empty context is returned.
-     *
-     * @param path the context's path
-     * @return the context info for the given path, or an empty context if none exists
-     */
-    public ContextInfo getContext(String path) {
-        path = trimRight(path, '/'); // remove trailing slash
-        ContextInfo info = null;
-        while (info == null && path != null) {
-            info = contexts.get(path);
-            path = getParentPath(path);
-        }
-        return info != null ? info : emptyContext;
-    }
-
-    /**
      * Adds a context and its corresponding context handler to this server.
      * Paths are normalized by removing trailing slashes (except the root).
      *
@@ -122,15 +107,16 @@ public class VirtualServer {
      * @param methods the HTTP methods supported by the context handler (default is "GET")
      * @throws IllegalArgumentException if path is malformed
      */
-    public void addContext(String path, ContextHandler handler, String... methods) {
+    public VirtualServer addContext(String path, ContextHandler handler, String... methods) {
         if (path == null || !path.startsWith("/") && !path.equals("*")) {
             throw new IllegalArgumentException("invalid path: " + path);
         }
-        path = trimRight(path, '/');
+        String s = trimRight(path, '/');
         ContextInfo info = new ContextInfo(this);
-        ContextInfo existing = contexts.putIfAbsent(path, info);
+        ContextInfo existing = contexts.putIfAbsent(s, info);
         info = existing != null ? existing : info;
         info.addHandler(handler, methods);
+        return this;
     }
 
     /**
@@ -141,17 +127,37 @@ public class VirtualServer {
      * @throws IllegalArgumentException if a Context-annotated
      *                                  method has an {@link Context invalid signature}
      */
-    public void addContexts(Object o) throws IllegalArgumentException {
+    public VirtualServer addContexts(Object o) throws IllegalArgumentException {
         for (Class<?> c = o.getClass(); c != null; c = c.getSuperclass()) {
-            // add to contexts those with @Context annotation
             for (Method m : c.getDeclaredMethods()) {
                 Context context = m.getAnnotation(Context.class);
                 if (context != null) {
-                    //m.setAccessible(true); // allow access to private method
                     addContext(context.value(), new MethodContextHandler(m, o), context.methods());
                 }
             }
         }
+        return this;
+    }
+
+    /**
+     * Returns the context handler for the given path.
+     * If a context is not found for the given path, the search is repeated for
+     * its parent path, and so on until a base context is found. If neither the
+     * given path nor any of its parents has a context, an empty context is returned.
+     *
+     * @param path the context's path
+     * @return the context info for the given path, or an empty context if none exists
+     */
+    public ContextPath getContextPath(String path) {
+        String s = trimRight(path, '/');
+        ContextInfo info = null;
+        String hook = null;
+        while (info == null && s != null) {
+            hook = s;
+            info = contexts.get(s);
+            s = getParentPath(s);
+        }
+        return new ContextPath(hook, info != null ? info : emptyContext);
     }
 
     /**
@@ -179,9 +185,29 @@ public class VirtualServer {
      * or null if given path is the root path
      */
     private static String getParentPath(String path) {
-        path = trimRight(path, '/'); // remove trailing slash
-        int slash = path.lastIndexOf('/');
-        return slash == -1 ? null : path.substring(0, slash);
+        String s = trimRight(path, '/'); // remove trailing slash
+        int slash = s.lastIndexOf('/');
+        return slash == -1 ? null : s.substring(0, slash);
+    }
+
+    public class ContextPath {
+
+        private final String hook;
+
+        private final ContextInfo contextInfo;
+
+        ContextPath(String hook, ContextInfo contextInfo) {
+            this.hook = hook;
+            this.contextInfo = contextInfo;
+        }
+
+        public String getHook() {
+            return hook;
+        }
+
+        public ContextInfo getContextInfo() {
+            return contextInfo;
+        }
     }
 
 }
