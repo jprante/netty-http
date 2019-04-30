@@ -29,9 +29,9 @@ import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder;
 import io.netty.handler.codec.http2.InboundHttp2ToHttpAdapterBuilder;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
-import org.junit.Ignore;
-import org.junit.Test;
-import org.xbib.netty.http.server.test.TestBase;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.xbib.netty.http.server.test.NettyHttpExtension;
 
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
@@ -39,8 +39,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-@Ignore
-public class CleartextHttp2Test extends TestBase {
+@ExtendWith(NettyHttpExtension.class)
+class CleartextHttp2Test {
 
     private static final Logger clientLogger = Logger.getLogger("client");
     private static final Logger serverLogger = Logger.getLogger("server");
@@ -56,17 +56,12 @@ public class CleartextHttp2Test extends TestBase {
     private CompletableFuture<Boolean> completableFuture;
 
     @Test
-    public void testHttp2() throws Exception {
-
+    void testHttp2() throws Exception {
         final InetSocketAddress inetSocketAddress = new InetSocketAddress("localhost", 8008);
-
         settingsPrefaceFuture = new CompletableFuture<>();
-
         completableFuture = new CompletableFuture<>();
-
         EventLoopGroup serverEventLoopGroup = new NioEventLoopGroup();
         EventLoopGroup clientEventLoopGroup = new NioEventLoopGroup();
-
         try {
             Http2Connection http2ServerConnection = new DefaultHttp2Connection(true);
             ServerBootstrap serverBootstrap = new ServerBootstrap()
@@ -132,7 +127,7 @@ public class CleartextHttp2Test extends TestBase {
             clientChannel.writeAndFlush(request);
 
             clientLogger.log(level, "waiting");
-            completableFuture.get(10, TimeUnit.SECONDS);
+            completableFuture.get(30, TimeUnit.SECONDS);
             if (completableFuture.isDone()) {
                 clientLogger.log(Level.INFO, "done");
             }

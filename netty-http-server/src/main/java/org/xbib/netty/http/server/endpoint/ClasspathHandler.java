@@ -1,4 +1,4 @@
-package org.xbib.netty.http.server.context;
+package org.xbib.netty.http.server.endpoint;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -16,19 +16,19 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-public class ClasspathContextHandler implements ContextHandler {
+public class ClasspathHandler implements Handler {
 
     private final ClassLoader classLoader;
 
     private final String prefix;
 
-    public ClasspathContextHandler(ClassLoader classLoader, String prefix) {
+    public ClasspathHandler(ClassLoader classLoader, String prefix) {
         this.classLoader = classLoader;
         this.prefix = prefix;
     }
 
     @Override
-    public void serve(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
+    public void handle(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
         String contextPath = serverRequest.getContextPath();
         URL url = classLoader.getResource(prefix + contextPath);
         if (url != null) {

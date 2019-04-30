@@ -16,9 +16,10 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.HttpVersion;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.pool.Pool;
 import org.xbib.netty.http.client.pool.BoundedChannelPool;
@@ -35,10 +36,11 @@ import java.util.concurrent.atomic.LongAdder;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class NioTest {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class NioTest {
 
     private static final Logger logger = Logger.getLogger(NioTest.class.getName());
 
@@ -61,8 +63,8 @@ public class NioTest {
 
     private EventLoopGroup eventLoopGroup;
 
-    @Before
-    public void setUp() throws Exception {
+    @BeforeAll
+    void setUp() throws Exception {
         mockNioServer = new MockNioServer(12345, FAIL_EVERY_ATTEMPT);
         Semaphore semaphore = new Semaphore(CONCURRENCY);
         eventLoopGroup = new NioEventLoopGroup();
@@ -83,15 +85,15 @@ public class NioTest {
         channelPool.prepare(CONCURRENCY);
     }
 
-    @After
-    public void tearDown() throws Exception {
+    @AfterAll
+    void tearDown() throws Exception {
         channelPool.close();
         eventLoopGroup.shutdownGracefully();
         mockNioServer.close();
     }
 
     @Test
-    public void testPoolNio() throws Exception {
+    void testPoolNio() throws Exception {
         LongAdder longAdder = new LongAdder();
         ExecutorService executor = Executors.newFixedThreadPool(CONCURRENCY);
         for(int i = 0; i < CONCURRENCY; i ++) {
@@ -142,7 +144,7 @@ public class NioTest {
 
         private final AtomicLong reqCounter;
 
-        public MockNioServer(int port, int dropEveryRequest) throws InterruptedException {
+        MockNioServer(int port, int dropEveryRequest) throws InterruptedException {
             dispatchGroup = new NioEventLoopGroup();
             workerGroup = new NioEventLoopGroup();
             reqCounter = new AtomicLong(0);

@@ -12,7 +12,7 @@ import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2MultiplexCodec;
 import io.netty.handler.codec.http2.Http2MultiplexCodecBuilder;
 import io.netty.handler.logging.LogLevel;
-import io.netty.handler.ssl.SslHandler;
+import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.ClientConfig;
 import org.xbib.netty.http.client.handler.http.TrafficLoggingHandler;
 import org.xbib.netty.http.client.transport.Transport;
@@ -29,14 +29,14 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
 
     private final HttpAddress httpAddress;
 
-    private final SslHandler sslHandler;
+    private final Client.SslHandlerFactory sslHandlerFactory;
 
     public Http2ChannelInitializer(ClientConfig clientConfig,
                             HttpAddress httpAddress,
-                            SslHandler sslHandler) {
+                                   Client.SslHandlerFactory sslHandlerFactory) {
         this.clientConfig = clientConfig;
         this.httpAddress = httpAddress;
-        this.sslHandler = sslHandler;
+        this.sslHandlerFactory = sslHandlerFactory;
     }
 
     @Override
@@ -55,7 +55,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
     }
 
     private void configureEncrypted(Channel channel) {
-        channel.pipeline().addLast(sslHandler);
+        channel.pipeline().addLast(sslHandlerFactory.create());
         configureCleartext(channel);
     }
 

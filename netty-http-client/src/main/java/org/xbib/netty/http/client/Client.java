@@ -199,13 +199,13 @@ public final class Client {
         Channel channel;
         if (httpAddress != null) {
             HttpVersion httpVersion = httpAddress.getVersion();
+            SslHandlerFactory sslHandlerFactory = new SslHandlerFactory(clientConfig, httpAddress, byteBufAllocator);
             ChannelInitializer<Channel> initializer;
-            SslHandler sslHandler = newSslHandler(clientConfig, byteBufAllocator, httpAddress);
             if (httpVersion.majorVersion() == 1) {
-                initializer = new HttpChannelInitializer(clientConfig, httpAddress, sslHandler,
-                        new Http2ChannelInitializer(clientConfig, httpAddress, sslHandler));
+                initializer = new HttpChannelInitializer(clientConfig, httpAddress, sslHandlerFactory,
+                        new Http2ChannelInitializer(clientConfig, httpAddress, sslHandlerFactory));
             } else {
-                initializer = new Http2ChannelInitializer(clientConfig, httpAddress, sslHandler);
+                initializer = new Http2ChannelInitializer(clientConfig, httpAddress, sslHandlerFactory);
             }
             try {
                 channel = bootstrap.handler(initializer)
@@ -412,15 +412,34 @@ public final class Client {
         public void channelCreated(Channel channel) {
             HttpAddress httpAddress = channel.attr(pool.getAttributeKey()).get();
             HttpVersion httpVersion = httpAddress.getVersion();
-            SslHandler sslHandler = newSslHandler(clientConfig, byteBufAllocator, httpAddress);
+            SslHandlerFactory sslHandlerFactory = new SslHandlerFactory(clientConfig, httpAddress, byteBufAllocator);
+            Http2ChannelInitializer http2ChannelInitializer = new Http2ChannelInitializer(clientConfig, httpAddress, sslHandlerFactory);
             if (httpVersion.majorVersion() == 1) {
-                HttpChannelInitializer initializer = new HttpChannelInitializer(clientConfig, httpAddress, sslHandler,
-                        new Http2ChannelInitializer(clientConfig, httpAddress, sslHandler));
+                HttpChannelInitializer initializer = new HttpChannelInitializer(clientConfig, httpAddress, sslHandlerFactory,
+                        http2ChannelInitializer);
                 initializer.initChannel(channel);
             } else {
-                Http2ChannelInitializer initializer = new Http2ChannelInitializer(clientConfig, httpAddress, sslHandler);
-                initializer.initChannel(channel);
+                http2ChannelInitializer.initChannel(channel);
             }
+        }
+    }
+
+    public class SslHandlerFactory {
+
+        private final ClientConfig clientConfig;
+
+        private final HttpAddress httpAddress;
+
+        private final ByteBufAllocator allocator;
+
+        SslHandlerFactory(ClientConfig clientConfig, HttpAddress httpAddress, ByteBufAllocator allocator) {
+            this.clientConfig = clientConfig;
+            this.httpAddress = httpAddress;
+            this.allocator = allocator;
+        }
+
+        public SslHandler create() {
+            return newSslHandler(clientConfig, allocator, httpAddress);
         }
     }
 }

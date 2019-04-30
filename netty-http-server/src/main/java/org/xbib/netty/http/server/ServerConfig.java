@@ -10,12 +10,14 @@ import io.netty.handler.ssl.OpenSsl;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import org.xbib.netty.http.common.HttpAddress;
-import org.xbib.netty.http.server.context.VirtualServer;
+import org.xbib.netty.http.server.endpoint.NamedServer;
 
 import javax.net.ssl.TrustManagerFactory;
 import java.io.InputStream;
 import java.security.KeyStore;
 import java.util.ArrayList;
+import java.util.Deque;
+import java.util.LinkedList;
 import java.util.List;
 
 public class ServerConfig {
@@ -117,7 +119,7 @@ public class ServerConfig {
 
         /**
          * This is Netty's default.
-         * See {@link io.netty.handler.codec.MessageAggregator#DEFAULT_MAX_COMPOSITEBUFFER_COMPONENTS}.
+         * See {@link io.netty.handler.codec.MessageAggregator#maxCumulationBufferComponents()}.
          */
         int MAX_COMPOSITE_BUFFER_COMPONENTS = 1024;
 
@@ -225,15 +227,15 @@ public class ServerConfig {
 
     private String keyPassword;
 
-    private List<VirtualServer> virtualServers;
+    private Deque<NamedServer> namedServers;
 
     private TrustManagerFactory trustManagerFactory = TRUST_MANAGER_FACTORY;
 
     private KeyStore trustManagerKeyStore = null;
 
     public ServerConfig() {
-        this.virtualServers = new ArrayList<>();
-        addVirtualServer(new VirtualServer(null));
+        this.namedServers = new LinkedList<>();
+        add(new NamedServer(null));
     }
 
     public ServerConfig enableDebug() {
@@ -512,13 +514,13 @@ public class ServerConfig {
         return keyPassword;
     }
 
-    public ServerConfig addVirtualServer(VirtualServer virtualServer) {
-        this.virtualServers.add(virtualServer);
+    public ServerConfig add(NamedServer namedServer) {
+        this.namedServers.add(namedServer);
         return this;
     }
 
-    public List<VirtualServer> getVirtualServers() {
-        return virtualServers;
+    public Deque<NamedServer> getNamedServers() {
+        return namedServers;
     }
 
     public ServerConfig setTrustManagerFactory(TrustManagerFactory trustManagerFactory) {

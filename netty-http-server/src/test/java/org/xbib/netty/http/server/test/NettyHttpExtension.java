@@ -1,5 +1,10 @@
-package org.xbib;
+package org.xbib.netty.http.server.test;
 
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.junit.jupiter.api.extension.BeforeAllCallback;
+import org.junit.jupiter.api.extension.ExtensionContext;
+
+import java.security.Security;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Handler;
 import java.util.logging.Level;
@@ -7,9 +12,13 @@ import java.util.logging.LogManager;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 
-public class TestBase {
+public class NettyHttpExtension implements BeforeAllCallback {
 
-    static {
+    @Override
+    public void beforeAll(ExtensionContext context) {
+        if (Security.getProvider("BC") == null) {
+            Security.addProvider(new BouncyCastleProvider());
+        }
         System.setProperty("io.netty.noUnsafe", Boolean.toString(true));
         System.setProperty("io.netty.noKeySetOptimization", Boolean.toString(true));
         //System.setProperty("io.netty.recycler.maxCapacity", Integer.toString(0));

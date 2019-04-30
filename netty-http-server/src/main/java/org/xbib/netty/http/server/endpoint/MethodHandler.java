@@ -1,4 +1,4 @@
-package org.xbib.netty.http.server.context;
+package org.xbib.netty.http.server.endpoint;
 
 import org.xbib.netty.http.server.transport.ServerRequest;
 import org.xbib.netty.http.server.transport.ServerResponse;
@@ -8,20 +8,19 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 /**
- * The {@code MethodContextHandler} services a context
- * by invoking a handler method on a specified object.
+ * The {@code MethodHandler} invokes g a handler method on a specified object.
  * The method must have the same signature and contract as
- * {@link ContextHandler#serve}, but can have an arbitrary name.
+ * {@link Handler#handle}, but can have an arbitrary name.
  *
- * @see VirtualServer#addContexts(Object)
+ * @see NamedServer#addHandlers(Object)
  */
-public class MethodContextHandler implements ContextHandler {
+public class MethodHandler implements Handler {
 
     private final Method m;
 
     private final Object obj;
 
-    public MethodContextHandler(Method m, Object obj) throws IllegalArgumentException {
+    public MethodHandler(Method m, Object obj) throws IllegalArgumentException {
         this.m = m;
         this.obj = obj;
         Class<?>[] params = m.getParameterTypes();
@@ -34,7 +33,7 @@ public class MethodContextHandler implements ContextHandler {
     }
 
     @Override
-    public void serve(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
+    public void handle(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
         try {
             m.invoke(obj, serverRequest, serverResponse);
         } catch (InvocationTargetException ite) {

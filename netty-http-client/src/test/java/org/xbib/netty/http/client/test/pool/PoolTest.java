@@ -9,16 +9,13 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.util.AttributeKey;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.pool.BoundedChannelPool;
 import org.xbib.netty.http.client.pool.Pool;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -30,11 +27,10 @@ import java.util.concurrent.atomic.LongAdder;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@RunWith(Parameterized.class)
-public class PoolTest {
+class PoolTest {
 
     private static final Logger logger = Logger.getLogger(PoolTest.class.getName());
 
@@ -42,30 +38,11 @@ public class PoolTest {
 
     private static final int BATCH_SIZE = 0x1000;
 
-    private int nodeCount;
-
-    private ConcurrentMap<HttpAddress, LongAdder> nodeFreq = new ConcurrentHashMap<>();
-
-    @Parameterized.Parameters
-    public static Collection<Object[]> generateData() {
-        return Arrays.asList(new Object[][] {
-                {1, 1},
-                {10, 1},
-                {10, 2},
-                //{10, 5},
-                //{10, 10},
-                {100, 1},
-                {100, 2},
-                //{100, 5},
-                //{100, 10},
-                //{1000, 1},
-                //{1000, 2},
-                //{1000, 5},
-                //{1000, 10}
-        });
-    }
-
-    public PoolTest(int concurrencyLevel, int nodeCount) throws InterruptedException {
+    @ParameterizedTest
+    @ValueSource(ints = {1,10,100})
+    void testPool(int concurrencyLevel) throws InterruptedException {
+        ConcurrentMap<HttpAddress, LongAdder> nodeFreq = new ConcurrentHashMap<>();
+        int nodecount = 2;
 
         ServerBootstrap serverBootstrap = new ServerBootstrap()
                 .group(new NioEventLoopGroup())
@@ -77,9 +54,8 @@ public class PoolTest {
                 });
         Channel serverChannel = serverBootstrap.bind("localhost", 8008).sync().channel();
 
-        this.nodeCount = nodeCount;
         List<HttpAddress> nodes = new ArrayList<>();
-        for (int i = 0; i < nodeCount; i ++) {
+        for (int i = 0; i < nodecount; i ++) {
             nodes.add(HttpAddress.http1("localhost", 8008));
         }
         try (Pool<Channel> pool = new BoundedChannelPool<>(new Semaphore(concurrencyLevel), HttpVersion.HTTP_1_1,
@@ -127,25 +103,16 @@ public class PoolTest {
         } finally {
             serverChannel.close();
             long connCountSum = nodeFreq.values().stream().mapToLong(LongAdder::sum).sum();
-            logger.log(Level.INFO, "concurrency = " + concurrencyLevel + ", nodes = " + nodeCount + " -> rate: " +
+            logger.log(Level.INFO, "concurrency = " + concurrencyLevel + ", nodes = " + nodecount + " -> rate: " +
                             connCountSum / TEST_STEP_TIME_SECONDS);
-        }
-    }
-
-    @Test
-    public void testNodeFrequency() {
-        if (nodeCount > 1) {
-            long connCountSum = nodeFreq.values().stream().mapToLong(LongAdder::sum).sum();
-            long avgConnCountPerNode = connCountSum / nodeCount;
+            long avgConnCountPerNode = connCountSum / 2;
             for (HttpAddress nodeAddr: nodeFreq.keySet()) {
                 assertTrue(nodeFreq.get(nodeAddr).sum() > 0);
-                assertEquals("Node count: " + nodeCount + ", node: " + nodeAddr
-                                + ", expected connection count: " + avgConnCountPerNode + ", actual: "
-                                + nodeFreq.get(nodeAddr).sum(),
+                assertEquals(/*"Node count: " + nodeCount + ", node: " + nodeAddr
+                            + ", expected connection count: " + avgConnCountPerNode + ", actual: "
+                            + nodeFreq.get(nodeAddr).sum(),*/
                         avgConnCountPerNode, nodeFreq.get(nodeAddr).sum(), 1.5 * avgConnCountPerNode);
             }
-        } else {
-            assertTrue(true);
         }
     }
 }

@@ -1,4 +1,4 @@
-package org.xbib.netty.http.server.context;
+package org.xbib.netty.http.server.endpoint;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -13,19 +13,19 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-public class DirectoryContextHandler implements ContextHandler {
+public class DirectoryHandler implements Handler {
 
     private Path path;
 
     private ByteBufAllocator allocator;
 
-    public DirectoryContextHandler(Path path, ByteBufAllocator allocator) {
+    public DirectoryHandler(Path path, ByteBufAllocator allocator) {
         this.path = path;
         this.allocator = allocator;
     }
 
     @Override
-    public void serve(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
+    public void handle(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
         String uri = serverRequest.getRequest().uri();
         Path p = path.resolve(uri);
         ByteBuf byteBuf = read(allocator, p);

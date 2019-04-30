@@ -1,4 +1,4 @@
-package org.xbib.netty.http.server.context;
+package org.xbib.netty.http.server.endpoint;
 
 import java.lang.reflect.Method;
 import java.util.Collections;
@@ -10,7 +10,7 @@ import java.util.Set;
 /**
  * The {@code VirtualServer} class represents a virtual server.
  */
-public class VirtualServer {
+public class NamedServer {
 
     private final String name;
 
@@ -18,28 +18,28 @@ public class VirtualServer {
 
     private final Set<String> methods;
 
-    private final ContextInfo emptyContext;
+    private final Endpoint defaultEndpoint;
 
-    private final Map<String, ContextInfo> contexts;
+    private final Map<String, Endpoint> endpointMap;
 
     private volatile boolean allowGeneratedIndex;
 
-    public VirtualServer() {
+    public NamedServer() {
         this(null);
     }
 
     /**
-     * Constructs a VirtualServer with the given name.
+     * Constructs a {@code NamedServer} with the given name.
      *
      * @param name the name, or null if it is the default server
      */
-    public VirtualServer(String name) {
+    public NamedServer(String name) {
         this.name = name;
         this.aliases = new HashSet<>();
         this.methods = new HashSet<>();
-        this.contexts = new HashMap<>();
-        this.emptyContext = new ContextInfo(this);
-        contexts.put("*", new ContextInfo(this)); // for "OPTIONS *"
+        this.endpointMap = new HashMap<>();
+        this.defaultEndpoint = new Endpoint(this);
+        endpointMap.put("*", new Endpoint(this)); // for "OPTIONS *"
     }
 
     /**
@@ -105,34 +105,36 @@ public class VirtualServer {
      * @param path    the context's path (must start with '/')
      * @param handler the context handler for the given path
      * @param methods the HTTP methods supported by the context handler (default is "GET")
+     * @return this virtual server
      * @throws IllegalArgumentException if path is malformed
      */
-    public VirtualServer addContext(String path, ContextHandler handler, String... methods) {
+    public NamedServer addHandler(String path, Handler handler, String... methods) {
         if (path == null || !path.startsWith("/") && !path.equals("*")) {
             throw new IllegalArgumentException("invalid path: " + path);
         }
         String s = trimRight(path, '/');
-        ContextInfo info = new ContextInfo(this);
-        ContextInfo existing = contexts.putIfAbsent(s, info);
+        Endpoint info = new Endpoint(this);
+        Endpoint existing = endpointMap.putIfAbsent(s, info);
         info = existing != null ? existing : info;
         info.addHandler(handler, methods);
         return this;
     }
 
     /**
-     * Adds contexts for all methods of the given object that
+     * Adds handler for all methods of the given object that
      * are annotated with the {@link Context} annotation.
      *
      * @param o the object whose annotated methods are added
+     * @return this virtual server
      * @throws IllegalArgumentException if a Context-annotated
      *                                  method has an {@link Context invalid signature}
      */
-    public VirtualServer addContexts(Object o) throws IllegalArgumentException {
+    public NamedServer addHandlers(Object o) throws IllegalArgumentException {
         for (Class<?> c = o.getClass(); c != null; c = c.getSuperclass()) {
             for (Method m : c.getDeclaredMethods()) {
                 Context context = m.getAnnotation(Context.class);
                 if (context != null) {
-                    addContext(context.value(), new MethodContextHandler(m, o), context.methods());
+                    addHandler(context.value(), new MethodHandler(m, o), context.methods());
                 }
             }
         }
@@ -140,24 +142,24 @@ public class VirtualServer {
     }
 
     /**
-     * Returns the context handler for the given path.
-     * If a context is not found for the given path, the search is repeated for
+     * Returns the endpoint for the given path.
+     * If an endpoint is not found for the given path, the search is repeated for
      * its parent path, and so on until a base context is found. If neither the
      * given path nor any of its parents has a context, an empty context is returned.
      *
      * @param path the context's path
      * @return the context info for the given path, or an empty context if none exists
      */
-    public ContextPath getContextPath(String path) {
+    public NamedEndpoint getNamedEndpoint(String path) {
         String s = trimRight(path, '/');
-        ContextInfo info = null;
+        Endpoint info = null;
         String hook = null;
         while (info == null && s != null) {
             hook = s;
-            info = contexts.get(s);
+            info = endpointMap.get(s);
             s = getParentPath(s);
         }
-        return new ContextPath(hook, info != null ? info : emptyContext);
+        return new NamedEndpoint(hook, info != null ? info : defaultEndpoint);
     }
 
     /**
@@ -188,26 +190,6 @@ public class VirtualServer {
         String s = trimRight(path, '/'); // remove trailing slash
         int slash = s.lastIndexOf('/');
         return slash == -1 ? null : s.substring(0, slash);
-    }
-
-    public class ContextPath {
-
-        private final String hook;
-
-        private final ContextInfo contextInfo;
-
-        ContextPath(String hook, ContextInfo contextInfo) {
-            this.hook = hook;
-            this.contextInfo = contextInfo;
-        }
-
-        public String getHook() {
-            return hook;
-        }
-
-        public ContextInfo getContextInfo() {
-            return contextInfo;
-        }
     }
 
 }

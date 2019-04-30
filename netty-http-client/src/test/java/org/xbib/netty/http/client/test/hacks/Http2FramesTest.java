@@ -1,4 +1,4 @@
-package org.xbib.netty.http.hacks;
+package org.xbib.netty.http.client.test.hacks;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
@@ -26,9 +26,7 @@ import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
-import org.junit.Ignore;
-import org.junit.Test;
-import org.xbib.TestBase;
+import org.junit.jupiter.api.Test;
 
 import javax.net.ssl.SNIHostName;
 import javax.net.ssl.SNIServerName;
@@ -40,13 +38,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-@Ignore
-public class Http2FramesTest extends TestBase {
+class Http2FramesTest {
 
     private static final Logger logger = Logger.getLogger(Http2FramesTest.class.getName());
 
     @Test
-    public void testHttp2Frames() throws Exception {
+    void testHttp2Frames() throws Exception {
         final InetSocketAddress inetSocketAddress = new InetSocketAddress("webtide.com", 443);
         CompletableFuture<Boolean> completableFuture = new CompletableFuture<>();
         EventLoopGroup eventLoopGroup = new NioEventLoopGroup();

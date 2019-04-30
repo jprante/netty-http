@@ -2,7 +2,8 @@ package org.xbib.netty.http.server.test;
 
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.client.listener.ResponseListener;
@@ -18,18 +19,19 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class CleartextHttp1Test extends TestBase {
+@ExtendWith(NettyHttpExtension.class)
+class CleartextHttp1Test {
 
     private static final Logger logger = Logger.getLogger(CleartextHttp1Test.class.getName());
 
     @Test
-    public void testSimpleClearTextHttp1() throws Exception {
+    void testSimpleClearTextHttp1() throws Exception {
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         Server server = Server.builder()
                 .bind(httpAddress).build();
-        server.getDefaultVirtualServer().addContext("/", (request, response) ->
+        server.getDefaultVirtualServer().addHandler("/", (request, response) ->
                 response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()));
         server.accept();
         Client client = Client.builder()
@@ -51,23 +53,20 @@ public class CleartextHttp1Test extends TestBase {
             client.shutdownGracefully();
             server.shutdownGracefully();
         }
-        logger.log(Level.INFO, "exepecting=1 counter=" + counter.get());
         assertEquals(1, counter.get());
     }
 
     @Test
-    public void testPooledClearTextHttp1() throws Exception {
+    void testPooledClearTextHttp1() throws Exception {
         int loop = 4096;
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         Server server = Server.builder()
-                //.enableDebug()
                 .bind(httpAddress).build();
-        server.getDefaultVirtualServer().addContext("/", (request, response) -> {
+        server.getDefaultVirtualServer().addHandler("/", (request, response) -> {
              response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain());
         });
         server.accept();
         Client client = Client.builder()
-                //.enableDebug()
                 .addPoolNode(httpAddress)
                 .setPoolNodeConnectionLimit(2)
                 .build();
@@ -96,19 +95,17 @@ public class CleartextHttp1Test extends TestBase {
             client.shutdownGracefully();
             server.shutdownGracefully();
         }
-        logger.log(Level.INFO, "expecting=" + loop + " counter=" + counter.get());
         assertEquals(loop, counter.get());
     }
 
     @Test
-    public void testMultithreadedPooledClearTextHttp1() throws Exception {
+    void testMultithreadedPooledClearTextHttp1() throws Exception {
         int threads = 4;
         int loop = 4 * 1024;
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         Server server = Server.builder()
-                //.enableDebug()
                 .bind(httpAddress).build();
-        server.getDefaultVirtualServer().addContext("/", (request, response) -> {
+        server.getDefaultVirtualServer().addHandler("/", (request, response) -> {
             response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain());
         });
         server.accept();
@@ -159,7 +156,6 @@ public class CleartextHttp1Test extends TestBase {
             client.shutdownGracefully();
             server.shutdownGracefully();
         }
-        logger.log(Level.INFO, "expecting=" + (threads * loop) + " counter=" + counter.get());
         assertEquals(threads * loop, counter.get());
     }
 }

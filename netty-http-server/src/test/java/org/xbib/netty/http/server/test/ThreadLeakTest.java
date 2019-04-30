@@ -1,8 +1,10 @@
 package org.xbib.netty.http.server.test;
 
 import io.netty.buffer.UnpooledByteBufAllocator;
-import org.junit.After;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.server.Server;
 
 import java.io.IOException;
@@ -10,16 +12,18 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class ThreadLeakTest extends TestBase {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@ExtendWith(NettyHttpExtension.class)
+class ThreadLeakTest {
 
     private static final Logger logger = Logger.getLogger(ThreadLeakTest.class.getName());
 
     @Test
-    public void testForLeaks() throws IOException {
+    void testForLeaks() throws IOException {
         Server server = Server.builder()
                 .setByteBufAllocator(UnpooledByteBufAllocator.DEFAULT)
                 .build();
-        server.getDefaultVirtualServer().addContext("/", (request, response) ->
+        server.getDefaultVirtualServer().addHandler("/", (request, response) ->
                 response.write("Hello World"));
         try {
             server.accept();
@@ -28,8 +32,8 @@ public class ThreadLeakTest extends TestBase {
         }
     }
 
-    @After
-    public void checkThreads() throws Exception {
+    @AfterAll
+    void checkThreads() throws Exception {
         Thread.sleep(1000L);
         System.gc();
         Thread.sleep(3000L);

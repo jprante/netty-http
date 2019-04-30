@@ -1,19 +1,19 @@
 package org.xbib.netty.http.client.test.retry;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.xbib.netty.http.client.retry.BackOff;
 
 import java.io.IOException;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests {@link MockBackOff}.
  */
-public class MockBackOffTest {
+class MockBackOffTest {
 
     @Test
-    public void testNextBackOffMillis() throws IOException {
+    void testNextBackOffMillis() throws IOException {
         subtestNextBackOffMillis(0, new MockBackOff());
         subtestNextBackOffMillis(BackOff.STOP, new MockBackOff().setBackOffMillis(BackOff.STOP));
         subtestNextBackOffMillis(42, new MockBackOff().setBackOffMillis(42));

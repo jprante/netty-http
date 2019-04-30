@@ -25,7 +25,6 @@ import io.netty.handler.codec.http.HttpServerUpgradeHandler;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http2.CleartextHttp2ServerUpgradeHandler;
 import io.netty.handler.codec.http2.DefaultHttp2Headers;
-//import io.netty.handler.codec.http2.DefaultHttp2PushPromiseFrame;
 import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame;
 import io.netty.handler.codec.http2.Http2CodecUtil;
 import io.netty.handler.codec.http2.Http2ConnectionPrefaceAndSettingsFrameWrittenEvent;
@@ -41,9 +40,9 @@ import io.netty.handler.codec.http2.Http2StreamFrameToHttpObjectCodec;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.util.AsciiString;
-import org.junit.Ignore;
-import org.junit.Test;
-import org.xbib.netty.http.server.test.TestBase;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.xbib.netty.http.server.test.NettyHttpExtension;
 
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
@@ -69,8 +68,8 @@ import java.util.logging.Logger;
  *
  *
  */
-@Ignore
-public class MultiplexCodecCleartextHttp2Test extends TestBase {
+@ExtendWith(NettyHttpExtension.class)
+class MultiplexCodecCleartextHttp2Test {
 
     private static final Logger clientLogger = Logger.getLogger("client");
     private static final Logger serverLogger = Logger.getLogger("server");
@@ -82,14 +81,11 @@ public class MultiplexCodecCleartextHttp2Test extends TestBase {
     private final CompletableFuture<Boolean> responseFuture = new CompletableFuture<>();
 
     @Test
-    public void testMultiplexHttp2() throws Exception {
-
+    void testMultiplexHttp2() throws Exception {
         Http2FrameLogger serverFrameLogger = new Http2FrameLogger(LogLevel.INFO, "server");
         Http2FrameLogger clientFrameLogger = new Http2FrameLogger(LogLevel.INFO, "client");
-
         EventLoopGroup serverEventLoopGroup = new NioEventLoopGroup();
         EventLoopGroup clientEventLoopGroup = new NioEventLoopGroup();
-
         try {
             ServerBootstrap serverBootstrap = new ServerBootstrap()
                 .group(serverEventLoopGroup)

@@ -27,9 +27,9 @@ import io.netty.handler.codec.http2.Http2ConnectionPrefaceAndSettingsFrameWritte
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder;
 import io.netty.handler.codec.http2.InboundHttp2ToHttpAdapterBuilder;
-import org.junit.Ignore;
-import org.junit.Test;
-import org.xbib.netty.http.server.test.TestBase;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.xbib.netty.http.server.test.NettyHttpExtension;
 
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
@@ -40,8 +40,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-@Ignore
-public class MultithreadedCleartextHttp2Test extends TestBase {
+@ExtendWith(NettyHttpExtension.class)
+class MultithreadedCleartextHttp2Test {
 
     private static final Logger clientLogger = Logger.getLogger("client");
     private static final Logger serverLogger = Logger.getLogger("server");
@@ -61,7 +61,7 @@ public class MultithreadedCleartextHttp2Test extends TestBase {
     private final AtomicInteger responseCounter = new AtomicInteger();
 
     @Test
-    public void testMultiThreadedHttp2() throws Exception {
+    void testMultiThreadedHttp2() throws Exception {
 
         inetSocketAddress = new InetSocketAddress("localhost", 8008);
         settingsPrefaceFuture = new CompletableFuture<>();

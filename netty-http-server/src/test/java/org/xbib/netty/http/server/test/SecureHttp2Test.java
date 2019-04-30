@@ -1,8 +1,8 @@
 package org.xbib.netty.http.server.test;
 
 import io.netty.handler.codec.http.HttpResponseStatus;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.client.listener.ResponseListener;
@@ -12,7 +12,6 @@ import org.xbib.netty.http.server.Server;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.security.Security;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -20,27 +19,22 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class SecureHttp2Test extends TestBase {
+@ExtendWith(NettyHttpExtension.class)
+class SecureHttp2Test {
 
     private static final Logger logger = Logger.getLogger(SecureHttp2Test.class.getName());
 
-    static {
-        if (Security.getProvider("BC") == null) {
-            Security.addProvider(new BouncyCastleProvider());
-        }
-    }
-
     @Test
-    public void testSimpleSecureHttp2() throws Exception {
+    void testSimpleSecureHttp2() throws Exception {
         HttpAddress httpAddress = HttpAddress.secureHttp2("localhost", 8143);
         Server server = Server.builder()
                 .setJdkSslProvider()
                 .setSelfCert()
                 .bind(httpAddress)
                 .build();
-        server.getDefaultVirtualServer().addContext("/", (request, response) ->
+        server.getDefaultVirtualServer().addHandler("/", (request, response) ->
                 response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()));
         server.accept();
         Client client = Client.builder()
@@ -57,7 +51,7 @@ public class SecureHttp2Test extends TestBase {
         };
         try {
             Transport transport = client.newTransport(httpAddress);
-            String payload = Integer.toString(0) + "/" + Integer.toString(0);
+            String payload = 0 + "/" + 0;
             Request request = Request.get()
                     .setVersion("HTTP/2.0")
                     .uri("/")
@@ -71,12 +65,11 @@ public class SecureHttp2Test extends TestBase {
             client.shutdownGracefully();
             server.shutdownGracefully();
         }
-        logger.log(Level.INFO, "counter = " + counter.get());
         assertEquals(1, counter.get());
     }
 
     @Test
-    public void testPooledSecureHttp2() throws Exception {
+    void testPooledSecureHttp2() throws Exception {
         int loop = 4096;
         HttpAddress httpAddress = HttpAddress.secureHttp2("localhost", 8143);
         Server server = Server.builder()
@@ -84,7 +77,7 @@ public class SecureHttp2Test extends TestBase {
                 .setSelfCert()
                 .bind(httpAddress)
                 .build();
-        server.getDefaultVirtualServer().addContext("/", (request, response) ->
+        server.getDefaultVirtualServer().addHandler("/", (request, response) ->
                 response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()));
         server.accept();
         Client client = Client.builder()
@@ -122,12 +115,11 @@ public class SecureHttp2Test extends TestBase {
             client.shutdownGracefully();
             server.shutdownGracefully();
         }
-        logger.log(Level.INFO, "counter=" + counter.get());
         assertEquals(loop, counter.get());
     }
 
     @Test
-    public void testMultithreadPooledSecureHttp2() throws Exception {
+    void testMultithreadPooledSecureHttp2() throws Exception {
         int threads = 4;
         int loop = 4 * 1024;
         HttpAddress httpAddress = HttpAddress.secureHttp2("localhost", 8143);
@@ -136,7 +128,7 @@ public class SecureHttp2Test extends TestBase {
                 .setSelfCert()
                 .bind(httpAddress)
                 .build();
-        server.getDefaultVirtualServer().addContext("/", (request, response) ->
+        server.getDefaultVirtualServer().addHandler("/", (request, response) ->
                 response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain())
         );
         server.accept();
@@ -163,7 +155,7 @@ public class SecureHttp2Test extends TestBase {
                 executorService.submit(() -> {
                     try {
                         for (int i = 0; i < loop; i++) {
-                            String payload = Integer.toString(t) + "/" + Integer.toString(i);
+                            String payload = t + "/" + i;
                             Request request = Request.get().setVersion("HTTP/2.0")
                                     .url(server.getServerConfig().getAddress().base())
                                     .content(payload, "text/plain")
@@ -181,14 +173,13 @@ public class SecureHttp2Test extends TestBase {
                 });
             }
             executorService.shutdown();
-            boolean terminated = executorService.awaitTermination(30, TimeUnit.SECONDS);
+            boolean terminated = executorService.awaitTermination(60, TimeUnit.SECONDS);
             logger.log(Level.INFO, "terminated = " + terminated + ", now waiting for transport to complete");
-            transport.get(30, TimeUnit.SECONDS);
+            transport.get(60, TimeUnit.SECONDS);
         } finally {
             client.shutdownGracefully();
             server.shutdownGracefully();
         }
-        logger.log(Level.INFO, "expected=" + (threads * loop) + " counter=" + counter.get());
         assertEquals(threads * loop , counter.get());
     }
 }

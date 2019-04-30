@@ -1,11 +1,12 @@
 package org.xbib.netty.http.client.test.pool;
 
 import io.netty.handler.codec.http.HttpVersion;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.net.URL;
 import org.xbib.netty.http.client.Client;
-import org.xbib.TestBase;
 import org.xbib.netty.http.client.listener.ResponseListener;
+import org.xbib.netty.http.client.test.NettyHttpExtension;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.Request;
 
@@ -18,12 +19,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class PooledClientTest extends TestBase {
+@ExtendWith(NettyHttpExtension.class)
+class PooledClientTest {
 
-    private static final Logger logger = Logger.getLogger("");
+    private static final Logger logger = Logger.getLogger(PooledClientTest.class.getName());
 
     @Test
-    public void testPooledClientWithSingleNode() throws IOException {
+    void testPooledClientWithSingleNode() throws IOException {
         int loop = 10;
         int threads = Runtime.getRuntime().availableProcessors();
         URL url = URL.from("https://fl-test.hbz-nrw.de/app/fl");

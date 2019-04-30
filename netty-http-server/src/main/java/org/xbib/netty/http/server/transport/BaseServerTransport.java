@@ -6,8 +6,9 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.context.ContextHandler;
-import org.xbib.netty.http.server.context.VirtualServer;
+import org.xbib.netty.http.server.endpoint.Handler;
+import org.xbib.netty.http.server.endpoint.NamedEndpoint;
+import org.xbib.netty.http.server.endpoint.NamedServer;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -88,28 +89,28 @@ abstract class BaseServerTransport implements ServerTransport {
     protected static void handle(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
         String method = serverRequest.getRequest().method().name();
         String path = serverRequest.getRequest().uri();
-        VirtualServer virtualServer = serverRequest.getVirtualServer();
-        VirtualServer.ContextPath contextPath = virtualServer.getContextPath(path);
-        serverRequest.setContextPath(contextPath.getHook());
-        Map<String, ContextHandler> methodHandlerMap = contextPath.getContextInfo().getMethodHandlerMap();
+        NamedServer namedServer = serverRequest.getNamedServer();
+        NamedEndpoint namedEndpoint = namedServer.getNamedEndpoint(path);
+        serverRequest.setContextPath(namedEndpoint.getName());
+        Map<String, Handler> methodHandlerMap = namedEndpoint.getEndpoint().getHandlerMap();
         // RFC 2616#5.1.1 - GET and HEAD must be supported
         if (method.equals("GET") || method.equals("HEAD") || methodHandlerMap.containsKey(method)) {
-            ContextHandler handler = methodHandlerMap.get(method);
+            Handler handler = methodHandlerMap.get(method);
             if (handler == null) {
                 serverResponse.writeError(HttpResponseStatus.NOT_FOUND);
             } else {
-                handler.serve(serverRequest, serverResponse);
+                handler.handle(serverRequest, serverResponse);
             }
         } else {
             Set<String> methods = new LinkedHashSet<>(METHODS);
             // "*" is a special server-wide (no-context) request supported by OPTIONS
             boolean isServerOptions = path.equals("*") && method.equals("OPTIONS");
-            methods.addAll(isServerOptions ? virtualServer.getMethods() : methodHandlerMap.keySet());
+            methods.addAll(isServerOptions ? namedServer.getMethods() : methodHandlerMap.keySet());
             serverResponse.setHeader(HttpHeaderNames.ALLOW, String.join(", ", methods));
             if (method.equals("OPTIONS")) { // default OPTIONS handler
                 serverResponse.setHeader(HttpHeaderNames.CONTENT_LENGTH, "0"); // RFC2616#9.2
                 serverResponse.write(HttpResponseStatus.OK);
-            } else if (virtualServer.getMethods().contains(method)) {
+            } else if (namedServer.getMethods().contains(method)) {
                 serverResponse.write(HttpResponseStatus.METHOD_NOT_ALLOWED); // supported by server, but not this context (nor built-in)
             } else {
                 serverResponse.writeError(HttpResponseStatus.NOT_IMPLEMENTED); // unsupported method

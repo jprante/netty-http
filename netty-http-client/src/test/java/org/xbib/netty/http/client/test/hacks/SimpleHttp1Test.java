@@ -1,4 +1,4 @@
-package org.xbib.netty.http.hacks;
+package org.xbib.netty.http.client.test.hacks;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
@@ -19,10 +19,9 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.util.AttributeKey;
-import org.junit.After;
-import org.junit.Ignore;
-import org.junit.Test;
-import org.xbib.TestBase;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -40,8 +39,8 @@ import java.util.logging.LogManager;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 
-@Ignore
-public class SimpleHttp1Test extends TestBase {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class SimpleHttp1Test {
 
     private static final Logger logger = Logger.getLogger(SimpleHttp1Test.class.getName());
 
@@ -62,7 +61,7 @@ public class SimpleHttp1Test extends TestBase {
         }
     }
 
-    @After
+    @AfterAll
     public void checkThreads() {
         Set<Thread> threadSet = Thread.getAllStackTraces().keySet();
         logger.log(Level.INFO, "threads = " + threadSet.size() );
@@ -74,7 +73,7 @@ public class SimpleHttp1Test extends TestBase {
     }
 
     @Test
-    public void testHttp1() throws Exception {
+    void testHttp1() throws Exception {
         Client client = new Client();
         try {
             HttpTransport transport = client.newTransport("xbib.org", 80);

@@ -17,16 +17,13 @@ import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 
 import io.netty.handler.codec.http.HttpVersion;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.pool.Pool;
 import org.xbib.netty.http.client.pool.BoundedChannelPool;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 import java.io.Closeable;
 import java.util.Collections;
@@ -40,8 +37,12 @@ import java.util.concurrent.atomic.LongAdder;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-@Ignore
-public class EpollTest {
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@DisabledIfEpolllNotAvailable
+class EpollTest {
 
     private static final Logger logger = Logger.getLogger(EpollTest.class.getName());
 
@@ -64,8 +65,8 @@ public class EpollTest {
 
     private EventLoopGroup eventLoopGroup;
 
-    @Before
-    public void setUp() throws Exception {
+    @BeforeAll
+    void setUp() throws Exception {
         mockEpollServer = new MockEpollServer(12345, FAIL_EVERY_ATTEMPT);
         Semaphore semaphore = new Semaphore(CONCURRENCY);
         eventLoopGroup = new EpollEventLoopGroup();
@@ -86,15 +87,15 @@ public class EpollTest {
         channelPool.prepare(CONCURRENCY);
     }
 
-    @After
-    public void tearDown() throws Exception {
+    @AfterAll
+    void tearDown() throws Exception {
         channelPool.close();
         eventLoopGroup.shutdownGracefully();
         mockEpollServer.close();
     }
 
     @Test
-    public void testPoolEpoll() throws Exception {
+    void testPoolEpoll() throws Exception {
         LongAdder longAdder = new LongAdder();
         ExecutorService executor = Executors.newFixedThreadPool(CONCURRENCY);
         for(int i = 0; i < CONCURRENCY; i ++) {
@@ -146,7 +147,7 @@ public class EpollTest {
 
         private final AtomicLong reqCounter;
 
-        public MockEpollServer(int port, int dropEveryRequest) throws InterruptedException {
+        MockEpollServer(int port, int dropEveryRequest) throws InterruptedException {
             dispatchGroup = new EpollEventLoopGroup();
             workerGroup = new EpollEventLoopGroup();
             reqCounter = new AtomicLong(0);

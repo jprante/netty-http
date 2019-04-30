@@ -1,3 +1,4 @@
 include 'netty-http-common'
 include 'netty-http-client'
 include 'netty-http-server'
+include 'netty-http-server-rest'

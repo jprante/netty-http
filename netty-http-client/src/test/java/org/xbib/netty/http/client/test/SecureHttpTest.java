@@ -1,9 +1,8 @@
 package org.xbib.netty.http.client.test;
 
 import io.netty.handler.codec.http.HttpMethod;
-import org.junit.Ignore;
-import org.junit.Test;
-import org.xbib.TestBase;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.Request;
 
@@ -12,13 +11,15 @@ import java.nio.charset.StandardCharsets;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class SecureHttp1Test extends TestBase {
+@ExtendWith(NettyHttpExtension.class)
+class SecureHttpTest {
 
-    private static final Logger logger = Logger.getLogger(SecureHttp1Test.class.getName());
+    private static final Logger logger = Logger.getLogger(SecureHttpTest.class.getName());
 
     @Test
-    public void testHttp1() throws Exception {
-        Client client = Client.builder().enableDebug().build();
+    void testHttp1() throws Exception {
+        Client client = Client.builder()
+                .build();
         try {
             Request request = Request.get().url("https://www.google.com/").build()
                     .setResponseListener(msg -> logger.log(Level.INFO, "got response: " +
@@ -32,39 +33,9 @@ public class SecureHttp1Test extends TestBase {
     }
 
     @Test
-    @Ignore
-    public void testParallelRequests() throws IOException {
-        Client client = Client.builder().enableDebug().build();
-        try {
-            Request request1 = Request.builder(HttpMethod.GET)
-                    .url("https://google.com").setVersion("HTTP/1.1")
-                    .build()
-                    .setResponseListener(msg -> logger.log(Level.INFO, "got response: " +
-                            msg.headers().entries() +
-                            //msg.content().toString(StandardCharsets.UTF_8) +
-                            " status=" + msg.status().code()));
-            Request request2 = Request.builder(HttpMethod.GET)
-                    .url("https://google.com").setVersion("HTTP/1.1")
-                    .build()
-                    .setResponseListener(msg -> logger.log(Level.INFO, "got response: " +
-                            msg.headers().entries() +
-                            //msg.content().toString(StandardCharsets.UTF_8) +
-                            " status=" + msg.status().code()));
-
-            for (int i = 0; i < 10; i++) {
-                client.execute(request1);
-                client.execute(request2);
-            }
-
-        } finally {
-            client.shutdownGracefully();
-        }
-    }
-
-    @Test
-    @Ignore
-    public void testSequentialRequests() throws Exception {
-        Client client = Client.builder().enableDebug().build();
+    void testSequentialRequests() throws Exception {
+        Client client = Client.builder()
+                .build();
         try {
             Request request1 = Request.get().url("https://google.com").build()
                     .setResponseListener(msg -> logger.log(Level.INFO, "got response: " +
@@ -79,4 +50,33 @@ public class SecureHttp1Test extends TestBase {
             client.shutdown();
         }
     }
+
+    @Test
+    void testParallelRequests() throws IOException {
+        Client client = Client.builder()
+                .build();
+        try {
+            Request request1 = Request.builder(HttpMethod.GET)
+                    .url("https://google.com").setVersion("HTTP/1.1")
+                    .build()
+                    .setResponseListener(msg -> logger.log(Level.INFO, "got response: " +
+                            msg.headers().entries() +
+                            " status=" + msg.status().code()));
+            Request request2 = Request.builder(HttpMethod.GET)
+                    .url("https://google.com").setVersion("HTTP/1.1")
+                    .build()
+                    .setResponseListener(msg -> logger.log(Level.INFO, "got response: " +
+                            msg.headers().entries() +
+                            " status=" + msg.status().code()));
+
+            for (int i = 0; i < 10; i++) {
+                client.execute(request1);
+                client.execute(request2);
+            }
+
+        } finally {
+            client.shutdownGracefully();
+        }
+    }
+
 }

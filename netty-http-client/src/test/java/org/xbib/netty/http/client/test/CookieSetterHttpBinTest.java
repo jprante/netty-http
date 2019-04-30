@@ -1,7 +1,7 @@
 package org.xbib.netty.http.client.test;
 
-import org.junit.Test;
-import org.xbib.TestBase;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.Request;
 
@@ -10,9 +10,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- */
-public class CookieSetterHttpBinTest extends TestBase {
+@ExtendWith(NettyHttpExtension.class)
+class CookieSetterHttpBinTest {
 
     private static final Logger logger = Logger.getLogger(CookieSetterHttpBinTest.class.getName());
 
@@ -30,7 +29,7 @@ public class CookieSetterHttpBinTest extends TestBase {
      * @throws IOException if test fails
      */
     @Test
-    public void testHttpBinCookies() throws IOException {
+    void testHttpBinCookies() throws IOException {
         Client client = new Client();
         try {
             Request request = Request.get()

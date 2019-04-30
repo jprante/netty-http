@@ -1,4 +1,4 @@
-package org.xbib.netty.http.server.context;
+package org.xbib.netty.http.server.endpoint;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -13,11 +13,11 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-public class NioContextHandler implements ContextHandler {
+public class NioHandler implements Handler {
 
     private final Path prefix;
 
-    public NioContextHandler(Path prefix) {
+    public NioHandler(Path prefix) {
         this.prefix = prefix;
         if (!Files.exists(prefix) || !Files.isDirectory(prefix)) {
             throw new IllegalArgumentException("prefix: " + prefix + " (not a directory");
@@ -25,7 +25,7 @@ public class NioContextHandler implements ContextHandler {
     }
 
     @Override
-    public void serve(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
+    public void handle(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
         String requestPath = serverRequest.getRequestPath();
         Path path = prefix.resolve(requestPath.substring(1)); // starts always with '/'
         if (Files.exists(path) && Files.isReadable(path)) {

@@ -1,12 +1,12 @@
 package org.xbib.netty.http.server.test;
 
 import io.netty.handler.codec.http.HttpVersion;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.Request;
+import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.context.NioContextHandler;
-import org.xbib.netty.http.server.context.VirtualServer;
+import org.xbib.netty.http.server.endpoint.NioHandler;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -16,18 +16,19 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class StaticFileServerTest {
+class StaticFileServerTest {
 
     private static final Logger logger = Logger.getLogger(StaticFileServerTest.class.getName());
 
     @Test
-    public void testStaticFileServer() throws Exception {
+    void testStaticFileServer() throws Exception {
         Path vartmp = Paths.get("/var/tmp/");
         Server server = Server.builder()
-                .addVirtualServer(new VirtualServer().addContext("/static", new NioContextHandler(vartmp)))
+                .bind(HttpAddress.http1("localhost", 8008))
+                .addHandler("/static", new NioHandler(vartmp))
                 .build();
         Client client = Client.builder()
                 .build();

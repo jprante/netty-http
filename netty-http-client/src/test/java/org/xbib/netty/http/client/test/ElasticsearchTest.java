@@ -1,8 +1,8 @@
 package org.xbib.netty.http.client.test;
 
-import org.junit.Ignore;
-import org.junit.Test;
-import org.xbib.TestBase;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.Request;
@@ -18,17 +18,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@Ignore
-public class ElasticsearchTest extends TestBase {
+@Disabled
+@ExtendWith(NettyHttpExtension.class)
+class ElasticsearchTest {
 
     private static final Logger logger = Logger.getLogger(ElasticsearchTest.class.getName());
 
     @Test
-    @Ignore
-    public void testElasticsearch() throws IOException {
-        Client client = Client.builder().enableDebug().build();
+    void testElasticsearch() throws IOException {
+        Client client = Client.builder()
+                .build();
         try {
             Request request = Request.get().url("http://localhost:9200")
                     .build()
@@ -44,9 +45,9 @@ public class ElasticsearchTest extends TestBase {
     }
 
     @Test
-    @Ignore
-    public void testElasticsearchCreateDocument() throws IOException {
-        Client client = Client.builder().enableDebug().build();
+    void testElasticsearchCreateDocument() throws IOException {
+        Client client = Client.builder()
+                .build();
         try {
             Request request = Request.put().url("http://localhost:9200/test/test/1")
                     .json("{\"text\":\"Hello World\"}")
@@ -63,8 +64,7 @@ public class ElasticsearchTest extends TestBase {
     }
 
     @Test
-    @Ignore
-    public void testElasticsearchMatchQuery() throws IOException {
+    void testElasticsearchMatchQuery() throws IOException {
         Client client = new Client();
         try {
             Request request = Request.post().url("http://localhost:9200/test/_search")
@@ -85,7 +85,7 @@ public class ElasticsearchTest extends TestBase {
      * @throws IOException if test fails
      */
     @Test
-    public void testElasticsearchPooled() throws IOException {
+    void testElasticsearchPooled() throws IOException {
         HttpAddress httpAddress = HttpAddress.http1("localhost", 9200);
         int limit = 4;
         Client client = Client.builder()

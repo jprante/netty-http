@@ -1,9 +1,8 @@
 package org.xbib.netty.http.client.test;
 
 import io.netty.handler.codec.http.HttpMethod;
-import org.junit.Ignore;
-import org.junit.Test;
-import org.xbib.TestBase;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.Request;
 
@@ -12,7 +11,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class Http2Test extends TestBase {
+@ExtendWith(NettyHttpExtension.class)
+class Http2Test {
 
     private static final Logger logger = Logger.getLogger(Http2Test.class.getName());
 
@@ -29,10 +29,8 @@ public class Http2Test extends TestBase {
      * @throws IOException if test fails
      */
     @Test
-    @Ignore
-    public void testAkamai() throws IOException {
+    void testAkamai() throws IOException {
         Client client = Client.builder()
-                .enableDebug()
                 .addServerNameForIdentification("http2.akamai.com")
                 .build();
         try {
@@ -53,8 +51,9 @@ public class Http2Test extends TestBase {
     }
 
     @Test
-    public void testWebtide() throws Exception {
-        Client client = Client.builder().enableDebug().build();
+    void testWebtide() throws Exception {
+        Client client = Client.builder()
+                .build();
         client.logDiagnostics(Level.INFO);
         try {
             Request request = Request.get().url("https://webtide.com").setVersion("HTTP/2.0").build()
@@ -69,10 +68,9 @@ public class Http2Test extends TestBase {
     }
 
     @Test
-    public void testHttp2PushIO() throws IOException {
+    void testHttp2PushIO() throws IOException {
         String url = "https://http2-push.io";
         Client client = Client.builder()
-                .enableDebug()
                 .addServerNameForIdentification("http2-push.io")
                 .build();
         try {
@@ -91,7 +89,7 @@ public class Http2Test extends TestBase {
     }
 
     @Test
-    public void testWebtideTwoRequestsOnSameConnection() throws IOException {
+    void testWebtideTwoRequestsOnSameConnection() throws IOException {
         Client client = new Client();
         try {
             Request request1 = Request.builder(HttpMethod.GET)

@@ -8,7 +8,8 @@ import io.netty.handler.ssl.CipherSuiteFilter;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import org.xbib.netty.http.common.HttpAddress;
-import org.xbib.netty.http.server.context.VirtualServer;
+import org.xbib.netty.http.server.endpoint.Handler;
+import org.xbib.netty.http.server.endpoint.NamedServer;
 import org.xbib.netty.http.server.security.tls.SelfSignedCertificate;
 
 import javax.net.ssl.SSLException;
@@ -224,8 +225,16 @@ public class ServerBuilder {
         return this;
     }
 
-    public ServerBuilder addVirtualServer(VirtualServer virtualServer) {
-        this.serverConfig.addVirtualServer(virtualServer);
+    public ServerBuilder addServer(NamedServer namedServer) {
+        this.serverConfig.add(namedServer);
+        return this;
+    }
+
+    public ServerBuilder addHandler(String path, Handler handler, String... methods) {
+        if (serverConfig.getNamedServers().isEmpty()) {
+            serverConfig.add(new NamedServer());
+        }
+        serverConfig.getNamedServers().getLast().addHandler(path, handler, methods);
         return this;
     }
 

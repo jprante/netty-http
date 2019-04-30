@@ -1,4 +1,4 @@
-package org.xbib.netty.http.hacks;
+package org.xbib.netty.http.client.test.hacks;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
@@ -35,9 +35,7 @@ import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.util.AttributeKey;
-import org.junit.Ignore;
-import org.junit.Test;
-import org.xbib.TestBase;
+import org.junit.jupiter.api.Test;
 
 import javax.net.ssl.SSLException;
 import java.io.IOException;
@@ -53,13 +51,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-@Ignore
-public class SimpleHttp2Test extends TestBase {
+class SimpleHttp2Test {
 
     private static final Logger logger = Logger.getLogger(SimpleHttp2Test.class.getName());
 
     @Test
-    public void testHttp2WithUpgrade() throws Exception {
+    void testHttp2WithUpgrade() throws Exception {
         Client client = new Client();
         try {
             Http2Transport transport = client.newTransport("webtide.com", 443);

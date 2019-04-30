@@ -35,9 +35,9 @@ import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
 import io.netty.handler.codec.http2.Http2StreamFrameToHttpObjectCodec;
 import io.netty.util.AsciiString;
-import org.junit.Ignore;
-import org.junit.Test;
-import org.xbib.netty.http.server.test.TestBase;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.xbib.netty.http.server.test.NettyHttpExtension;
 
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
@@ -53,8 +53,8 @@ import java.util.logging.Logger;
  * Multithreaded Http2MultiplexCodec demo for cleartext HTTP/2 between a server and a client.
  *
  */
-@Ignore
-public class MultithreadedMultiplexCodecCleartextHttp2Test extends TestBase {
+@ExtendWith(NettyHttpExtension.class)
+class MultithreadedMultiplexCodecCleartextHttp2Test {
 
     private static final Logger clientLogger = Logger.getLogger("client");
     private static final Logger serverLogger = Logger.getLogger("server");
@@ -74,7 +74,7 @@ public class MultithreadedMultiplexCodecCleartextHttp2Test extends TestBase {
     private final AtomicInteger responseCounter = new AtomicInteger();
 
     @Test
-    public void testMultithreadedMultiplexHttp2() throws Exception {
+    void testMultithreadedMultiplexHttp2() throws Exception {
 
         inetSocketAddress = new InetSocketAddress("localhost", 8008);
         settingsPrefaceFuture = new CompletableFuture<>();

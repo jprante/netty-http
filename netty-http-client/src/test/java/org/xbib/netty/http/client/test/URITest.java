@@ -1,19 +1,17 @@
 package org.xbib.netty.http.client.test;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.client.RequestBuilder;
 
 import java.net.URI;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-/**
- */
-public class URITest {
+class URITest {
 
     @Test
-    public void testURIResolve() {
+    void testURIResolve() {
         URI uri = URI.create("http://localhost");
         URI uri2 = uri.resolve("/path");
         assertEquals("http://localhost/path", uri2.toString());
@@ -23,7 +21,7 @@ public class URITest {
     }
 
     @Test
-    public void testRequestURIs() {
+    void testRequestURIs() {
         RequestBuilder httpRequestBuilder = Request.get();
         httpRequestBuilder.url("https://localhost").uri("/path");
         assertEquals("/path", httpRequestBuilder.build().relativeUri());

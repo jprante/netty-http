@@ -1,7 +1,7 @@
 package org.xbib.netty.http.client.test;
 
 import io.netty.handler.codec.http.FullHttpResponse;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.Request;
 
@@ -12,7 +12,7 @@ import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class CompletableFutureTest {
+class CompletableFutureTest {
 
     private static final Logger logger = Logger.getLogger(CompletableFutureTest.class.getName());
 
@@ -20,7 +20,7 @@ public class CompletableFutureTest {
      * Get some weird content from one URL and post it to another URL, by composing completable futures.
      */
     @Test
-    public void testComposeCompletableFutures() throws IOException {
+    void testComposeCompletableFutures() throws IOException {
         Client client = Client.builder().build();
         try {
             final Function<FullHttpResponse, String> httpResponseStringFunction = response ->

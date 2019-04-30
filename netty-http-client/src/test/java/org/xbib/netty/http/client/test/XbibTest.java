@@ -2,8 +2,7 @@ package org.xbib.netty.http.client.test;
 
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.proxy.HttpProxyHandler;
-import org.junit.Test;
-import org.xbib.TestBase;
+import org.junit.jupiter.api.Test;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.Request;
 
@@ -15,12 +14,12 @@ import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class XbibTest extends TestBase {
+class XbibTest {
 
-    private static final Logger logger = Logger.getLogger("");
+    private static final Logger logger = Logger.getLogger(XbibTest.class.getName());
 
     @Test
-    public void testXbibOrgWithDefaults() throws IOException {
+    void testXbibOrgWithDefaults() throws IOException {
         Client client = new Client();
         try {
             Request request = Request.get().url("http://xbib.org")
@@ -36,7 +35,7 @@ public class XbibTest extends TestBase {
     }
 
     @Test
-    public void testXbibOrgWithCompletableFuture() throws IOException {
+    void testXbibOrgWithCompletableFuture() throws IOException {
         Client httpClient = Client.builder()
                 .setTcpNodelay(true)
                 .build();
@@ -66,7 +65,7 @@ public class XbibTest extends TestBase {
     }
 
     @Test
-    public void testXbibOrgWithProxy() throws IOException {
+    void testXbibOrgWithProxy() throws IOException {
         Client httpClient = Client.builder()
                 .setHttpProxyHandler(new HttpProxyHandler(new InetSocketAddress("80.241.223.251", 8080)))
                 .setConnectTimeoutMillis(30000)
@@ -87,7 +86,7 @@ public class XbibTest extends TestBase {
     }
 
     @Test
-    public void testXbibOrgWithVeryShortReadTimeout() throws IOException {
+    void testXbibOrgWithVeryShortReadTimeout() throws IOException {
         Client httpClient = Client.builder()
                 .build();
         try {
@@ -106,7 +105,7 @@ public class XbibTest extends TestBase {
     }
 
     @Test
-    public void testXbibTwoSequentialRequests() throws IOException {
+    void testXbibTwoSequentialRequests() throws IOException {
         Client httpClient = new Client();
         try {
             httpClient.execute(Request.get()

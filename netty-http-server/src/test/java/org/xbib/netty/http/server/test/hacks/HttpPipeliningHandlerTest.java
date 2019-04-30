@@ -18,13 +18,15 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.QueryStringDecoder;
-import org.junit.After;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.server.handler.http.HttpPipelinedRequest;
 import org.xbib.netty.http.server.handler.http.HttpPipelinedResponse;
 import org.xbib.netty.http.server.handler.http.HttpPipeliningHandler;
-import org.xbib.netty.http.server.test.TestBase;
+import org.xbib.netty.http.server.test.NettyHttpExtension;
 
 import java.nio.channels.ClosedChannelException;
 import java.nio.charset.StandardCharsets;
@@ -42,26 +44,30 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.core.Is.is;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@Ignore
-public class HttpPipeliningHandlerTest extends TestBase {
+/** flaky */
+@Disabled
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@ExtendWith(NettyHttpExtension.class)
+class HttpPipeliningHandlerTest {
 
     private static final Logger logger = Logger.getLogger(HttpPipeliningHandlerTest.class.getName());
 
     private static Map<String, CountDownLatch> waitingRequests  = new ConcurrentHashMap<>();
 
-    @After
-    public void closeResources() {
+    @AfterAll
+    void closeResources() {
         for (String url : waitingRequests.keySet()) {
             finishRequest(url);
         }
     }
 
     @Test
-    public void testThatPipeliningWorksWithFastSerializedRequests() {
+    void testThatPipeliningWorksWithFastSerializedRequests() {
         WorkEmulatorHandler handler = new WorkEmulatorHandler();
         EmbeddedChannel embeddedChannel = new EmbeddedChannel(new HttpPipeliningHandler(10000),
                 handler);
@@ -75,11 +81,11 @@ public class HttpPipeliningHandlerTest extends TestBase {
         for (int i = 0; i < 5; i++) {
             assertReadHttpMessageHasContent(embeddedChannel, String.valueOf(i));
         }
-        assertThat(embeddedChannel.isOpen(), is(true));
+        assertTrue(embeddedChannel.isOpen());
     }
 
     @Test
-    public void testThatPipeliningWorksWhenSlowRequestsInDifferentOrder() {
+    void testThatPipeliningWorksWhenSlowRequestsInDifferentOrder() {
         WorkEmulatorHandler handler = new WorkEmulatorHandler();
         EmbeddedChannel embeddedChannel = new EmbeddedChannel(new HttpPipeliningHandler(10000),
                 handler);
@@ -95,11 +101,11 @@ public class HttpPipeliningHandlerTest extends TestBase {
         for (int i = 0; i < 5; i++) {
             assertReadHttpMessageHasContent(embeddedChannel, String.valueOf(i));
         }
-        assertThat(embeddedChannel.isOpen(), is(true));
+        assertTrue(embeddedChannel.isOpen());
     }
 
     @Test
-    public void testThatPipeliningWorksWithChunkedRequests() {
+    void testThatPipeliningWorksWithChunkedRequests() {
         WorkEmulatorHandler handler = new WorkEmulatorHandler();
         EmbeddedChannel embeddedChannel = new EmbeddedChannel(new AggregateUrisAndHeadersHandler(),
                 new HttpPipeliningHandler(10000), handler);
@@ -115,32 +121,34 @@ public class HttpPipeliningHandlerTest extends TestBase {
         for (int i = 0; i < 2; i++) {
             assertReadHttpMessageHasContent(embeddedChannel, String.valueOf(i));
         }
-        assertThat(embeddedChannel.isOpen(), is(true));
+        assertTrue(embeddedChannel.isOpen());
     }
 
-    @Test(expected = ClosedChannelException.class)
-    public void testThatPipeliningClosesConnectionWithTooManyEvents() {
-        WorkEmulatorHandler handler = new WorkEmulatorHandler();
-        EmbeddedChannel embeddedChannel = new EmbeddedChannel(new HttpPipeliningHandler(2),
-                handler);
-        embeddedChannel.writeInbound(createHttpRequest("/0"));
-        embeddedChannel.writeInbound(createHttpRequest("/1"));
-        embeddedChannel.writeInbound(createHttpRequest("/2"));
-        embeddedChannel.writeInbound(createHttpRequest("/3"));
-        finishRequest("1");
-        finishRequest("2");
-        finishRequest("3");
-        finishRequest("0");
-        handler.shutdownExecutorService();
-        embeddedChannel.writeInbound(createHttpRequest("/"));
+    @Test
+    void testThatPipeliningClosesConnectionWithTooManyEvents() {
+        assertThrows(ClosedChannelException.class, () -> {
+            WorkEmulatorHandler handler = new WorkEmulatorHandler();
+            EmbeddedChannel embeddedChannel = new EmbeddedChannel(new HttpPipeliningHandler(2),
+                    handler);
+            embeddedChannel.writeInbound(createHttpRequest("/0"));
+            embeddedChannel.writeInbound(createHttpRequest("/1"));
+            embeddedChannel.writeInbound(createHttpRequest("/2"));
+            embeddedChannel.writeInbound(createHttpRequest("/3"));
+            finishRequest("1");
+            finishRequest("2");
+            finishRequest("3");
+            finishRequest("0");
+            handler.shutdownExecutorService();
+            embeddedChannel.writeInbound(createHttpRequest("/"));
+        });
     }
 
     private void assertReadHttpMessageHasContent(EmbeddedChannel embeddedChannel, String expectedContent) {
         FullHttpResponse response = (FullHttpResponse) embeddedChannel.outboundMessages().poll();
-        assertNotNull("Expected response to exist, maybe you did not wait long enough?", response);
-        assertNotNull("Expected response to have content " + expectedContent, response.content());
+        assertNotNull(response);
+        assertNotNull(response.content());
         String data = new String(ByteBufUtil.getBytes(response.content()), StandardCharsets.UTF_8);
-        assertThat(data, is(expectedContent));
+        assertEquals(expectedContent, data);
     }
 
     private void finishRequest(String url) {
@@ -163,7 +171,7 @@ public class HttpPipeliningHandlerTest extends TestBase {
 
     private class WorkEmulatorHandler extends SimpleChannelInboundHandler<HttpPipelinedRequest> {
 
-        private final ExecutorService executorService = Executors.newFixedThreadPool(5);
+        private final ExecutorService executorService = Executors.newFixedThreadPool(8);
 
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, HttpPipelinedRequest pipelinedRequest) {
@@ -181,6 +189,7 @@ public class HttpPipeliningHandlerTest extends TestBase {
             httpResponse.headers().add(HttpHeaderNames.CONTENT_LENGTH, content.readableBytes());
             CountDownLatch latch = new CountDownLatch(1);
             waitingRequests.put(uri, latch);
+            // can cause RejectedExecutionException if executorService is too small
             executorService.submit(() -> {
                 try {
                     latch.await(2, TimeUnit.SECONDS);

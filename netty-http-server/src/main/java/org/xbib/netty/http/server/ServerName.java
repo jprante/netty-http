@@ -12,7 +12,7 @@ public final class ServerName {
     /**
      * The default value for {@code Server} header.
      */
-    private static final String SERVER_NAME = String.format("XbibHttpServer/%s (Java/%s/%s) (Netty/%s)",
+    private static final String SERVER_NAME = String.format("NettyHttpServer/%s (Java/%s/%s) (Netty/%s)",
             httpServerVersion(), javaVendor(), javaVersion(), nettyVersion());
 
     private ServerName() {

@@ -10,7 +10,7 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
-import io.netty.handler.ssl.SslHandler;
+import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.ClientConfig;
 import org.xbib.netty.http.client.handler.http2.Http2ChannelInitializer;
 import org.xbib.netty.http.common.HttpAddress;
@@ -26,7 +26,7 @@ public class HttpChannelInitializer extends ChannelInitializer<Channel> {
 
     private final HttpAddress httpAddress;
 
-    private final SslHandler sslHandler;
+    private final Client.SslHandlerFactory sslHandlerFactory;
 
     private final HttpResponseHandler httpResponseHandler;
 
@@ -34,11 +34,11 @@ public class HttpChannelInitializer extends ChannelInitializer<Channel> {
 
     public HttpChannelInitializer(ClientConfig clientConfig,
                                   HttpAddress httpAddress,
-                                  SslHandler sslHandler,
+                                  Client.SslHandlerFactory sslHandlerFactory,
                                   Http2ChannelInitializer http2ChannelInitializer) {
         this.clientConfig = clientConfig;
         this.httpAddress = httpAddress;
-        this.sslHandler = sslHandler;
+        this.sslHandlerFactory = sslHandlerFactory;
         this.http2ChannelInitializer = http2ChannelInitializer;
         this.httpResponseHandler = new HttpResponseHandler();
     }
@@ -60,7 +60,7 @@ public class HttpChannelInitializer extends ChannelInitializer<Channel> {
 
     private void configureEncrypted(Channel channel)  {
         ChannelPipeline pipeline = channel.pipeline();
-        pipeline.addLast(sslHandler);
+        pipeline.addLast(sslHandlerFactory.create());
         if (clientConfig.isEnableNegotiation()) {
             ApplicationProtocolNegotiationHandler negotiationHandler =
                     new ApplicationProtocolNegotiationHandler(ApplicationProtocolNames.HTTP_1_1) {
@@ -101,10 +101,6 @@ public class HttpChannelInitializer extends ChannelInitializer<Channel> {
                 false);
         httpObjectAggregator.setMaxCumulationBufferComponents(clientConfig.getMaxCompositeBufferComponents());
         pipeline.addLast(httpObjectAggregator);
-        /*if (clientConfig.isEnableGzip()) {
-            pipeline.addLast(new HttpChunkContentCompressor(6));
-        }
-        pipeline.addLast(new ChunkedWriteHandler());*/
         pipeline.addLast(httpResponseHandler);
     }
 }

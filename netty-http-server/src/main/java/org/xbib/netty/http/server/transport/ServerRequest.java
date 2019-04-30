@@ -2,14 +2,14 @@ package org.xbib.netty.http.server.transport;
 
 import io.netty.handler.codec.http.FullHttpRequest;
 import org.xbib.netty.http.common.HttpAddress;
-import org.xbib.netty.http.server.context.VirtualServer;
+import org.xbib.netty.http.server.endpoint.NamedServer;
 
 /**
  * The {@code ServerRequest} class encapsulates a single request.
  */
 public class ServerRequest {
 
-    private final VirtualServer virtualServer;
+    private final NamedServer namedServer;
 
     private final HttpAddress httpAddress;
 
@@ -23,9 +23,9 @@ public class ServerRequest {
 
     private String contextPath;
 
-    public ServerRequest(VirtualServer virtualServer, HttpAddress httpAddress,
+    public ServerRequest(NamedServer namedServer, HttpAddress httpAddress,
                          FullHttpRequest httpRequest, Integer sequenceId, Integer streamId, Integer requestId) {
-        this.virtualServer = virtualServer;
+        this.namedServer = namedServer;
         this.httpAddress = httpAddress;
         this.httpRequest = httpRequest;
         this.sequenceId = sequenceId;
@@ -33,8 +33,8 @@ public class ServerRequest {
         this.requestId = requestId;
     }
 
-    public VirtualServer getVirtualServer() {
-        return virtualServer;
+    public NamedServer getNamedServer() {
+        return namedServer;
     }
 
     public void setContextPath(String contextPath) {

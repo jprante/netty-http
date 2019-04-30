@@ -21,7 +21,7 @@ import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.util.DomainNameMapping;
 import io.netty.util.DomainNameMappingBuilder;
 import org.xbib.netty.http.common.HttpAddress;
-import org.xbib.netty.http.server.context.VirtualServer;
+import org.xbib.netty.http.server.endpoint.NamedServer;
 import org.xbib.netty.http.server.handler.http.HttpChannelInitializer;
 import org.xbib.netty.http.server.handler.http2.Http2ChannelInitializer;
 import org.xbib.netty.http.server.transport.HttpServerTransport;
@@ -73,7 +73,7 @@ public final class Server {
 
     private final ServerBootstrap bootstrap;
 
-    private final Map<String, VirtualServer> virtualServerMap;
+    private final Map<String, NamedServer> virtualServerMap;
 
     private ChannelFuture channelFuture;
 
@@ -118,11 +118,11 @@ public final class Server {
             bootstrap.handler(new LoggingHandler("bootstrap-server", serverConfig.getDebugLogLevel()));
         }
         this.virtualServerMap = new HashMap<>();
-        for (VirtualServer virtualServer : serverConfig.getVirtualServers()) {
-            String name = virtualServer.getName();
-            virtualServerMap.put(name, virtualServer);
-            for (String alias : virtualServer.getAliases()) {
-                virtualServerMap.put(alias, virtualServer);
+        for (NamedServer namedServer : serverConfig.getNamedServers()) {
+            String name = namedServer.getName();
+            virtualServerMap.put(name, namedServer);
+            for (String alias : namedServer.getAliases()) {
+                virtualServerMap.put(alias, namedServer);
             }
         }
         DomainNameMapping<SslContext> domainNameMapping = null;
@@ -136,8 +136,8 @@ public final class Server {
             }
             SslContext sslContext = sslContextBuilder.build();
             DomainNameMappingBuilder<SslContext> mappingBuilder = new DomainNameMappingBuilder<>(sslContext);
-            for (VirtualServer virtualServer : serverConfig.getVirtualServers()) {
-                String name = virtualServer.getName();
+            for (NamedServer namedServer : serverConfig.getNamedServers()) {
+                String name = namedServer.getName();
                 mappingBuilder.add(name == null ? "*" : name, sslContext);
             }
             domainNameMapping = mappingBuilder.build();
@@ -169,11 +169,11 @@ public final class Server {
      *             the default virtual host
      * @return the virtual host with the given name, or null if it doesn't exist
      */
-    public VirtualServer getVirtualServer(String name) {
+    public NamedServer getVirtualServer(String name) {
         return virtualServerMap.get(name);
     }
 
-    public VirtualServer getDefaultVirtualServer() {
+    public NamedServer getDefaultVirtualServer() {
         return virtualServerMap.get(null);
     }
 

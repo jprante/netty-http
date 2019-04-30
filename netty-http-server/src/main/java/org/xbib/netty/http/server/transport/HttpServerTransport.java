@@ -7,7 +7,7 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http2.Http2Settings;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.context.VirtualServer;
+import org.xbib.netty.http.server.endpoint.NamedServer;
 
 import java.io.IOException;
 
@@ -26,12 +26,12 @@ public class HttpServerTransport extends BaseServerTransport {
     public void requestReceived(ChannelHandlerContext ctx, FullHttpRequest fullHttpRequest, Integer sequenceId)
             throws IOException {
         int requestId = requestCounter.incrementAndGet();
-        VirtualServer virtualServer = server.getVirtualServer(fullHttpRequest.headers().get(HttpHeaderNames.HOST));
-        if (virtualServer == null) {
-            virtualServer = server.getDefaultVirtualServer();
+        NamedServer namedServer = server.getVirtualServer(fullHttpRequest.headers().get(HttpHeaderNames.HOST));
+        if (namedServer == null) {
+            namedServer = server.getDefaultVirtualServer();
         }
         HttpAddress httpAddress = server.getServerConfig().getAddress();
-        ServerRequest serverRequest = new ServerRequest(virtualServer, httpAddress, fullHttpRequest,
+        ServerRequest serverRequest = new ServerRequest(namedServer, httpAddress, fullHttpRequest,
                  sequenceId, null, requestId);
         ServerResponse serverResponse = new HttpServerResponse(serverRequest, ctx);
         if (acceptRequest(serverRequest, serverResponse)) {
