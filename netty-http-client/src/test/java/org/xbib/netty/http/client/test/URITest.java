@@ -21,7 +21,7 @@ class URITest {
     }
 
     @Test
-    void testRequestURIs() {
+    void testRelativeUri() {
         RequestBuilder httpRequestBuilder = Request.get();
         httpRequestBuilder.url("https://localhost").uri("/path");
         assertEquals("/path", httpRequestBuilder.build().relativeUri());

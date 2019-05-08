@@ -285,6 +285,7 @@ public class RequestBuilder {
         if (url.getHost() == null) {
             throw new IllegalStateException("host in URL not defined: " + url);
         }
+        // add path from uri()
         if (uri != null) {
             try {
                 url = URL.base(url).resolve(uri);
@@ -292,9 +293,7 @@ public class RequestBuilder {
                 throw new IllegalArgumentException(e);
             }
         }
-        // add explicit parameters to URL
-        queryParameters.forEach(param -> url.getQueryParams().add(param));
-        // let Netty's query string decoder/encoder work over the URL to add paramters given implicitly in url()
+        // let Netty's query string decoder/encoder work over the URL to add parameters given implicitly in url()
         QueryStringDecoder queryStringDecoder = new QueryStringDecoder(URI.create(url.toString()), StandardCharsets.UTF_8);
         QueryStringEncoder queryStringEncoder = new QueryStringEncoder(queryStringDecoder.path());
         for (Map.Entry<String, List<String>> entry : queryStringDecoder.parameters().entrySet()) {
@@ -302,15 +301,25 @@ public class RequestBuilder {
                 queryStringEncoder.addParam(entry.getKey(), value);
             }
         }
+        // attach user query parameters
+        queryParameters.forEach(param -> queryStringEncoder.addParam(param.getFirst(), param.getSecond()));
         // build uri from QueryStringDecoder
-        StringBuilder sb = new StringBuilder();
         String pathAndQuery = queryStringEncoder.toString();
+        StringBuilder sb = new StringBuilder();
         sb.append(pathAndQuery.isEmpty() ? "/" : pathAndQuery);
         String ref = url.getFragment();
         if (ref != null && !ref.isEmpty()) {
             sb.append('#').append(ref);
         }
         String uri = sb.toString();
+        // resolve again
+        if (!uri.equals("/")) {
+            try {
+                url = uri.startsWith("/") ? URL.base(url).resolve(uri) : URL.base(url).resolve("/" + uri) ;
+            } catch (URLSyntaxException | MalformedInputException | UnmappableCharacterException e) {
+                throw new IllegalArgumentException(e);
+            }
+        }
         DefaultHttpHeaders validatedHeaders = new DefaultHttpHeaders(true);
         validatedHeaders.set(headers);
         String scheme = url.getScheme();

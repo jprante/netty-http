@@ -2,7 +2,7 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
 plugins {
-    id "com.github.spotbugs" version "1.6.9"
+    id "com.github.spotbugs" version "1.7.1"
     id "org.sonarqube" version "2.6.1"
     id "io.codearte.nexus-staging" version "0.11.0"
     id "org.xbib.gradle.plugin.asciidoctor" version "1.5.6.0.1"
@@ -148,7 +148,7 @@ subprojects {
         scmDeveloperConnection = 'scm:git:git://github.com/' + user + '/' + name + '.git'
     }
 
-    task xbibUpload(type: Upload) {
+    /*task xbibUpload(type: Upload) {
         group = 'publish'
         configuration = configurations.archives
         uploadDescriptor = true
@@ -162,7 +162,7 @@ subprojects {
                 }
             }
         }
-    }
+    }*/
 
     task sonaTypeUpload(type: Upload) {
         group = 'publish'
