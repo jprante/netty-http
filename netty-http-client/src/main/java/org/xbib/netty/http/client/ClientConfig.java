@@ -3,15 +3,14 @@ package org.xbib.netty.http.client;
 import io.netty.channel.WriteBufferWaterMark;
 import io.netty.channel.epoll.Epoll;
 import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.ssl.CipherSuiteFilter;
 import io.netty.handler.ssl.SslProvider;
-import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import org.xbib.netty.http.client.retry.BackOff;
 import org.xbib.netty.http.common.HttpAddress;
+import org.xbib.netty.http.common.SecurityUtil;
 
 import javax.net.ssl.TrustManagerFactory;
 import java.io.InputStream;
@@ -95,7 +94,7 @@ public class ClientConfig {
 
         /**
          * This is Netty's default.
-         * See {@link io.netty.handler.codec.MessageAggregator#DEFAULT_MAX_COMPOSITEBUFFER_COMPONENTS}.
+         * See {@link io.netty.handler.codec.MessageAggregator}.
          */
         int MAX_COMPOSITE_BUFFER_COMPONENTS = 1024;
 
@@ -112,7 +111,7 @@ public class ClientConfig {
         /**
          * Default SSL provider.
          */
-        SslProvider SSL_PROVIDER = SslProvider.JDK;
+        SslProvider SSL_PROVIDER = SecurityUtil.Defaults.DEFAULT_SSL_PROVIDER;
 
         /**
          * Default SSL context provider (for JDK SSL only).
@@ -122,12 +121,12 @@ public class ClientConfig {
         /**
          * Default ciphers. We care about HTTP/2.
          */
-        Iterable<String> CIPHERS = Http2SecurityUtil.CIPHERS;
+        Iterable<String> CIPHERS = SecurityUtil.Defaults.DEFAULT_CIPHERS;
 
         /**
          * Default cipher suite filter.
          */
-        CipherSuiteFilter CIPHER_SUITE_FILTER = SupportedCipherSuiteFilter.INSTANCE;
+        CipherSuiteFilter CIPHER_SUITE_FILTER = SecurityUtil.Defaults.DEFAULT_CIPHER_SUITE_FILTER;
 
         /**
          * Default for SSL client authentication.
@@ -165,16 +164,6 @@ public class ClientConfig {
         BackOff BACK_OFF = BackOff.ZERO_BACKOFF;
 
         Boolean ENABLE_NEGOTIATION = false;
-    }
-
-    private static TrustManagerFactory TRUST_MANAGER_FACTORY;
-
-    static {
-        try {
-            TRUST_MANAGER_FACTORY = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-        } catch (Exception e) {
-            TRUST_MANAGER_FACTORY = null;
-        }
     }
 
     private boolean debug = Defaults.DEBUG;
@@ -219,7 +208,7 @@ public class ClientConfig {
 
     private CipherSuiteFilter cipherSuiteFilter = Defaults.CIPHER_SUITE_FILTER;
 
-    private TrustManagerFactory trustManagerFactory = TRUST_MANAGER_FACTORY;
+    private TrustManagerFactory trustManagerFactory = SecurityUtil.Defaults.DEFAULT_TRUST_MANAGER_FACTORY;
 
     private KeyStore trustManagerKeyStore = null;
 
@@ -430,6 +419,24 @@ public class ClientConfig {
         return http2Settings;
     }
 
+    public ClientConfig setTrustManagerFactory(TrustManagerFactory trustManagerFactory) {
+        this.trustManagerFactory = trustManagerFactory;
+        return this;
+    }
+
+    public TrustManagerFactory getTrustManagerFactory() {
+        return trustManagerFactory;
+    }
+
+    public ClientConfig setTrustManagerKeyStore(KeyStore trustManagerKeyStore) {
+        this.trustManagerKeyStore = trustManagerKeyStore;
+        return this;
+    }
+
+    public KeyStore getTrustManagerKeyStore() {
+        return trustManagerKeyStore;
+    }
+
     public ClientConfig setSslProvider(SslProvider sslProvider) {
         this.sslProvider = sslProvider;
         return this;
@@ -509,24 +516,6 @@ public class ClientConfig {
 
     public ClientAuthMode getClientAuthMode() {
         return clientAuthMode;
-    }
-
-    public ClientConfig setTrustManagerFactory(TrustManagerFactory trustManagerFactory) {
-        this.trustManagerFactory = trustManagerFactory;
-        return this;
-    }
-
-    public TrustManagerFactory getTrustManagerFactory() {
-        return trustManagerFactory;
-    }
-
-    public ClientConfig setTrustManagerKeyStore(KeyStore trustManagerKeyStore) {
-        this.trustManagerKeyStore = trustManagerKeyStore;
-        return this;
-    }
-
-    public KeyStore getTrustManagerKeyStore() {
-        return trustManagerKeyStore;
     }
 
     public ClientConfig setHttpProxyHandler(HttpProxyHandler httpProxyHandler) {

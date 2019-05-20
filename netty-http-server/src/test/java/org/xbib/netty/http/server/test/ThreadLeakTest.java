@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.server.Server;
+import org.xbib.netty.http.server.endpoint.NamedServer;
 
 import java.io.IOException;
 import java.util.Set;
@@ -20,11 +21,13 @@ class ThreadLeakTest {
 
     @Test
     void testForLeaks() throws IOException {
-        Server server = Server.builder()
+        NamedServer namedServer = NamedServer.builder()
+                .singleEndpoint("/", (request, response) ->
+                        response.write("Hello World"))
+                .build();
+        Server server = Server.builder(namedServer)
                 .setByteBufAllocator(UnpooledByteBufAllocator.DEFAULT)
                 .build();
-        server.getDefaultVirtualServer().addHandler("/", (request, response) ->
-                response.write("Hello World"));
         try {
             server.accept();
         } finally {

@@ -6,8 +6,8 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.HttpConversionUtil;
-import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
+import org.xbib.netty.http.server.ServerResponse;
 import org.xbib.netty.http.server.endpoint.NamedServer;
 
 import java.io.IOException;
@@ -26,15 +26,19 @@ public class Http2ServerTransport extends BaseServerTransport {
     @Override
     public void requestReceived(ChannelHandlerContext ctx, FullHttpRequest fullHttpRequest, Integer sequenceId) throws IOException {
         int requestId = requestCounter.incrementAndGet();
-        NamedServer namedServer = server.getVirtualServer(fullHttpRequest.headers().get(HttpHeaderNames.HOST));
+        NamedServer namedServer = server.getNamedServer(fullHttpRequest.headers().get(HttpHeaderNames.HOST));
         if (namedServer == null) {
-            namedServer = server.getDefaultVirtualServer();
+            namedServer = server.getDefaultNamedServer();
         }
-        HttpAddress httpAddress = server.getServerConfig().getAddress();
         Integer streamId = fullHttpRequest.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text());
-        ServerRequest serverRequest = new ServerRequest(namedServer, httpAddress, fullHttpRequest,
-                sequenceId, streamId, requestId);
-        ServerResponse serverResponse = new Http2ServerResponse(serverRequest, ctx);
+        HttpServerRequest serverRequest = new HttpServerRequest();
+        serverRequest.setNamedServer(namedServer);
+        serverRequest.setChannelHandlerContext(ctx);
+        serverRequest.setRequest(fullHttpRequest);
+        serverRequest.setSequenceId(sequenceId);
+        serverRequest.setRequestId(requestId);
+        serverRequest.setStreamId(streamId);
+        ServerResponse serverResponse = new Http2ServerResponse(serverRequest);
         if (acceptRequest(serverRequest, serverResponse)) {
             handle(serverRequest, serverResponse);
         } else {

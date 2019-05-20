@@ -6,6 +6,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.WriteBufferWaterMark;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -14,13 +15,17 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.codec.http2.Http2SecurityUtil;
+import io.netty.handler.codec.http2.Http2Settings;
+import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ApplicationProtocolNames;
+import io.netty.handler.ssl.CipherSuiteFilter;
 import io.netty.handler.ssl.OpenSsl;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.handler.ssl.SslProvider;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import org.xbib.netty.http.client.handler.http.HttpChannelInitializer;
 import org.xbib.netty.http.client.handler.http2.Http2ChannelInitializer;
 import org.xbib.netty.http.client.pool.BoundedChannelPool;
@@ -29,6 +34,7 @@ import org.xbib.netty.http.client.transport.HttpTransport;
 import org.xbib.netty.http.client.transport.Transport;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.NetworkUtils;
+import org.xbib.netty.http.common.SecurityUtil;
 
 import javax.net.ssl.SNIHostName;
 import javax.net.ssl.SNIServerName;
@@ -37,14 +43,17 @@ import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.TrustManagerFactory;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.security.KeyStoreException;
+import java.security.Provider;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -81,7 +90,7 @@ public final class Client {
 
     private final Bootstrap bootstrap;
 
-    private final List<Transport> transports;
+    private final Queue<Transport> transports;
 
     private BoundedChannelPool<HttpAddress> pool;
 
@@ -116,7 +125,7 @@ public final class Client {
                 .option(ChannelOption.SO_RCVBUF, clientConfig.getTcpReceiveBufferSize())
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, clientConfig.getConnectTimeoutMillis())
                 .option(ChannelOption.WRITE_BUFFER_WATER_MARK, clientConfig.getWriteBufferWaterMark());
-        this.transports = new CopyOnWriteArrayList<>();
+        this.transports = new ConcurrentLinkedQueue<>();
         if (!clientConfig.getPoolNodes().isEmpty()) {
             List<HttpAddress> nodes = clientConfig.getPoolNodes();
             Integer limit = clientConfig.getPoolNodeConnectionLimit();
@@ -161,12 +170,15 @@ public final class Client {
     }
 
     public void logDiagnostics(Level level) {
-        logger.log(level, () -> "OpenSSL available: " + OpenSsl.isAvailable() +
-                " OpenSSL ALPN support: " + OpenSsl.isAlpnSupported() +
-                " Local host name: " + NetworkUtils.getLocalHostName("localhost") +
-                " event loop group: " + eventLoopGroup +
-                " socket: " + socketChannelClass.getName() +
-                " allocator: " + byteBufAllocator.getClass().getName());
+        logger.log(level, () -> "JDK ciphers: " + SecurityUtil.Defaults.JDK_CIPHERS);
+        logger.log(level, () -> "OpenSSL ciphers: " + SecurityUtil.Defaults.OPENSSL_CIPHERS);
+        logger.log(level, () -> "OpenSSL available: " + OpenSsl.isAvailable());
+        logger.log(level, () -> "OpenSSL ALPN support: " + OpenSsl.isAlpnSupported());
+        logger.log(level, () -> "Candidate ciphers on client: " + clientConfig.getCiphers());
+        logger.log(level, () -> "Local host name: " + NetworkUtils.getLocalHostName("localhost"));
+        logger.log(level, () -> "Event loop group: " + eventLoopGroup + " threads=" + clientConfig.getThreadCount());
+        logger.log(level, () -> "Socket: " + socketChannelClass.getName());
+        logger.log(level, () -> "Allocator: " + byteBufAllocator.getClass().getName());
         logger.log(level, NetworkUtils::displayNetworkInterfaces);
     }
 
@@ -243,9 +255,8 @@ public final class Client {
     }
 
     public Transport execute(Request request) throws IOException {
-        Transport transport = newTransport(HttpAddress.of(request.url(), request.httpVersion()));
-        transport.execute(request);
-        return transport;
+        return newTransport(HttpAddress.of(request.url(), request.httpVersion()))
+                .execute(request);
     }
 
     public <T> CompletableFuture<T> execute(Request request,
@@ -328,6 +339,7 @@ public final class Client {
     private static SslHandler newSslHandler(ClientConfig clientConfig, ByteBufAllocator allocator, HttpAddress httpAddress) {
         try {
             SslContext sslContext = newSslContext(clientConfig, httpAddress.getVersion());
+            logger.log(Level.FINE, () -> "installed ciphers: " + sslContext.cipherSuites());
             InetSocketAddress peer = httpAddress.getInetSocketAddress();
             SslHandler sslHandler = sslContext.newHandler(allocator, peer.getHostName(), peer.getPort());
             SSLEngine engine = sslHandler.engine();
@@ -363,7 +375,7 @@ public final class Client {
     private static SslContext newSslContext(ClientConfig clientConfig, HttpVersion httpVersion) throws SSLException {
         SslContextBuilder sslContextBuilder = SslContextBuilder.forClient()
                 .sslProvider(clientConfig.getSslProvider())
-                .ciphers(Http2SecurityUtil.CIPHERS, clientConfig.getCipherSuiteFilter())
+                .ciphers(clientConfig.getCiphers(), clientConfig.getCipherSuiteFilter())
                 .applicationProtocolConfig(newApplicationProtocolConfig(httpVersion));
         if (clientConfig.getSslContextProvider() != null) {
             sslContextBuilder.sslContextProvider(clientConfig.getSslContextProvider());
@@ -440,6 +452,225 @@ public final class Client {
 
         public SslHandler create() {
             return newSslHandler(clientConfig, allocator, httpAddress);
+        }
+    }
+
+    public static class ClientBuilder {
+
+        private ByteBufAllocator byteBufAllocator;
+
+        private EventLoopGroup eventLoopGroup;
+
+        private Class<? extends SocketChannel> socketChannelClass;
+
+        private ClientConfig clientConfig;
+
+        private ClientBuilder() {
+            this.clientConfig = new ClientConfig();
+        }
+
+        public ClientBuilder enableDebug() {
+            clientConfig.enableDebug();
+            return this;
+        }
+
+        public ClientBuilder disableDebug() {
+            clientConfig.disableDebug();
+            return this;
+        }
+
+        /**
+         * Set byte buf allocator for payload in HTTP requests.
+         * @param byteBufAllocator the byte buf allocator
+         * @return this builder
+         */
+        public ClientBuilder setByteBufAllocator(ByteBufAllocator byteBufAllocator) {
+            this.byteBufAllocator = byteBufAllocator;
+            return this;
+        }
+
+        public ClientBuilder setEventLoop(EventLoopGroup eventLoopGroup) {
+            this.eventLoopGroup = eventLoopGroup;
+            return this;
+        }
+
+        public ClientBuilder setChannelClass(Class<SocketChannel> socketChannelClass) {
+            this.socketChannelClass = socketChannelClass;
+            return this;
+        }
+
+        public ClientBuilder setThreadCount(int threadCount) {
+            clientConfig.setThreadCount(threadCount);
+            return this;
+        }
+
+        public ClientBuilder setConnectTimeoutMillis(int connectTimeoutMillis) {
+            clientConfig.setConnectTimeoutMillis(connectTimeoutMillis);
+            return this;
+        }
+
+        public ClientBuilder setTcpSendBufferSize(int tcpSendBufferSize) {
+            clientConfig.setTcpSendBufferSize(tcpSendBufferSize);
+            return this;
+        }
+
+        public ClientBuilder setTcpReceiveBufferSize(int tcpReceiveBufferSize) {
+            clientConfig.setTcpReceiveBufferSize(tcpReceiveBufferSize);
+            return this;
+        }
+
+        public ClientBuilder setTcpNodelay(boolean tcpNodelay) {
+            clientConfig.setTcpNodelay(tcpNodelay);
+            return this;
+        }
+
+        public ClientBuilder setKeepAlive(boolean keepAlive) {
+            clientConfig.setKeepAlive(keepAlive);
+            return this;
+        }
+
+        public ClientBuilder setReuseAddr(boolean reuseAddr) {
+            clientConfig.setReuseAddr(reuseAddr);
+            return this;
+        }
+
+        public ClientBuilder setMaxChunkSize(int maxChunkSize) {
+            clientConfig.setMaxChunkSize(maxChunkSize);
+            return this;
+        }
+
+        public ClientBuilder setMaxInitialLineLength(int maxInitialLineLength) {
+            clientConfig.setMaxInitialLineLength(maxInitialLineLength);
+            return this;
+        }
+
+        public ClientBuilder setMaxHeadersSize(int maxHeadersSize) {
+            clientConfig.setMaxHeadersSize(maxHeadersSize);
+            return this;
+        }
+
+        public ClientBuilder setMaxContentLength(int maxContentLength) {
+            clientConfig.setMaxContentLength(maxContentLength);
+            return this;
+        }
+
+        public ClientBuilder setMaxCompositeBufferComponents(int maxCompositeBufferComponents) {
+            clientConfig.setMaxCompositeBufferComponents(maxCompositeBufferComponents);
+            return this;
+        }
+
+        public ClientBuilder setReadTimeoutMillis(int readTimeoutMillis) {
+            clientConfig.setReadTimeoutMillis(readTimeoutMillis);
+            return this;
+        }
+
+        public ClientBuilder setEnableGzip(boolean enableGzip) {
+            clientConfig.setEnableGzip(enableGzip);
+            return this;
+        }
+
+        public ClientBuilder setSslProvider(SslProvider sslProvider) {
+            clientConfig.setSslProvider(sslProvider);
+            return this;
+        }
+
+        public ClientBuilder setJdkSslProvider() {
+            clientConfig.setJdkSslProvider();
+            clientConfig.setCiphers(SecurityUtil.Defaults.JDK_CIPHERS);
+            return this;
+        }
+
+        public ClientBuilder setOpenSSLSslProvider() {
+            clientConfig.setOpenSSLSslProvider();
+            clientConfig.setCiphers(SecurityUtil.Defaults.OPENSSL_CIPHERS);
+            return this;
+        }
+
+        public ClientBuilder setSslContextProvider(Provider provider) {
+            clientConfig.setSslContextProvider(provider);
+            return this;
+        }
+
+        public ClientBuilder setCiphers(Iterable<String> ciphers) {
+            clientConfig.setCiphers(ciphers);
+            return this;
+        }
+
+        public ClientBuilder setCipherSuiteFilter(CipherSuiteFilter cipherSuiteFilter) {
+            clientConfig.setCipherSuiteFilter(cipherSuiteFilter);
+            return this;
+        }
+
+        public ClientBuilder setKeyCert(InputStream keyCertChainInputStream, InputStream keyInputStream) {
+            clientConfig.setKeyCert(keyCertChainInputStream, keyInputStream);
+            return this;
+        }
+
+        public ClientBuilder setKeyCert(InputStream keyCertChainInputStream, InputStream keyInputStream,
+                                        String keyPassword) {
+            clientConfig.setKeyCert(keyCertChainInputStream, keyInputStream, keyPassword);
+            return this;
+        }
+
+        public ClientBuilder setTrustManagerFactory(TrustManagerFactory trustManagerFactory) {
+            clientConfig.setTrustManagerFactory(trustManagerFactory);
+            return this;
+        }
+
+        public ClientBuilder trustInsecure() {
+            clientConfig.setTrustManagerFactory(InsecureTrustManagerFactory.INSTANCE);
+            return this;
+        }
+
+        public ClientBuilder setClientAuthMode(ClientAuthMode clientAuthMode) {
+            clientConfig.setClientAuthMode(clientAuthMode);
+            return this;
+        }
+
+        public ClientBuilder setHttpProxyHandler(HttpProxyHandler httpProxyHandler) {
+            clientConfig.setHttpProxyHandler(httpProxyHandler);
+            return this;
+        }
+
+        public ClientBuilder addPoolNode(HttpAddress httpAddress) {
+            clientConfig.addPoolNode(httpAddress);
+            clientConfig.setPoolVersion(httpAddress.getVersion());
+            clientConfig.setPoolSecure(httpAddress.isSecure());
+            return this;
+        }
+
+        public ClientBuilder setPoolNodeConnectionLimit(int nodeConnectionLimit) {
+            clientConfig.setPoolNodeConnectionLimit(nodeConnectionLimit);
+            return this;
+        }
+
+        public ClientBuilder setRetriesPerPoolNode(int retriesPerNode) {
+            clientConfig.setRetriesPerPoolNode(retriesPerNode);
+            return this;
+        }
+
+        public ClientBuilder addServerNameForIdentification(String serverName) {
+            clientConfig.addServerNameForIdentification(serverName);
+            return this;
+        }
+
+        public ClientBuilder setHttp2Settings(Http2Settings http2Settings) {
+            clientConfig.setHttp2Settings(http2Settings);
+            return this;
+        }
+
+        public ClientBuilder setWriteBufferWaterMark(WriteBufferWaterMark writeBufferWaterMark) {
+            clientConfig.setWriteBufferWaterMark(writeBufferWaterMark);
+            return this;
+        }
+
+        public ClientBuilder enableNegotiation(boolean enableNegotiation) {
+            clientConfig.setEnableNegotiation(enableNegotiation);
+            return this;
+        }
+
+        public Client build() {
+            return new Client(clientConfig, byteBufAllocator, eventLoopGroup, socketChannelClass);
         }
     }
 }

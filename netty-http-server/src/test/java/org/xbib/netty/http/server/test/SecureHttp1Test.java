@@ -10,6 +10,7 @@ import org.xbib.netty.http.client.listener.ResponseListener;
 import org.xbib.netty.http.client.transport.Transport;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
+import org.xbib.netty.http.server.endpoint.NamedServer;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -29,13 +30,14 @@ class SecureHttp1Test {
 
     @Test
     void testSimpleSecureHttp1() throws Exception {
-        Server server = Server.builder()
-                .setJdkSslProvider()
+        HttpAddress httpAddress = HttpAddress.secureHttp1("localhost", 8143);
+        Server server = Server.builder(NamedServer.builder(httpAddress)
                 .setSelfCert()
-                .bind(HttpAddress.secureHttp1("localhost", 8143))
+                .singleEndpoint("/", (request, response) ->
+                        response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()))
+                .build())
                 .build();
         Client client = Client.builder()
-                .setJdkSslProvider()
                 .trustInsecure()
                 .build();
         AtomicInteger counter = new AtomicInteger();
@@ -45,8 +47,6 @@ class SecureHttp1Test {
             counter.getAndIncrement();
         };
         try {
-            server.getDefaultVirtualServer().addHandler("/", (request, response) ->
-                    response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()));
             server.accept();
             Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base())
@@ -64,15 +64,14 @@ class SecureHttp1Test {
     void testPooledSecureHttp1() throws Exception {
         int loop = 4096;
         HttpAddress httpAddress = HttpAddress.secureHttp1("localhost", 8143);
-        Server server = Server.builder()
-                .setJdkSslProvider()
+        Server server = Server.builder(NamedServer.builder(httpAddress)
                 .setSelfCert()
-                .bind(httpAddress).build();
-        server.getDefaultVirtualServer().addHandler("/", (request, response) ->
-                response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()));
+                .singleEndpoint("/", (request, response) ->
+                        response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()))
+                .build())
+                .build();
         server.accept();
         Client client = Client.builder()
-                .setJdkSslProvider()
                 .trustInsecure()
                 .addPoolNode(httpAddress)
                 .setPoolNodeConnectionLimit(2)
@@ -111,17 +110,15 @@ class SecureHttp1Test {
         int threads = 4;
         int loop = 4 * 1024;
         HttpAddress httpAddress = HttpAddress.secureHttp1("localhost", 8143);
-        Server server = Server.builder()
-                .setJdkSslProvider()
+        Server server = Server.builder(NamedServer.builder(httpAddress)
                 .setSelfCert()
-                .bind(httpAddress)
+                .singleEndpoint("/", (request, response) ->
+                        response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain())
+                )
+                .build())
                 .build();
-        server.getDefaultVirtualServer().addHandler("/", (request, response) ->
-                response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain())
-        );
         server.accept();
         Client client = Client.builder()
-                .setJdkSslProvider()
                 .trustInsecure()
                 .addPoolNode(httpAddress)
                 .setPoolNodeConnectionLimit(threads)

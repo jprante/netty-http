@@ -16,13 +16,11 @@ import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.util.AsciiString;
 import org.xbib.net.PercentEncoder;
 import org.xbib.net.PercentEncoders;
-import org.xbib.net.QueryParameters;
 import org.xbib.net.URL;
-import org.xbib.net.URLSyntaxException;
 import org.xbib.netty.http.client.retry.BackOff;
 import org.xbib.netty.http.common.HttpAddress;
+import org.xbib.netty.http.common.HttpParameters;
 
-import java.net.URI;
 import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnmappableCharacterException;
@@ -79,9 +77,7 @@ public class RequestBuilder {
 
     private URL url;
 
-    private String uri;
-
-    private QueryParameters queryParameters;
+    private HttpParameters queryParameters;
 
     private ByteBuf content;
 
@@ -110,7 +106,7 @@ public class RequestBuilder {
         removeHeaders = new ArrayList<>();
         cookies = new HashSet<>();
         encoder = PercentEncoders.getQueryEncoder(StandardCharsets.UTF_8);
-        queryParameters = new QueryParameters();
+        queryParameters = new HttpParameters();
     }
 
     public RequestBuilder setMethod(HttpMethod httpMethod) {
@@ -163,7 +159,7 @@ public class RequestBuilder {
     }
 
     public RequestBuilder uri(String uri) {
-        this.uri = uri;
+        this.url = url.resolve(uri);
         return this;
     }
 
@@ -285,41 +281,31 @@ public class RequestBuilder {
         if (url.getHost() == null) {
             throw new IllegalStateException("host in URL not defined: " + url);
         }
-        // add path from uri()
-        if (uri != null) {
-            try {
-                url = URL.base(url).resolve(uri);
-            } catch (URLSyntaxException | MalformedInputException | UnmappableCharacterException e) {
-                throw new IllegalArgumentException(e);
-            }
-        }
+        // attach user query parameters to URL
+        URL.Builder builder = url.newBuilder();
+        queryParameters.forEach((k, v) -> v.forEach(value -> builder.queryParam(k, value)));
+        url = builder.build();
         // let Netty's query string decoder/encoder work over the URL to add parameters given implicitly in url()
-        QueryStringDecoder queryStringDecoder = new QueryStringDecoder(URI.create(url.toString()), StandardCharsets.UTF_8);
+        String path = url.getPath();
+        String query = url.getQuery();
+        QueryStringDecoder queryStringDecoder = new QueryStringDecoder(query != null ? path + "?" + query : path, StandardCharsets.UTF_8);
         QueryStringEncoder queryStringEncoder = new QueryStringEncoder(queryStringDecoder.path());
         for (Map.Entry<String, List<String>> entry : queryStringDecoder.parameters().entrySet()) {
             for (String value : entry.getValue()) {
                 queryStringEncoder.addParam(entry.getKey(), value);
             }
         }
-        // attach user query parameters
-        queryParameters.forEach(param -> queryStringEncoder.addParam(param.getFirst(), param.getSecond()));
         // build uri from QueryStringDecoder
         String pathAndQuery = queryStringEncoder.toString();
         StringBuilder sb = new StringBuilder();
-        sb.append(pathAndQuery.isEmpty() ? "/" : pathAndQuery);
-        String ref = url.getFragment();
-        if (ref != null && !ref.isEmpty()) {
-            sb.append('#').append(ref);
+        if (!pathAndQuery.isEmpty()) {
+            sb.append(pathAndQuery);
         }
-        String uri = sb.toString();
-        // resolve again
-        if (!uri.equals("/")) {
-            try {
-                url = uri.startsWith("/") ? URL.base(url).resolve(uri) : URL.base(url).resolve("/" + uri) ;
-            } catch (URLSyntaxException | MalformedInputException | UnmappableCharacterException e) {
-                throw new IllegalArgumentException(e);
-            }
+        String fragment = url.getFragment();
+        if (fragment != null && !fragment.isEmpty()) {
+            sb.append('#').append(fragment);
         }
+        String uri = sb.toString(); // the encoded form of path/query/fragment
         DefaultHttpHeaders validatedHeaders = new DefaultHttpHeaders(true);
         validatedHeaders.set(headers);
         String scheme = url.getScheme();
@@ -355,7 +341,7 @@ public class RequestBuilder {
         for (String headerName : removeHeaders) {
             validatedHeaders.remove(headerName);
         }
-        return new Request(url, httpVersion, httpMethod, validatedHeaders, cookies, uri, content,
+        return new Request(url, uri, httpVersion, httpMethod, validatedHeaders, cookies, content,
                 timeoutInMillis, followRedirect, maxRedirects, 0, enableBackOff, backOff);
     }
 

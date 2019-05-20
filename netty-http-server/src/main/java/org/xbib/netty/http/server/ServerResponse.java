@@ -1,4 +1,4 @@
-package org.xbib.netty.http.server.transport;
+package org.xbib.netty.http.server;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -12,6 +12,8 @@ import java.nio.charset.Charset;
 public interface ServerResponse {
 
     void setHeader(AsciiString name, String value);
+
+    HttpResponseStatus getLastStatus();
 
     void write(String text);
 

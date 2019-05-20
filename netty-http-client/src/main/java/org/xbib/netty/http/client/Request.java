@@ -11,6 +11,7 @@ import io.netty.handler.codec.http.cookie.Cookie;
 import org.xbib.net.URL;
 import org.xbib.netty.http.client.listener.CookieListener;
 import org.xbib.netty.http.client.listener.ResponseListener;
+import org.xbib.netty.http.client.listener.StatusListener;
 import org.xbib.netty.http.client.retry.BackOff;
 
 import java.nio.charset.StandardCharsets;
@@ -24,6 +25,8 @@ public class Request {
 
     private final URL url;
 
+    private final String uri;
+
     private final HttpVersion httpVersion;
 
     private final HttpMethod httpMethod;
@@ -31,8 +34,6 @@ public class Request {
     private final HttpHeaders headers;
 
     private final Collection<Cookie> cookies;
-
-    private final String uri;
 
     private final ByteBuf content;
 
@@ -54,17 +55,18 @@ public class Request {
 
     private CookieListener cookieListener;
 
-    Request(URL url, HttpVersion httpVersion, HttpMethod httpMethod,
-            HttpHeaders headers, Collection<Cookie> cookies,
-            String uri, ByteBuf content,
+    private StatusListener statusListener;
+
+    Request(URL url, String uri, HttpVersion httpVersion, HttpMethod httpMethod,
+            HttpHeaders headers, Collection<Cookie> cookies, ByteBuf content,
             long timeoutInMillis, boolean followRedirect, int maxRedirect, int redirectCount,
             boolean isBackOff, BackOff backOff) {
         this.url = url;
+        this.uri = uri;
         this.httpVersion = httpVersion;
         this.httpMethod = httpMethod;
         this.headers = headers;
         this.cookies = cookies;
-        this.uri = uri;
         this.content = content;
         this.timeoutInMillis = timeoutInMillis;
         this.followRedirect = followRedirect;
@@ -78,16 +80,21 @@ public class Request {
         return url;
     }
 
+    public String absolute() {
+        return url.toExternalForm();
+    }
+
+    public String relative() {
+        // is already in external form
+        return uri;
+    }
+
     public HttpVersion httpVersion() {
         return httpVersion;
     }
 
     public HttpMethod httpMethod() {
         return httpMethod;
-    }
-
-    public String relativeUri() {
-        return uri;
     }
 
     public HttpHeaders headers() {
@@ -145,7 +152,6 @@ public class Request {
         sb.append("Request[url='").append(url)
                 .append("',version=").append(httpVersion)
                 .append(",method=").append(httpMethod)
-                .append(",uri=").append(uri)
                 .append(",headers=").append(headers.entries())
                 .append(",content=").append(content != null && content.readableBytes() >= 16 ?
                     content.copy(0,16).toString(StandardCharsets.UTF_8) + "..." :
@@ -171,6 +177,15 @@ public class Request {
 
     public CookieListener getCookieListener() {
         return cookieListener;
+    }
+
+    public Request setStatusListener(StatusListener statusListener) {
+        this.statusListener = statusListener;
+        return this;
+    }
+
+    public StatusListener getStatusListener() {
+        return statusListener;
     }
 
     public Request setResponseListener(ResponseListener responseListener) {

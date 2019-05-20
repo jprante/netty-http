@@ -17,11 +17,13 @@ import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
 import io.netty.handler.codec.http2.HttpConversionUtil;
+import io.netty.util.AsciiString;
 import org.xbib.net.URLSyntaxException;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.handler.http2.Http2ResponseHandler;
 import org.xbib.netty.http.client.handler.http2.Http2StreamFrameToHttpObjectCodec;
 import org.xbib.netty.http.client.listener.CookieListener;
+import org.xbib.netty.http.client.listener.StatusListener;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.client.listener.ResponseListener;
@@ -73,14 +75,12 @@ public class Http2Transport extends BaseTransport {
         channelFlowMap.putIfAbsent(channelId, new Flow());
         Http2StreamChannel childChannel = new Http2StreamChannelBootstrap(channel)
                 .handler(initializer).open().syncUninterruptibly().getNow();
+        AsciiString method = request.httpMethod().asciiName();
+        String scheme = request.url().getScheme();
         String authority = request.url().getHost() + (request.url().getPort() != null ? ":" + request.url().getPort() : "");
-        String path = request.url().getPath() != null && !request.url().getPath().isEmpty() ?
-                request.url().getPath() : "/";
+        String path = request.relative().isEmpty() ? "/" : request.relative();
         Http2Headers http2Headers = new DefaultHttp2Headers()
-                .method(request.httpMethod().asciiName())
-                .scheme(request.url().getScheme())
-                .authority(authority)
-                .path(path);
+                .method(method).scheme(scheme).authority(authority).path(path);
         final Integer streamId = channelFlowMap.get(channelId).nextStreamId();
         if (streamId == null) {
             throw new IllegalStateException();
@@ -158,6 +158,10 @@ public class Http2Transport extends BaseTransport {
             if (request == null) {
                 promise.completeExceptionally(new IllegalStateException());
             } else {
+                StatusListener statusListener = request.getStatusListener();
+                if (statusListener != null) {
+                    statusListener.onStatus(fullHttpResponse.status());
+                }
                 for (String cookieString : fullHttpResponse.headers().getAll(HttpHeaderNames.SET_COOKIE)) {
                     Cookie cookie = ClientCookieDecoder.STRICT.decode(cookieString);
                     addCookie(cookie);

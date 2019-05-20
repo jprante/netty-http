@@ -10,6 +10,7 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
+import io.netty.handler.ssl.SslHandler;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.ClientConfig;
 import org.xbib.netty.http.client.handler.http2.Http2ChannelInitializer;

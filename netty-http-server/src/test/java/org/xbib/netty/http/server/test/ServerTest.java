@@ -2,17 +2,19 @@ package org.xbib.netty.http.server.test;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
+import org.xbib.netty.http.server.endpoint.NamedServer;
 
 @Disabled
 class ServerTest {
 
     @Test
     void testServer() throws Exception {
-        Server server = Server.builder()
+        NamedServer namedServer = NamedServer.builder(HttpAddress.http1("localhost", 8008), "*")
+                .singleEndpoint("/", (request, response) -> response.write("Hello World"))
                 .build();
-        server.getDefaultVirtualServer().addHandler("/", (request, response) ->
-                response.write("Hello World"));
+        Server server = Server.builder(namedServer).build();
         try {
             server.accept().channel().closeFuture().sync();
         } finally {

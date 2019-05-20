@@ -1,5 +1,7 @@
 package org.xbib.netty.http.server.endpoint;
 
+import org.xbib.netty.http.server.endpoint.service.Service;
+
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -9,9 +11,7 @@ import java.lang.annotation.Target;
  * The {@code Context} annotation decorates methods which are mapped
  * to a context path within the server, and provide its contents.
  * The annotated methods must have the same signature and contract
- * as {@link Handler#handle}, but can have arbitrary names.
- *
- * @see NamedServer#addHandlers(Object)
+ * as {@link Service#handle}, but can have arbitrary names.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
@@ -25,9 +25,9 @@ public @interface Context {
     String value();
 
     /**
-     * The HTTP methods supported by this context handler (default is "GET").
+     * The HTTP methods supported by this context handler (default is "GET" and "HEAD").
      *
      * @return the HTTP methods supported by this context handler
      */
-    String[] methods() default "GET";
+    String[] methods() default {"GET", "HEAD"};
 }

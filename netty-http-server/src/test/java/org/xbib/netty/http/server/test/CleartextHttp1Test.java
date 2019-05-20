@@ -10,6 +10,7 @@ import org.xbib.netty.http.client.listener.ResponseListener;
 import org.xbib.netty.http.client.transport.Transport;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
+import org.xbib.netty.http.server.endpoint.NamedServer;
 
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutorService;
@@ -29,18 +30,21 @@ class CleartextHttp1Test {
     @Test
     void testSimpleClearTextHttp1() throws Exception {
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        Server server = Server.builder()
-                .bind(httpAddress).build();
-        server.getDefaultVirtualServer().addHandler("/", (request, response) ->
-                response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()));
+        NamedServer namedServer = NamedServer.builder(httpAddress)
+                .singleEndpoint("/**", (request, response) ->
+                        response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()))
+                .build();
+        Server server = Server.builder(namedServer).build();
         server.accept();
         Client client = Client.builder()
                 .build();
         AtomicInteger counter = new AtomicInteger();
         final ResponseListener responseListener = fullHttpResponse -> {
-            String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-            //logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
-            counter.incrementAndGet();
+            if (fullHttpResponse.status().equals(HttpResponseStatus.OK)) {
+                String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
+                //logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
+                counter.incrementAndGet();
+            }
         };
         try {
             Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
@@ -60,11 +64,11 @@ class CleartextHttp1Test {
     void testPooledClearTextHttp1() throws Exception {
         int loop = 4096;
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        Server server = Server.builder()
-                .bind(httpAddress).build();
-        server.getDefaultVirtualServer().addHandler("/", (request, response) -> {
-             response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain());
-        });
+        NamedServer namedServer = NamedServer.builder(httpAddress)
+                .singleEndpoint("/**", (request, response) ->
+                    response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()))
+                .build();
+        Server server = Server.builder(namedServer).build();
         server.accept();
         Client client = Client.builder()
                 .addPoolNode(httpAddress)
@@ -72,9 +76,11 @@ class CleartextHttp1Test {
                 .build();
         AtomicInteger counter = new AtomicInteger();
         final ResponseListener responseListener = fullHttpResponse -> {
-            String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-            //logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
-            counter.incrementAndGet();
+            if (fullHttpResponse.status().equals(HttpResponseStatus.OK)) {
+                String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
+                //logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
+                counter.incrementAndGet();
+            }
         };
         try {
             for (int i = 0; i < loop; i++) {
@@ -103,11 +109,11 @@ class CleartextHttp1Test {
         int threads = 4;
         int loop = 4 * 1024;
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        Server server = Server.builder()
-                .bind(httpAddress).build();
-        server.getDefaultVirtualServer().addHandler("/", (request, response) -> {
-            response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain());
-        });
+        NamedServer namedServer = NamedServer.builder(httpAddress)
+                .singleEndpoint("/**", (request, response) ->
+                    response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()))
+                .build();
+        Server server = Server.builder(namedServer).build();
         server.accept();
         Client client = Client.builder()
                 .addPoolNode(httpAddress)
@@ -115,10 +121,12 @@ class CleartextHttp1Test {
                 .build();
         AtomicInteger counter = new AtomicInteger();
         final ResponseListener responseListener = fullHttpResponse -> {
-            String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-            //logger.log(Level.INFO, "status = " + fullHttpResponse.status() +
-            //        " response=" + response + " payload=" + payload);
-            counter.incrementAndGet();
+            if (fullHttpResponse.status().equals(HttpResponseStatus.OK)) {
+                String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
+                //logger.log(Level.INFO, "status = " + fullHttpResponse.status() +
+                //        " response=" + response + " payload=" + payload);
+                counter.incrementAndGet();
+            }
         };
         try {
             ExecutorService executorService = Executors.newFixedThreadPool(threads);

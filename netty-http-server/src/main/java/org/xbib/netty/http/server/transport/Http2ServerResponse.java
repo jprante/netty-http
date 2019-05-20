@@ -9,18 +9,27 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http2.DefaultHttp2DataFrame;
 import io.netty.handler.codec.http2.DefaultHttp2Headers;
 import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame;
+import io.netty.handler.codec.http2.Http2DataFrame;
 import io.netty.handler.codec.http2.Http2Headers;
+import io.netty.handler.codec.http2.Http2HeadersFrame;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.util.AsciiString;
 import org.xbib.netty.http.server.ServerName;
+import org.xbib.netty.http.server.ServerRequest;
+import org.xbib.netty.http.server.ServerResponse;
 
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class Http2ServerResponse implements ServerResponse {
+
+    private static final Logger logger = Logger.getLogger(Http2ServerResponse.class.getName());
 
     private final ServerRequest serverRequest;
 
@@ -28,9 +37,13 @@ public class Http2ServerResponse implements ServerResponse {
 
     private Http2Headers headers;
 
-    public Http2ServerResponse(ServerRequest serverRequest, ChannelHandlerContext ctx) {
+    private HttpResponseStatus httpResponseStatus;
+
+    public Http2ServerResponse(ServerRequest serverRequest) {
+        Objects.requireNonNull(serverRequest);
+        Objects.requireNonNull(serverRequest.getChannelHandlerContext());
         this.serverRequest = serverRequest;
-        this.ctx = ctx;
+        this.ctx = serverRequest.getChannelHandlerContext();
         this.headers = new DefaultHttp2Headers();
     }
 
@@ -40,37 +53,29 @@ public class Http2ServerResponse implements ServerResponse {
     }
 
     @Override
+    public HttpResponseStatus getLastStatus() {
+        return httpResponseStatus;
+    }
+
+    @Override
     public void write(String text) {
         write(HttpResponseStatus.OK, "text/plain; charset=utf-8", text);
     }
 
-    /**
-     * Sends an error response with the given status and default body.
-     *
-     * @param status the response status
-     */
     @Override
     public void writeError(HttpResponseStatus status) {
-        writeError(status, status.code() < 400 ? ":)" : "sorry it didn't work out :(");
+        writeError(status, status.reasonPhrase());
     }
 
     /**
      * Sends an error response with the given status and detailed message.
-     * An HTML body is created containing the status and its description,
-     * as well as the message, which is escaped using the
-     * {@link #escapeHTML escape} method.
      *
      * @param status the response status
-     * @param text   the text body (sent as text/html)
+     * @param text   the text body
      */
     @Override
     public void writeError(HttpResponseStatus status, String text) {
-        write(status, "text/html; charset=utf-8",
-                String.format("<!DOCTYPE html>%n<html>%n<head><title>%d %s</title></head>%n" +
-                                "<body><h1>%d %s</h1>%n<p>%s</p>%n</body></html>",
-                        status.code(), status.reasonPhrase(),
-                        status.code(), status.reasonPhrase(),
-                        escapeHTML(text)));
+        write(status, "text/plain; charset=utf-8", status.code() + " " + text);
     }
 
     @Override
@@ -119,12 +124,15 @@ public class Http2ServerResponse implements ServerResponse {
                 headers.setInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), streamId);
             }
         }
-        Http2Headers http2Headers = new DefaultHttp2Headers()
-                .status(status.codeAsText())
-                .add(headers);
-        ctx.channel().write(new DefaultHttp2HeadersFrame(http2Headers,byteBuf == null));
+        Http2Headers http2Headers = new DefaultHttp2Headers().status(status.codeAsText()).add(headers);
+        Http2HeadersFrame http2HeadersFrame = new DefaultHttp2HeadersFrame(http2Headers,byteBuf == null);
+        logger.log(Level.FINEST, http2HeadersFrame::toString);
+        ctx.channel().write(http2HeadersFrame);
+        this.httpResponseStatus = status;
         if (byteBuf != null) {
-            ctx.channel().write(new DefaultHttp2DataFrame(byteBuf, true));
+            Http2DataFrame http2DataFrame = new DefaultHttp2DataFrame(byteBuf, true);
+            logger.log(Level.FINEST, http2DataFrame::toString);
+            ctx.channel().write(http2DataFrame);
         }
         ctx.channel().flush();
     }
@@ -166,7 +174,7 @@ public class Http2ServerResponse implements ServerResponse {
                     break;
             }
             if (ref != null) {
-                es.append(s.substring(start, i)).append(ref);
+                es.append(s, start, i).append(ref);
                 start = i + 1;
             }
         }

@@ -22,6 +22,7 @@ public class HttpAddress implements PoolKey {
 
     private InetSocketAddress inetSocketAddress;
 
+
     public static HttpAddress http1(String host) {
         return new HttpAddress(host, 80, HttpVersion.HTTP_1_1, false);
     }
@@ -60,6 +61,10 @@ public class HttpAddress implements PoolKey {
 
     public static HttpAddress http2(URL url) {
         return new HttpAddress(url, HTTP_2_0);
+    }
+
+    public static HttpAddress of(URL url) {
+        return new HttpAddress(url, HttpVersion.HTTP_1_1);
     }
 
     public static HttpAddress of(URL url, HttpVersion httpVersion) {

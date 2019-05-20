@@ -5,7 +5,6 @@ import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http2.Http2Settings;
-import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.endpoint.NamedServer;
 
@@ -26,14 +25,17 @@ public class HttpServerTransport extends BaseServerTransport {
     public void requestReceived(ChannelHandlerContext ctx, FullHttpRequest fullHttpRequest, Integer sequenceId)
             throws IOException {
         int requestId = requestCounter.incrementAndGet();
-        NamedServer namedServer = server.getVirtualServer(fullHttpRequest.headers().get(HttpHeaderNames.HOST));
+        NamedServer namedServer = server.getNamedServer(fullHttpRequest.headers().get(HttpHeaderNames.HOST));
         if (namedServer == null) {
-            namedServer = server.getDefaultVirtualServer();
+            namedServer = server.getDefaultNamedServer();
         }
-        HttpAddress httpAddress = server.getServerConfig().getAddress();
-        ServerRequest serverRequest = new ServerRequest(namedServer, httpAddress, fullHttpRequest,
-                 sequenceId, null, requestId);
-        ServerResponse serverResponse = new HttpServerResponse(serverRequest, ctx);
+        HttpServerRequest serverRequest = new HttpServerRequest();
+        serverRequest.setNamedServer(namedServer);
+        serverRequest.setChannelHandlerContext(ctx);
+        serverRequest.setRequest(fullHttpRequest);
+        serverRequest.setSequenceId(sequenceId);
+        serverRequest.setRequestId(requestId);
+        HttpServerResponse serverResponse = new HttpServerResponse(serverRequest);
         if (acceptRequest(serverRequest, serverResponse)) {
             handle(serverRequest, serverResponse);
         } else {

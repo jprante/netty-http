@@ -5,6 +5,7 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.WriteBufferWaterMark;
 import io.netty.channel.epoll.Epoll;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollServerSocketChannel;
@@ -13,28 +14,24 @@ import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.logging.LoggingHandler;
-import io.netty.handler.ssl.ApplicationProtocolConfig;
-import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.OpenSsl;
 import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.util.DomainNameMapping;
 import io.netty.util.DomainNameMappingBuilder;
 import org.xbib.netty.http.common.HttpAddress;
+import org.xbib.netty.http.common.NetworkUtils;
 import org.xbib.netty.http.server.endpoint.NamedServer;
 import org.xbib.netty.http.server.handler.http.HttpChannelInitializer;
 import org.xbib.netty.http.server.handler.http2.Http2ChannelInitializer;
+import org.xbib.netty.http.common.SecurityUtil;
+import org.xbib.netty.http.server.transport.Http2ServerResponse;
+import org.xbib.netty.http.server.transport.HttpServerRequest;
+import org.xbib.netty.http.server.transport.HttpServerResponse;
 import org.xbib.netty.http.server.transport.HttpServerTransport;
 import org.xbib.netty.http.server.transport.Http2ServerTransport;
 import org.xbib.netty.http.server.transport.ServerTransport;
-import org.xbib.netty.http.server.util.NetworkUtils;
 
-import javax.net.ssl.SSLException;
-import javax.net.ssl.TrustManagerFactory;
 import java.io.IOException;
-import java.security.KeyStoreException;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ThreadFactory;
 import java.util.logging.Level;
@@ -73,27 +70,23 @@ public final class Server {
 
     private final ServerBootstrap bootstrap;
 
-    private final Map<String, NamedServer> virtualServerMap;
-
     private ChannelFuture channelFuture;
 
     /**
-     * Create a new HTTP server. Use {@link #builder()} to build HTTP client instance.
+     * Create a new HTTP server. Use {@link #builder(HttpAddress)} to build HTTP client instance.
      * @param serverConfig server configuration
      * @param byteBufAllocator byte buf allocator
      * @param parentEventLoopGroup parent event loop group
      * @param childEventLoopGroup child event loop group
      * @param socketChannelClass socket channel class
-     * @throws SSLException if SSL can not be configured
      */
-    public Server(ServerConfig serverConfig,
+    private Server(ServerConfig serverConfig,
                   ByteBufAllocator byteBufAllocator,
                   EventLoopGroup parentEventLoopGroup,
                   EventLoopGroup childEventLoopGroup,
-                  Class<? extends ServerSocketChannel> socketChannelClass) throws SSLException {
+                  Class<? extends ServerSocketChannel> socketChannelClass) {
         Objects.requireNonNull(serverConfig);
         this.serverConfig = serverConfig;
-        initializeTrustManagerFactory(serverConfig);
         this.byteBufAllocator = byteBufAllocator != null ?
                 byteBufAllocator : ByteBufAllocator.DEFAULT;
         this.parentEventLoopGroup = createParentEventLoopGroup(serverConfig, parentEventLoopGroup);
@@ -117,45 +110,28 @@ public final class Server {
         if (serverConfig.isDebug()) {
             bootstrap.handler(new LoggingHandler("bootstrap-server", serverConfig.getDebugLogLevel()));
         }
-        this.virtualServerMap = new HashMap<>();
-        for (NamedServer namedServer : serverConfig.getNamedServers()) {
-            String name = namedServer.getName();
-            virtualServerMap.put(name, namedServer);
-            for (String alias : namedServer.getAliases()) {
-                virtualServerMap.put(alias, namedServer);
-            }
-        }
-        DomainNameMapping<SslContext> domainNameMapping = null;
-        if (serverConfig.getAddress().isSecure()) {
-            SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(serverConfig.getKeyCertChainInputStream(),
-                    serverConfig.getKeyInputStream(), serverConfig.getKeyPassword())
-                    .sslProvider(serverConfig.getSslProvider())
-                    .ciphers(serverConfig.getCiphers(), serverConfig.getCipherSuiteFilter());
-            if (serverConfig.getAddress().getVersion().majorVersion() == 2) {
-                sslContextBuilder.applicationProtocolConfig(newApplicationProtocolConfig());
-            }
-            SslContext sslContext = sslContextBuilder.build();
-            DomainNameMappingBuilder<SslContext> mappingBuilder = new DomainNameMappingBuilder<>(sslContext);
-            for (NamedServer namedServer : serverConfig.getNamedServers()) {
-                String name = namedServer.getName();
-                mappingBuilder.add(name == null ? "*" : name, sslContext);
-            }
-            domainNameMapping = mappingBuilder.build();
-        }
-        HttpAddress httpAddress = serverConfig.getAddress();
-        if (httpAddress.getVersion().majorVersion() == 1) {
+        DomainNameMapping<SslContext> domainNameMapping = createDomainNameMapping();
+        if (serverConfig.getAddress().getVersion().majorVersion() == 1) {
             HttpChannelInitializer httpChannelInitializer = new HttpChannelInitializer(this,
-                    httpAddress, domainNameMapping);
+                    serverConfig.getAddress(), domainNameMapping);
             bootstrap.childHandler(httpChannelInitializer);
         } else {
-            Http2ChannelInitializer initializer = new Http2ChannelInitializer(this,
-                    httpAddress, domainNameMapping);
-            bootstrap.childHandler(initializer);
+            Http2ChannelInitializer http2ChannelInitializer = new Http2ChannelInitializer(this,
+                    serverConfig.getAddress(), domainNameMapping);
+            bootstrap.childHandler(http2ChannelInitializer);
         }
     }
 
-    public static ServerBuilder builder() {
-        return new ServerBuilder();
+    public static Builder builder() {
+        return new Builder(HttpAddress.http1("localhost", 8008));
+    }
+
+    public static Builder builder(HttpAddress httpAddress) {
+        return new Builder(httpAddress);
+    }
+
+    public static Builder builder(NamedServer namedServer) {
+        return new Builder(namedServer.getHttpAddress(), namedServer);
     }
 
     public ServerConfig getServerConfig() {
@@ -163,18 +139,18 @@ public final class Server {
     }
 
     /**
-     * Returns the virtual host with the given name.
+     * Returns the named server with the given name.
      *
      * @param name the name of the virtual host to return, or null for
      *             the default virtual host
      * @return the virtual host with the given name, or null if it doesn't exist
      */
-    public NamedServer getVirtualServer(String name) {
-        return virtualServerMap.get(name);
+    public NamedServer getNamedServer(String name) {
+        return serverConfig.getNamedServers().get(name);
     }
 
-    public NamedServer getDefaultVirtualServer() {
-        return virtualServerMap.get(null);
+    public NamedServer getDefaultNamedServer() {
+        return serverConfig.getDefaultNamedServer();
     }
 
     /**
@@ -189,14 +165,27 @@ public final class Server {
     }
 
     public void logDiagnostics(Level level) {
-        logger.log(level, () -> "OpenSSL available: " + OpenSsl.isAvailable() +
-                " OpenSSL ALPN support: " + OpenSsl.isAlpnSupported() +
-                " Local host name: " + NetworkUtils.getLocalHostName("localhost") +
-                " parent event loop group: " + parentEventLoopGroup +
-                " child event loop group: " + childEventLoopGroup +
-                " socket: " + socketChannelClass.getName() +
-                " allocator: " + byteBufAllocator.getClass().getName());
+        logger.log(level, () -> "JDK ciphers: " + SecurityUtil.Defaults.JDK_CIPHERS);
+        logger.log(level, () -> "OpenSSL ciphers: " + SecurityUtil.Defaults.OPENSSL_CIPHERS);
+        logger.log(level, () -> "OpenSSL available: " + OpenSsl.isAvailable());
+        logger.log(level, () -> "OpenSSL ALPN support: " + OpenSsl.isAlpnSupported());
+        logger.log(level, () -> "Installed ciphers on default server: " +
+                (serverConfig.getAddress().isSecure() ? getDefaultNamedServer().getSslContext().cipherSuites() : ""));
+        logger.log(level, () -> "Local host name: " + NetworkUtils.getLocalHostName("localhost"));
+        logger.log(level, () -> "Parent event loop group: " + parentEventLoopGroup + " threads=" + serverConfig.getParentThreadCount());
+        logger.log(level, () -> "Child event loop group: " + childEventLoopGroup + " threads=" +serverConfig.getChildThreadCount());
+        logger.log(level, () -> "Socket: " + socketChannelClass.getName());
+        logger.log(level, () -> "Allocator: " + byteBufAllocator.getClass().getName());
         logger.log(level, NetworkUtils::displayNetworkInterfaces);
+    }
+
+    public ServerRequest newRequest() {
+        return new HttpServerRequest();
+    }
+
+    public ServerResponse newResponse(ServerRequest serverRequest) {
+        return serverRequest.getNamedServer().getHttpAddress().getVersion().majorVersion() == 1 ?
+                new HttpServerResponse(serverRequest) : new Http2ServerResponse(serverRequest);
     }
 
     public ServerTransport newTransport(HttpVersion httpVersion) {
@@ -249,27 +238,23 @@ public final class Server {
         return channelClass;
     }
 
-    /**
-     * Initialize trust manager factory once per server lifecycle.
-     * @param serverConfig the server config
-     */
-    private static void initializeTrustManagerFactory(ServerConfig serverConfig) {
-        TrustManagerFactory trustManagerFactory = serverConfig.getTrustManagerFactory();
-        if (trustManagerFactory != null) {
-            try {
-                trustManagerFactory.init(serverConfig.getTrustManagerKeyStore());
-            } catch (KeyStoreException e) {
-                logger.log(Level.WARNING, e.getMessage(), e);
-            }
+    private DomainNameMapping<SslContext> createDomainNameMapping() {
+        if (serverConfig.getDefaultNamedServer() == null) {
+            throw new IllegalStateException("no default named server (with name '*') configured, unable to continue");
         }
-    }
-
-    private static ApplicationProtocolConfig newApplicationProtocolConfig() {
-        return new ApplicationProtocolConfig(ApplicationProtocolConfig.Protocol.ALPN,
-                ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
-                ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
-                ApplicationProtocolNames.HTTP_2,
-                ApplicationProtocolNames.HTTP_1_1);
+        DomainNameMapping<SslContext> domainNameMapping = null;
+        if (serverConfig.getAddress().isSecure() && serverConfig.getDefaultNamedServer().getSslContext() != null) {
+            DomainNameMappingBuilder<SslContext> mappingBuilder =
+                    new DomainNameMappingBuilder<>(serverConfig.getDefaultNamedServer().getSslContext());
+            for (NamedServer namedServer : serverConfig.getNamedServers().values()) {
+                String name = namedServer.getName();
+                if (!"*".equals(name)) {
+                    mappingBuilder.add(name, namedServer.getSslContext());
+                }
+            }
+            domainNameMapping = mappingBuilder.build();
+        }
+        return domainNameMapping;
     }
 
     static class HttpServerParentThreadFactory implements ThreadFactory {
@@ -295,4 +280,165 @@ public final class Server {
             return thread;
         }
     }
+
+    /**
+     * HTTP server builder.
+     */
+    public static class Builder {
+
+        private ByteBufAllocator byteBufAllocator;
+
+        private EventLoopGroup parentEventLoopGroup;
+
+        private EventLoopGroup childEventLoopGroup;
+
+        private Class<? extends ServerSocketChannel> socketChannelClass;
+
+        private ServerConfig serverConfig;
+
+        Builder(HttpAddress httpAddress) {
+            this(httpAddress, NamedServer.builder(httpAddress, "*").build());
+        }
+
+        Builder(HttpAddress httpAddress, NamedServer defaultNamedServer) {
+            this.serverConfig = new ServerConfig();
+            this.serverConfig.setAddress(httpAddress);
+            this.serverConfig.add(defaultNamedServer);
+        }
+
+        public Builder enableDebug() {
+            this.serverConfig.enableDebug();
+            return this;
+        }
+
+        public Builder setByteBufAllocator(ByteBufAllocator byteBufAllocator) {
+            this.byteBufAllocator = byteBufAllocator;
+            return this;
+        }
+
+        public Builder setParentEventLoopGroup(EventLoopGroup parentEventLoopGroup) {
+            this.parentEventLoopGroup = parentEventLoopGroup;
+            return this;
+        }
+
+        public Builder setChildEventLoopGroup(EventLoopGroup childEventLoopGroup) {
+            this.childEventLoopGroup = childEventLoopGroup;
+            return this;
+        }
+
+        public Builder setChannelClass(Class<? extends ServerSocketChannel> socketChannelClass) {
+            this.socketChannelClass = socketChannelClass;
+            return this;
+        }
+
+        public Builder setUseEpoll(boolean useEpoll) {
+            this.serverConfig.setEpoll(useEpoll);
+            return this;
+        }
+
+        public Builder setConnectTimeoutMillis(int connectTimeoutMillis) {
+            this.serverConfig.setConnectTimeoutMillis(connectTimeoutMillis);
+            return this;
+        }
+
+        public Builder setParentThreadCount(int parentThreadCount) {
+            this.serverConfig.setParentThreadCount(parentThreadCount);
+            return this;
+        }
+
+        public Builder setChildThreadCount(int childThreadCount) {
+            this.serverConfig.setChildThreadCount(childThreadCount);
+            return this;
+        }
+
+        public Builder setTcpSendBufferSize(int tcpSendBufferSize) {
+            this.serverConfig.setTcpSendBufferSize(tcpSendBufferSize);
+            return this;
+        }
+
+        public Builder setTcpReceiveBufferSize(int tcpReceiveBufferSize) {
+            this.serverConfig.setTcpReceiveBufferSize(tcpReceiveBufferSize);
+            return this;
+        }
+
+        public Builder setTcpNoDelay(boolean tcpNoDelay) {
+            this.serverConfig.setTcpNodelay(tcpNoDelay);
+            return this;
+        }
+
+        public Builder setReuseAddr(boolean reuseAddr) {
+            this.serverConfig.setReuseAddr(reuseAddr);
+            return this;
+        }
+
+        public Builder setBacklogSize(int backlogSize) {
+            this.serverConfig.setBackLogSize(backlogSize);
+            return this;
+        }
+
+        public Builder setMaxChunkSize(int maxChunkSize) {
+            this.serverConfig.setMaxChunkSize(maxChunkSize);
+            return this;
+        }
+
+        public Builder setMaxInitialLineLength(int maxInitialLineLength) {
+            this.serverConfig.setMaxInitialLineLength(maxInitialLineLength);
+            return this;
+        }
+
+        public Builder setMaxHeadersSize(int maxHeadersSize) {
+            this.serverConfig.setMaxHeadersSize(maxHeadersSize);
+            return this;
+        }
+
+        public Builder setMaxContentLength(int maxContentLength) {
+            this.serverConfig.setMaxContentLength(maxContentLength);
+            return this;
+        }
+
+        public Builder setMaxCompositeBufferComponents(int maxCompositeBufferComponents) {
+            this.serverConfig.setMaxCompositeBufferComponents(maxCompositeBufferComponents);
+            return this;
+        }
+
+        public Builder setReadTimeoutMillis(int readTimeoutMillis) {
+            this.serverConfig.setReadTimeoutMillis(readTimeoutMillis);
+            return this;
+        }
+
+        public Builder setConnectionTimeoutMillis(int connectionTimeoutMillis) {
+            this.serverConfig.setConnectTimeoutMillis(connectionTimeoutMillis);
+            return this;
+        }
+
+        public Builder setIdleTimeoutMillis(int idleTimeoutMillis) {
+            this.serverConfig.setIdleTimeoutMillis(idleTimeoutMillis);
+            return this;
+        }
+
+        public Builder setWriteBufferWaterMark(WriteBufferWaterMark writeBufferWaterMark) {
+            this.serverConfig.setWriteBufferWaterMark(writeBufferWaterMark);
+            return this;
+        }
+
+        public Builder setEnableGzip(boolean enableGzip) {
+            this.serverConfig.setEnableGzip(enableGzip);
+            return this;
+        }
+
+        public Builder setInstallHttp2Upgrade(boolean installHttp2Upgrade) {
+            this.serverConfig.setInstallHttp2Upgrade(installHttp2Upgrade);
+            return this;
+        }
+
+        public Builder addServer(NamedServer namedServer) {
+            this.serverConfig.add(namedServer);
+            return this;
+        }
+
+        public Server build() {
+            return new Server(serverConfig, byteBufAllocator, parentEventLoopGroup, childEventLoopGroup, socketChannelClass);
+        }
+    }
+
 }

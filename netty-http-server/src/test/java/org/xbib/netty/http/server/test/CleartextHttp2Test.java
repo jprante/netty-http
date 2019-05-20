@@ -9,6 +9,7 @@ import org.xbib.netty.http.client.listener.ResponseListener;
 import org.xbib.netty.http.client.transport.Transport;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
+import org.xbib.netty.http.server.endpoint.NamedServer;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -29,11 +30,11 @@ class CleartextHttp2Test {
     @Test
     void testSimpleCleartextHttp2() throws Exception {
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
-        Server server = Server.builder()
-                .bind(httpAddress)
+        NamedServer namedServer = NamedServer.builder(httpAddress)
+                .singleEndpoint("/", (request, response) ->
+                        response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()))
                 .build();
-        server.getDefaultVirtualServer().addHandler("/", (request, response) ->
-                response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()));
+        Server server = Server.builder(namedServer).build();
         server.accept();
         Client client = Client.builder()
                 .build();
@@ -46,7 +47,7 @@ class CleartextHttp2Test {
             counter.incrementAndGet();
         };
         try {
-            String payload = Integer.toString(0) + "/" + Integer.toString(0);
+            String payload = 0 + "/" + 0;
             Request request = Request.get().setVersion("HTTP/2.0")
                     .url(server.getServerConfig().getAddress().base())
                     .content(payload, "text/plain")
@@ -69,10 +70,11 @@ class CleartextHttp2Test {
     void testPooledClearTextHttp2() throws Exception {
         int loop = 4096;
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
-        Server server = Server.builder()
-                .bind(httpAddress).build();
-        server.getDefaultVirtualServer().addHandler("/", (request, response) ->
-                response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()));
+        NamedServer namedServer = NamedServer.builder(httpAddress)
+                .singleEndpoint("/", (request, response) ->
+                        response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()))
+                .build();
+        Server server = Server.builder(namedServer).build();
         server.accept();
         Client client = Client.builder()
                 .addPoolNode(httpAddress)
@@ -116,12 +118,12 @@ class CleartextHttp2Test {
         int threads = 2;
         int loop = 4 * 1024;
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
-        Server server = Server.builder()
-                .bind(httpAddress)
+        NamedServer namedServer = NamedServer.builder(httpAddress)
+                .singleEndpoint("/", (request, response) ->
+                        response.write(HttpResponseStatus.OK, "text/plain",
+                                request.getRequest().content().toString(StandardCharsets.UTF_8)))
                 .build();
-        server.getDefaultVirtualServer().addHandler("/", (request, response) ->
-            response.write(request.getRequest().content().toString(StandardCharsets.UTF_8))
-        );
+        Server server = Server.builder(namedServer).build();
         server.accept();
         Client client = Client.builder()
                 .addPoolNode(httpAddress)
@@ -144,7 +146,7 @@ class CleartextHttp2Test {
                 executorService.submit(() -> {
                     try {
                         for (int i = 0; i < loop; i++) {
-                            String payload = Integer.toString(t) + "/" + Integer.toString(i);
+                            String payload = t + "/" + i;
                             Request request = Request.get().setVersion("HTTP/2.0")
                                     .url(server.getServerConfig().getAddress().base())
                                     .content(payload, "text/plain")
@@ -180,24 +182,26 @@ class CleartextHttp2Test {
 
         HttpAddress httpAddress1 = HttpAddress.http2("localhost", 8008);
         AtomicInteger counter1 = new AtomicInteger();
-        Server server1 = Server.builder()
-                .bind(httpAddress1).build();
-        server1.getDefaultVirtualServer().addHandler("/", (request, response) -> {
-            response.write(request.getRequest().content().toString(StandardCharsets.UTF_8));
-            counter1.incrementAndGet();
-        });
+        NamedServer namedServer1 = NamedServer.builder(httpAddress1)
+                .singleEndpoint("/", (request, response) -> {
+                        response.write(HttpResponseStatus.OK, "text/plain",
+                                request.getRequest().content().toString(StandardCharsets.UTF_8));
+                        counter1.incrementAndGet();
+                })
+                .build();
+        Server server1 = Server.builder(namedServer1).build();
         server1.accept();
-
         HttpAddress httpAddress2 = HttpAddress.http2("localhost", 8009);
         AtomicInteger counter2 = new AtomicInteger();
-        Server server2 = Server.builder()
-                .bind(httpAddress2).build();
-        server2.getDefaultVirtualServer().addHandler("/", (request, response) -> {
-            response.write(request.getRequest().content().toString(StandardCharsets.UTF_8));
-            counter2.incrementAndGet();
-        });
+        NamedServer namedServer2 = NamedServer.builder(httpAddress2)
+                .singleEndpoint("/", (request, response) -> {
+                    response.write(HttpResponseStatus.OK, "text/plain",
+                            request.getRequest().content().toString(StandardCharsets.UTF_8));
+                    counter2.incrementAndGet();
+                })
+                .build();
+        Server server2 = Server.builder(namedServer2).build();
         server2.accept();
-
         Client client = Client.builder()
                 .addPoolNode(httpAddress1)
                 .addPoolNode(httpAddress2)
@@ -220,7 +224,7 @@ class CleartextHttp2Test {
                 executorService.submit(() -> {
                     try {
                         for (int i = 0; i < loop; i++) {
-                            String payload = Integer.toString(t) + "/" + Integer.toString(i);
+                            String payload = t + "/" + i;
                             Request request = Request.get().setVersion("HTTP/2.0")
                                     .uri("/")
                                     .content(payload, "text/plain")

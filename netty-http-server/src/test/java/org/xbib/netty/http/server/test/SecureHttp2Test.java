@@ -9,6 +9,7 @@ import org.xbib.netty.http.client.listener.ResponseListener;
 import org.xbib.netty.http.client.transport.Transport;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
+import org.xbib.netty.http.server.endpoint.NamedServer;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -29,16 +30,14 @@ class SecureHttp2Test {
     @Test
     void testSimpleSecureHttp2() throws Exception {
         HttpAddress httpAddress = HttpAddress.secureHttp2("localhost", 8143);
-        Server server = Server.builder()
-                .setJdkSslProvider()
+        Server server = Server.builder(NamedServer.builder(httpAddress)
                 .setSelfCert()
-                .bind(httpAddress)
+                .singleEndpoint("/", (request, response) ->
+                        response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()))
+                .build())
                 .build();
-        server.getDefaultVirtualServer().addHandler("/", (request, response) ->
-                response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()));
         server.accept();
         Client client = Client.builder()
-                .setJdkSslProvider()
                 .trustInsecure()
                 .build();
         AtomicInteger counter = new AtomicInteger();
@@ -72,16 +71,14 @@ class SecureHttp2Test {
     void testPooledSecureHttp2() throws Exception {
         int loop = 4096;
         HttpAddress httpAddress = HttpAddress.secureHttp2("localhost", 8143);
-        Server server = Server.builder()
-                .setJdkSslProvider()
+        Server server = Server.builder(NamedServer.builder(httpAddress)
                 .setSelfCert()
-                .bind(httpAddress)
+                .singleEndpoint("/", (request, response) ->
+                        response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()))
+                .build())
                 .build();
-        server.getDefaultVirtualServer().addHandler("/", (request, response) ->
-                response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()));
         server.accept();
         Client client = Client.builder()
-                .setJdkSslProvider()
                 .trustInsecure()
                 .addPoolNode(httpAddress)
                 .setPoolNodeConnectionLimit(2)
@@ -123,17 +120,15 @@ class SecureHttp2Test {
         int threads = 4;
         int loop = 4 * 1024;
         HttpAddress httpAddress = HttpAddress.secureHttp2("localhost", 8143);
-        Server server = Server.builder()
-                .setJdkSslProvider()
+        Server server = Server.builder(NamedServer.builder(httpAddress)
                 .setSelfCert()
-                .bind(httpAddress)
+                .singleEndpoint("/", (request, response) ->
+                        response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain())
+                )
+                .build())
                 .build();
-        server.getDefaultVirtualServer().addHandler("/", (request, response) ->
-                response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain())
-        );
         server.accept();
         Client client = Client.builder()
-                .setJdkSslProvider()
                 .trustInsecure()
                 .addPoolNode(httpAddress)
                 .setPoolNodeConnectionLimit(threads)

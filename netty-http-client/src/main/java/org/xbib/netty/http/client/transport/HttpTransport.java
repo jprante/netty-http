@@ -14,6 +14,7 @@ import io.netty.handler.codec.http2.HttpConversionUtil;
 import org.xbib.net.URLSyntaxException;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.listener.CookieListener;
+import org.xbib.netty.http.client.listener.StatusListener;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.client.listener.ResponseListener;
@@ -45,8 +46,7 @@ public class HttpTransport extends BaseTransport {
         // The "origin form" requires a "Host" header.
         // Our algorithm is: use always "origin form" for HTTP 1, use absolute form for HTTP 2.
         // The reason is that Netty derives the HTTP/2 scheme header from the absolute form.
-        String uri = request.httpVersion().majorVersion() == 1 ?
-                request.url().relativeReference() : request.url().toString();
+        String uri = request.httpVersion().majorVersion() == 1 ? request.relative() : request.absolute();
         FullHttpRequest fullHttpRequest = request.content() == null ?
                 new DefaultFullHttpRequest(request.httpVersion(), request.httpMethod(), uri) :
                 new DefaultFullHttpRequest(request.httpVersion(), request.httpMethod(), uri, request.content());
@@ -80,9 +80,17 @@ public class HttpTransport extends BaseTransport {
             logger.log(Level.WARNING, "throwable not null for response " + fullHttpResponse, throwable);
             return;
         }
+        if (requests.isEmpty()) {
+            logger.log(Level.WARNING, "no request present for responding");
+            return;
+        }
         // streamID is expected to be null, last request on memory is expected to be current, remove request from memory
-        Request request = requests.remove(requests.isEmpty() ? null : requests.lastKey());
+        Request request = requests.remove(requests.lastKey());
         if (request != null) {
+            StatusListener statusListener = request.getStatusListener();
+            if (statusListener != null) {
+                statusListener.onStatus(fullHttpResponse.status());
+            }
             for (String cookieString : fullHttpResponse.headers().getAll(HttpHeaderNames.SET_COOKIE)) {
                 Cookie cookie = ClientCookieDecoder.STRICT.decode(cookieString);
                 addCookie(cookie);

@@ -2,7 +2,7 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
 plugins {
-    id "com.github.spotbugs" version "1.7.1"
+    id "com.github.spotbugs" version "2.0.0"
     id "org.sonarqube" version "2.6.1"
     id "io.codearte.nexus-staging" version "0.11.0"
     id "org.xbib.gradle.plugin.asciidoctor" version "1.5.6.0.1"
@@ -29,11 +29,10 @@ subprojects {
     apply plugin: 'maven'
     apply plugin: 'signing'
     apply plugin: "com.github.spotbugs"
-
+    
     configurations {
         alpnagent
         asciidoclet
-        wagon
     }
 
     dependencies {
@@ -42,7 +41,6 @@ subprojects {
         testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${project.property('junit.version')}"
         alpnagent "org.mortbay.jetty.alpn:jetty-alpn-agent:${project.property('alpnagent.version')}"
         asciidoclet "org.asciidoctor:asciidoclet:${project.property('asciidoclet.version')}"
-        wagon "org.apache.maven.wagon:wagon-ssh:${project.property('wagon.version')}"
     }
 
     compileJava {
@@ -147,23 +145,7 @@ subprojects {
         scmConnection = 'scm:git:git://github.com/' + user + '/' + name + '.git'
         scmDeveloperConnection = 'scm:git:git://github.com/' + user + '/' + name + '.git'
     }
-
-    /*task xbibUpload(type: Upload) {
-        group = 'publish'
-        configuration = configurations.archives
-        uploadDescriptor = true
-        repositories {
-            if (project.hasProperty("xbibUsername")) {
-                mavenDeployer {
-                    configuration = configurations.wagon
-                    repository(url: 'sftp://xbib.org/repository') {
-                        authentication(userName: xbibUsername, privateKey: xbibPrivateKey)
-                    }
-                }
-            }
-        }
-    }*/
-
+    
     task sonaTypeUpload(type: Upload) {
         group = 'publish'
         configuration = configurations.archives
@@ -224,14 +206,6 @@ subprojects {
         reportLevel = "high"
         // includeFilter = file("config/findbugs/findbugs-include.xml")
         // excludeFilter = file("config/findbugs/findbugs-excludes.xml")
-    }
-    spotbugsMain.reports {
-        xml.enabled = false
-        html.enabled = true
-    }
-    spotbugsTest.reports {
-        xml.enabled = false
-        html.enabled = true
     }
 }
 

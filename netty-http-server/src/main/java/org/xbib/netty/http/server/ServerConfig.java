@@ -2,23 +2,13 @@ package org.xbib.netty.http.server;
 
 import io.netty.channel.WriteBufferWaterMark;
 import io.netty.channel.epoll.Epoll;
-import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.logging.LogLevel;
-import io.netty.handler.ssl.CipherSuiteFilter;
-import io.netty.handler.ssl.OpenSsl;
-import io.netty.handler.ssl.SslProvider;
-import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.endpoint.NamedServer;
 
-import javax.net.ssl.TrustManagerFactory;
-import java.io.InputStream;
-import java.security.KeyStore;
-import java.util.ArrayList;
-import java.util.Deque;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class ServerConfig {
 
@@ -143,30 +133,6 @@ public class ServerConfig {
          */
         boolean INSTALL_HTTP_UPGRADE2 = false;
 
-        /**
-         * Default SSL provider.
-         */
-        SslProvider DEFAULT_SSL_PROVIDER = OpenSsl.isAlpnSupported() ? SslProvider.OPENSSL : SslProvider.JDK;
-
-        /**
-         * Default ciphers.
-         */
-        Iterable<String> DEFAULT_CIPHERS = Http2SecurityUtil.CIPHERS;
-
-        /**
-         * Default cipher suite filter.
-         */
-        CipherSuiteFilter DEFAULT_CIPHER_SUITE_FILTER = SupportedCipherSuiteFilter.INSTANCE;
-    }
-
-    private static TrustManagerFactory TRUST_MANAGER_FACTORY;
-
-    static {
-        try {
-            TRUST_MANAGER_FACTORY = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-        } catch (Exception e) {
-            TRUST_MANAGER_FACTORY = null;
-        }
     }
 
     private HttpAddress httpAddress = Defaults.ADDRESS;
@@ -215,27 +181,10 @@ public class ServerConfig {
 
     private boolean installHttp2Upgrade = Defaults.INSTALL_HTTP_UPGRADE2;
 
-    private SslProvider sslProvider = Defaults.DEFAULT_SSL_PROVIDER;
-
-    private Iterable<String> ciphers = Defaults.DEFAULT_CIPHERS;
-
-    private CipherSuiteFilter cipherSuiteFilter = Defaults.DEFAULT_CIPHER_SUITE_FILTER;
-
-    private InputStream keyCertChainInputStream;
-
-    private InputStream keyInputStream;
-
-    private String keyPassword;
-
-    private Deque<NamedServer> namedServers;
-
-    private TrustManagerFactory trustManagerFactory = TRUST_MANAGER_FACTORY;
-
-    private KeyStore trustManagerKeyStore = null;
+    private Map<String, NamedServer> namedServers;
 
     public ServerConfig() {
-        this.namedServers = new LinkedList<>();
-        add(new NamedServer(null));
+        this.namedServers = new LinkedHashMap<>();
     }
 
     public ServerConfig enableDebug() {
@@ -460,84 +409,20 @@ public class ServerConfig {
         return http2Settings;
     }
 
-    public ServerConfig setSslProvider(SslProvider sslProvider) {
-        this.sslProvider = sslProvider;
-        return this;
-    }
-
-    public SslProvider getSslProvider() {
-        return sslProvider;
-    }
-
-    public ServerConfig setCiphers(Iterable<String> ciphers) {
-        this.ciphers = ciphers;
-        return this;
-    }
-
-    public Iterable<String> getCiphers() {
-        return ciphers;
-    }
-
-    public ServerConfig setCipherSuiteFilter(CipherSuiteFilter cipherSuiteFilter) {
-        this.cipherSuiteFilter = cipherSuiteFilter;
-        return this;
-    }
-
-    public CipherSuiteFilter getCipherSuiteFilter() {
-        return cipherSuiteFilter;
-    }
-
-    public ServerConfig setKeyCertChainInputStream(InputStream keyCertChainInputStream) {
-        this.keyCertChainInputStream = keyCertChainInputStream;
-        return this;
-    }
-
-    public InputStream getKeyCertChainInputStream() {
-        return keyCertChainInputStream;
-    }
-
-    public ServerConfig setKeyInputStream(InputStream keyInputStream) {
-        this.keyInputStream = keyInputStream;
-        return this;
-    }
-
-    public InputStream getKeyInputStream() {
-        return keyInputStream;
-    }
-
-    public ServerConfig setKeyPassword(String keyPassword) {
-        this.keyPassword = keyPassword;
-        return this;
-    }
-
-    public String getKeyPassword() {
-        return keyPassword;
-    }
-
     public ServerConfig add(NamedServer namedServer) {
-        this.namedServers.add(namedServer);
+        this.namedServers.put(namedServer.getName(), namedServer);
+        for (String alias : namedServer.getAliases()) {
+            this.namedServers.put(alias, namedServer);
+        }
         return this;
     }
 
-    public Deque<NamedServer> getNamedServers() {
+    public NamedServer getDefaultNamedServer() {
+        return namedServers.get("*");
+    }
+
+    public Map<String, NamedServer> getNamedServers() {
         return namedServers;
     }
 
-    public ServerConfig setTrustManagerFactory(TrustManagerFactory trustManagerFactory) {
-        this.trustManagerFactory = trustManagerFactory;
-        return this;
-    }
-
-    public TrustManagerFactory getTrustManagerFactory() {
-        return trustManagerFactory;
-    }
-
-    public ServerConfig setTrustManagerKeyStore(KeyStore trustManagerKeyStore) {
-        this.trustManagerKeyStore = trustManagerKeyStore;
-        return this;
-    }
-
-    public KeyStore getTrustManagerKeyStore() {
-        return trustManagerKeyStore;
-    }
 }

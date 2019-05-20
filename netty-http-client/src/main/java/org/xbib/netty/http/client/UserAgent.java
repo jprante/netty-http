@@ -12,7 +12,7 @@ public final class UserAgent {
     /**
      * The default value for {@code User-Agent}.
      */
-    private static final String USER_AGENT = String.format("XbibHttpClient/%s (Java/%s/%s) (Netty/%s)",
+    private static final String USER_AGENT = String.format("NettyHttpClient/%s (Java/%s/%s) (Netty/%s)",
             httpClientVersion(), javaVendor(), javaVersion(), nettyVersion());
 
     private UserAgent() {

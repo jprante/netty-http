@@ -6,16 +6,10 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.endpoint.Handler;
-import org.xbib.netty.http.server.endpoint.NamedEndpoint;
-import org.xbib.netty.http.server.endpoint.NamedServer;
+import org.xbib.netty.http.server.ServerRequest;
+import org.xbib.netty.http.server.ServerResponse;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -24,13 +18,11 @@ abstract class BaseServerTransport implements ServerTransport {
 
     private static final Logger logger = Logger.getLogger(BaseServerTransport.class.getName());
 
-    protected static final AtomicInteger requestCounter = new AtomicInteger();
-
-    private static final List<String> METHODS = Arrays.asList("GET", "HEAD", "OPTIONS");
+    static final AtomicInteger requestCounter = new AtomicInteger();
 
     protected final Server server;
 
-    protected BaseServerTransport(Server server) {
+    BaseServerTransport(Server server) {
         this.server = server;
     }
 
@@ -48,9 +40,9 @@ abstract class BaseServerTransport implements ServerTransport {
      * @param serverResponse the response
      * @return whether further processing should be performed
      */
-    protected static boolean acceptRequest(ServerRequest serverRequest, ServerResponse serverResponse) {
+    static boolean acceptRequest(ServerRequest serverRequest, ServerResponse serverResponse) {
         HttpHeaders reqHeaders = serverRequest.getRequest().headers();
-        HttpVersion version = serverRequest.getHttpAddress().getVersion();
+        HttpVersion version = serverRequest.getNamedServer().getHttpAddress().getVersion();
         switch (version.majorVersion()) {
             case 1:
             case 2:
@@ -86,35 +78,7 @@ abstract class BaseServerTransport implements ServerTransport {
      * @param serverResponse the response (into which the response is written)
      * @throws IOException if and error occurs
      */
-    protected static void handle(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
-        String method = serverRequest.getRequest().method().name();
-        String path = serverRequest.getRequest().uri();
-        NamedServer namedServer = serverRequest.getNamedServer();
-        NamedEndpoint namedEndpoint = namedServer.getNamedEndpoint(path);
-        serverRequest.setContextPath(namedEndpoint.getName());
-        Map<String, Handler> methodHandlerMap = namedEndpoint.getEndpoint().getHandlerMap();
-        // RFC 2616#5.1.1 - GET and HEAD must be supported
-        if (method.equals("GET") || method.equals("HEAD") || methodHandlerMap.containsKey(method)) {
-            Handler handler = methodHandlerMap.get(method);
-            if (handler == null) {
-                serverResponse.writeError(HttpResponseStatus.NOT_FOUND);
-            } else {
-                handler.handle(serverRequest, serverResponse);
-            }
-        } else {
-            Set<String> methods = new LinkedHashSet<>(METHODS);
-            // "*" is a special server-wide (no-context) request supported by OPTIONS
-            boolean isServerOptions = path.equals("*") && method.equals("OPTIONS");
-            methods.addAll(isServerOptions ? namedServer.getMethods() : methodHandlerMap.keySet());
-            serverResponse.setHeader(HttpHeaderNames.ALLOW, String.join(", ", methods));
-            if (method.equals("OPTIONS")) { // default OPTIONS handler
-                serverResponse.setHeader(HttpHeaderNames.CONTENT_LENGTH, "0"); // RFC2616#9.2
-                serverResponse.write(HttpResponseStatus.OK);
-            } else if (namedServer.getMethods().contains(method)) {
-                serverResponse.write(HttpResponseStatus.METHOD_NOT_ALLOWED); // supported by server, but not this context (nor built-in)
-            } else {
-                serverResponse.writeError(HttpResponseStatus.NOT_IMPLEMENTED); // unsupported method
-            }
-        }
+    static void handle(HttpServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
+        serverRequest.getNamedServer().execute(serverRequest, serverResponse);
     }
 }
