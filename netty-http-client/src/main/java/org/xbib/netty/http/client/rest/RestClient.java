@@ -7,7 +7,6 @@ import org.xbib.net.URL;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.Request;
-import org.xbib.netty.http.client.RequestBuilder;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -89,7 +88,7 @@ public class RestClient {
                                     HttpMethod httpMethod) throws IOException {
         URL url = URL.create(urlString);
         RestClient restClient = new RestClient();
-        RequestBuilder requestBuilder = Request.builder(httpMethod).url(url);
+        Request.Builder requestBuilder = Request.builder(httpMethod).url(url);
         if (byteBuf != null) {
             requestBuilder.content(byteBuf);
         }

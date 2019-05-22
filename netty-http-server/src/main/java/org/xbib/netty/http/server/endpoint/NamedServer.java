@@ -20,6 +20,7 @@ import java.io.InputStream;
 import java.security.KeyStore;
 import java.security.Provider;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -255,6 +256,13 @@ public class NamedServer {
         public Builder singleEndpoint(String prefix, String path, Service service) {
             addEndpointResolver(EndpointResolver.builder()
                     .addEndpoint(Endpoint.builder().setPrefix(prefix).setPath(path).addFilter(service).build()).build());
+            return this;
+        }
+
+        public Builder singleEndpoint(String prefix, String path, Service service, String... methods) {
+            addEndpointResolver(EndpointResolver.builder()
+                    .addEndpoint(Endpoint.builder().setPrefix(prefix).setPath(path).addFilter(service)
+                            .setMethods(Arrays.asList(methods)).build()).build());
             return this;
         }
 

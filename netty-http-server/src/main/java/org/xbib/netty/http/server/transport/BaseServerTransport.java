@@ -79,6 +79,8 @@ abstract class BaseServerTransport implements ServerTransport {
      * @throws IOException if and error occurs
      */
     static void handle(HttpServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
+        // parse parameters from path and parse body, if required
+        serverRequest.createParameters();
         serverRequest.getNamedServer().execute(serverRequest, serverResponse);
     }
 }

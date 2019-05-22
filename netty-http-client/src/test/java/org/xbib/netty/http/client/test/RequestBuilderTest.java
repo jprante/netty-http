@@ -4,7 +4,6 @@ import io.netty.handler.codec.http.HttpMethod;
 import org.junit.jupiter.api.Test;
 import org.xbib.net.URL;
 import org.xbib.netty.http.client.Request;
-import org.xbib.netty.http.client.RequestBuilder;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -35,7 +34,7 @@ class RequestBuilderTest {
 
     @Test
     void testRelativeUri() {
-        RequestBuilder httpRequestBuilder = Request.get();
+        Request.Builder httpRequestBuilder = Request.get();
         httpRequestBuilder.url("https://localhost").uri("/path");
         assertEquals("/path", httpRequestBuilder.build().relative());
         httpRequestBuilder.uri("/foobar");
@@ -68,17 +67,17 @@ class RequestBuilderTest {
     }
 
     @Test
-    void testPostRequest() {
+    void testBasicPostRequest() {
         Request request = Request.builder(HttpMethod.POST)
                 .url("http://xbib.org")
                 .addParameter("param1", "value1")
                 .addParameter("param2", "value2")
-                .content("Hello", "text/plain")
+                .content("a=b&c=d", "application/x-www-form-urldencoded")
                 .build();
         assertEquals("xbib.org", request.url().getHost());
         assertEquals("?param1=value1&param2=value2", request.relative());
         assertEquals("http://xbib.org?param1=value1&param2=value2", request.url().toExternalForm());
-        assertEquals("Hello", request.content().toString(StandardCharsets.UTF_8));
+        assertEquals("a=b&c=d", request.content().toString(StandardCharsets.UTF_8));
     }
 
     @Test
@@ -112,7 +111,7 @@ class RequestBuilderTest {
 
     @Test
     void testMassiveQueryParameters() {
-        RequestBuilder requestBuilder = Request.builder(HttpMethod.GET);
+        Request.Builder requestBuilder = Request.builder(HttpMethod.GET);
         for (int i = 0; i < 2000; i++) {
             requestBuilder.addParameter("param" + i, "value" + i);
         }

@@ -77,7 +77,7 @@ public class Endpoint {
             for (QueryParameters.Pair<String, String> pair : queryParameters) {
                 map.put(pair.getFirst(), pair.getSecond());
             }
-            serverRequest.setRawParameters(map);
+            serverRequest.setPathParameters(map);
         }
     }
 

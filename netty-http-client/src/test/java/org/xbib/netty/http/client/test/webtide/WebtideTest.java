@@ -25,7 +25,7 @@ class WebtideTest {
                     .setResponseListener(msg -> logger.log(Level.INFO, "got response: " + msg));
             client.execute(request).get();
         } finally {
-            client.shutdown();
+            client.shutdownGracefully();
         }
     }
 

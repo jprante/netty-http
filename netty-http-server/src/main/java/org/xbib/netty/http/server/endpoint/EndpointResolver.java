@@ -12,13 +12,9 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public class EndpointResolver {
-
-    private static final Logger logger = Logger.getLogger(EndpointResolver.class.getName());
 
     private final Endpoint defaultEndpoint;
 
@@ -44,9 +40,6 @@ public class EndpointResolver {
                 .filter(endpoint -> endpoint.matches(endpointInfo))
                 .sorted(new Endpoint.EndpointPathComparator(serverRequest.getEffectiveRequestPath())).collect(Collectors.toList()));
         List<Endpoint> matchingEndpoints = cache.get(endpointInfo);
-        if (logger.isLoggable(Level.FINER)) {
-            logger.log(Level.FINER, "matching endpoints = " + matchingEndpoints);
-        }
         if (matchingEndpoints.isEmpty()) {
             if (defaultEndpoint != null) {
                 defaultEndpoint.resolveUriTemplate(serverRequest);
@@ -148,8 +141,9 @@ public class EndpointResolver {
         }
 
         /**
+         * Add endpoint.
          *
-         * @param endpoint
+         * @param endpoint the endpoint
          * @return this builder
          */
         public Builder addEndpoint(Endpoint endpoint) {
@@ -164,6 +158,8 @@ public class EndpointResolver {
         /**
          * Adds a service for the methods of the given object that
          * are annotated with the {@link Context} annotation.
+         * @param classWithAnnotatedMethods class with annotated methods
+         * @return this builder
          */
         public Builder addEndpoint(Object classWithAnnotatedMethods) {
             for (Class<?> clazz = classWithAnnotatedMethods.getClass(); clazz != null; clazz = clazz.getSuperclass()) {

@@ -1,5 +1,6 @@
 package org.xbib.netty.http.server.rest.util;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -1153,13 +1154,13 @@ public class MediaType {
     private final String contentType;
 
     private MediaType(String contentType) {
-        this.bytes = contentType.getBytes();
+        this.bytes = contentType.getBytes(StandardCharsets.UTF_8);
         this.contentType = contentType;
     }
 
     private MediaType(String name, String[] attributes) {
-        this.bytes = join(name, attributes).getBytes();
-        this.contentType = new String(this.bytes);
+        this.bytes = join(name, attributes).getBytes(StandardCharsets.UTF_8);
+        this.contentType = new String(this.bytes, StandardCharsets.UTF_8);
     }
 
     private static MediaType create(String type, String... fileExtensisons) {

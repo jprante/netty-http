@@ -193,6 +193,7 @@ public final class Server {
     }
 
     public synchronized void shutdownGracefully() throws IOException {
+        logger.log(Level.FINE, "shutting down gracefully");
         // first, shut down threads, then server socket
         childEventLoopGroup.shutdownGracefully();
         parentEventLoopGroup.shutdownGracefully();

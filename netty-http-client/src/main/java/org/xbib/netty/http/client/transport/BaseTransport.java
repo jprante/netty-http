@@ -11,7 +11,6 @@ import org.xbib.net.URLSyntaxException;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.Request;
-import org.xbib.netty.http.client.RequestBuilder;
 import org.xbib.netty.http.client.retry.BackOff;
 
 import java.io.IOException;
@@ -243,7 +242,7 @@ abstract class BaseTransport implements Transport {
                             logger.log(Level.FINE, "found redirect location: " + location);
                             URL redirUrl = URL.base(request.url()).resolve(location);
                             HttpMethod method = httpResponse.status().code() == 303 ? HttpMethod.GET : request.httpMethod();
-                            RequestBuilder newHttpRequestBuilder = Request.builder(method)
+                            Request.Builder newHttpRequestBuilder = Request.builder(method)
                                     .url(redirUrl)
                                     .setVersion(request.httpVersion())
                                     .setHeaders(request.headers())

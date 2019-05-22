@@ -28,7 +28,7 @@ class Http1Test {
                             " status=" + msg.status().code()));
             client.execute(request).get();
         } finally {
-            client.shutdown();
+            client.shutdownGracefully();
         }
     }
 
@@ -47,7 +47,7 @@ class Http1Test {
                             msg.content().toString(StandardCharsets.UTF_8)));
             client.execute(request2).get();
         } finally {
-            client.shutdown();
+            client.shutdownGracefully();
         }
     }
 

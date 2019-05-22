@@ -153,8 +153,8 @@ public final class Client {
         }
     }
 
-    public static ClientBuilder builder() {
-        return new ClientBuilder();
+    public static Builder builder() {
+        return new Builder();
     }
 
     public ClientConfig getClientConfig() {
@@ -292,12 +292,8 @@ public final class Client {
         close(transport);
     }
 
-    public void close(Transport transport) throws IOException {
-        transport.close();
-        transports.remove(transport);
-    }
-
-    public void close() throws IOException {
+    public void shutdownGracefully() throws IOException {
+        logger.log(Level.FINE, "shutting down gracefully");
         for (Transport transport : transports) {
             close(transport);
         }
@@ -305,20 +301,18 @@ public final class Client {
         if (hasPooledConnections()) {
             pool.close();
         }
-    }
-
-    public void shutdownGracefully() throws IOException {
-        close();
-        shutdown();
-    }
-
-    public void shutdown() {
+        logger.log(Level.FINE, "shutting down");
         eventLoopGroup.shutdownGracefully();
         try {
             eventLoopGroup.awaitTermination(10L, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             // ignore
         }
+    }
+
+    private void close(Transport transport) throws IOException {
+        transport.close();
+        transports.remove(transport);
     }
 
     /**
@@ -410,7 +404,7 @@ public final class Client {
         }
     }
 
-    class ClientChannelPoolHandler implements ChannelPoolHandler {
+    private class ClientChannelPoolHandler implements ChannelPoolHandler {
 
         @Override
         public void channelReleased(Channel channel) {
@@ -455,7 +449,7 @@ public final class Client {
         }
     }
 
-    public static class ClientBuilder {
+    public static class Builder {
 
         private ByteBufAllocator byteBufAllocator;
 
@@ -465,16 +459,16 @@ public final class Client {
 
         private ClientConfig clientConfig;
 
-        private ClientBuilder() {
+        private Builder() {
             this.clientConfig = new ClientConfig();
         }
 
-        public ClientBuilder enableDebug() {
+        public Builder enableDebug() {
             clientConfig.enableDebug();
             return this;
         }
 
-        public ClientBuilder disableDebug() {
+        public Builder disableDebug() {
             clientConfig.disableDebug();
             return this;
         }
@@ -484,187 +478,187 @@ public final class Client {
          * @param byteBufAllocator the byte buf allocator
          * @return this builder
          */
-        public ClientBuilder setByteBufAllocator(ByteBufAllocator byteBufAllocator) {
+        public Builder setByteBufAllocator(ByteBufAllocator byteBufAllocator) {
             this.byteBufAllocator = byteBufAllocator;
             return this;
         }
 
-        public ClientBuilder setEventLoop(EventLoopGroup eventLoopGroup) {
+        public Builder setEventLoop(EventLoopGroup eventLoopGroup) {
             this.eventLoopGroup = eventLoopGroup;
             return this;
         }
 
-        public ClientBuilder setChannelClass(Class<SocketChannel> socketChannelClass) {
+        public Builder setChannelClass(Class<SocketChannel> socketChannelClass) {
             this.socketChannelClass = socketChannelClass;
             return this;
         }
 
-        public ClientBuilder setThreadCount(int threadCount) {
+        public Builder setThreadCount(int threadCount) {
             clientConfig.setThreadCount(threadCount);
             return this;
         }
 
-        public ClientBuilder setConnectTimeoutMillis(int connectTimeoutMillis) {
+        public Builder setConnectTimeoutMillis(int connectTimeoutMillis) {
             clientConfig.setConnectTimeoutMillis(connectTimeoutMillis);
             return this;
         }
 
-        public ClientBuilder setTcpSendBufferSize(int tcpSendBufferSize) {
+        public Builder setTcpSendBufferSize(int tcpSendBufferSize) {
             clientConfig.setTcpSendBufferSize(tcpSendBufferSize);
             return this;
         }
 
-        public ClientBuilder setTcpReceiveBufferSize(int tcpReceiveBufferSize) {
+        public Builder setTcpReceiveBufferSize(int tcpReceiveBufferSize) {
             clientConfig.setTcpReceiveBufferSize(tcpReceiveBufferSize);
             return this;
         }
 
-        public ClientBuilder setTcpNodelay(boolean tcpNodelay) {
+        public Builder setTcpNodelay(boolean tcpNodelay) {
             clientConfig.setTcpNodelay(tcpNodelay);
             return this;
         }
 
-        public ClientBuilder setKeepAlive(boolean keepAlive) {
+        public Builder setKeepAlive(boolean keepAlive) {
             clientConfig.setKeepAlive(keepAlive);
             return this;
         }
 
-        public ClientBuilder setReuseAddr(boolean reuseAddr) {
+        public Builder setReuseAddr(boolean reuseAddr) {
             clientConfig.setReuseAddr(reuseAddr);
             return this;
         }
 
-        public ClientBuilder setMaxChunkSize(int maxChunkSize) {
+        public Builder setMaxChunkSize(int maxChunkSize) {
             clientConfig.setMaxChunkSize(maxChunkSize);
             return this;
         }
 
-        public ClientBuilder setMaxInitialLineLength(int maxInitialLineLength) {
+        public Builder setMaxInitialLineLength(int maxInitialLineLength) {
             clientConfig.setMaxInitialLineLength(maxInitialLineLength);
             return this;
         }
 
-        public ClientBuilder setMaxHeadersSize(int maxHeadersSize) {
+        public Builder setMaxHeadersSize(int maxHeadersSize) {
             clientConfig.setMaxHeadersSize(maxHeadersSize);
             return this;
         }
 
-        public ClientBuilder setMaxContentLength(int maxContentLength) {
+        public Builder setMaxContentLength(int maxContentLength) {
             clientConfig.setMaxContentLength(maxContentLength);
             return this;
         }
 
-        public ClientBuilder setMaxCompositeBufferComponents(int maxCompositeBufferComponents) {
+        public Builder setMaxCompositeBufferComponents(int maxCompositeBufferComponents) {
             clientConfig.setMaxCompositeBufferComponents(maxCompositeBufferComponents);
             return this;
         }
 
-        public ClientBuilder setReadTimeoutMillis(int readTimeoutMillis) {
+        public Builder setReadTimeoutMillis(int readTimeoutMillis) {
             clientConfig.setReadTimeoutMillis(readTimeoutMillis);
             return this;
         }
 
-        public ClientBuilder setEnableGzip(boolean enableGzip) {
+        public Builder setEnableGzip(boolean enableGzip) {
             clientConfig.setEnableGzip(enableGzip);
             return this;
         }
 
-        public ClientBuilder setSslProvider(SslProvider sslProvider) {
+        public Builder setSslProvider(SslProvider sslProvider) {
             clientConfig.setSslProvider(sslProvider);
             return this;
         }
 
-        public ClientBuilder setJdkSslProvider() {
+        public Builder setJdkSslProvider() {
             clientConfig.setJdkSslProvider();
             clientConfig.setCiphers(SecurityUtil.Defaults.JDK_CIPHERS);
             return this;
         }
 
-        public ClientBuilder setOpenSSLSslProvider() {
+        public Builder setOpenSSLSslProvider() {
             clientConfig.setOpenSSLSslProvider();
             clientConfig.setCiphers(SecurityUtil.Defaults.OPENSSL_CIPHERS);
             return this;
         }
 
-        public ClientBuilder setSslContextProvider(Provider provider) {
+        public Builder setSslContextProvider(Provider provider) {
             clientConfig.setSslContextProvider(provider);
             return this;
         }
 
-        public ClientBuilder setCiphers(Iterable<String> ciphers) {
+        public Builder setCiphers(Iterable<String> ciphers) {
             clientConfig.setCiphers(ciphers);
             return this;
         }
 
-        public ClientBuilder setCipherSuiteFilter(CipherSuiteFilter cipherSuiteFilter) {
+        public Builder setCipherSuiteFilter(CipherSuiteFilter cipherSuiteFilter) {
             clientConfig.setCipherSuiteFilter(cipherSuiteFilter);
             return this;
         }
 
-        public ClientBuilder setKeyCert(InputStream keyCertChainInputStream, InputStream keyInputStream) {
+        public Builder setKeyCert(InputStream keyCertChainInputStream, InputStream keyInputStream) {
             clientConfig.setKeyCert(keyCertChainInputStream, keyInputStream);
             return this;
         }
 
-        public ClientBuilder setKeyCert(InputStream keyCertChainInputStream, InputStream keyInputStream,
-                                        String keyPassword) {
+        public Builder setKeyCert(InputStream keyCertChainInputStream, InputStream keyInputStream,
+                                  String keyPassword) {
             clientConfig.setKeyCert(keyCertChainInputStream, keyInputStream, keyPassword);
             return this;
         }
 
-        public ClientBuilder setTrustManagerFactory(TrustManagerFactory trustManagerFactory) {
+        public Builder setTrustManagerFactory(TrustManagerFactory trustManagerFactory) {
             clientConfig.setTrustManagerFactory(trustManagerFactory);
             return this;
         }
 
-        public ClientBuilder trustInsecure() {
+        public Builder trustInsecure() {
             clientConfig.setTrustManagerFactory(InsecureTrustManagerFactory.INSTANCE);
             return this;
         }
 
-        public ClientBuilder setClientAuthMode(ClientAuthMode clientAuthMode) {
+        public Builder setClientAuthMode(ClientAuthMode clientAuthMode) {
             clientConfig.setClientAuthMode(clientAuthMode);
             return this;
         }
 
-        public ClientBuilder setHttpProxyHandler(HttpProxyHandler httpProxyHandler) {
+        public Builder setHttpProxyHandler(HttpProxyHandler httpProxyHandler) {
             clientConfig.setHttpProxyHandler(httpProxyHandler);
             return this;
         }
 
-        public ClientBuilder addPoolNode(HttpAddress httpAddress) {
+        public Builder addPoolNode(HttpAddress httpAddress) {
             clientConfig.addPoolNode(httpAddress);
             clientConfig.setPoolVersion(httpAddress.getVersion());
             clientConfig.setPoolSecure(httpAddress.isSecure());
             return this;
         }
 
-        public ClientBuilder setPoolNodeConnectionLimit(int nodeConnectionLimit) {
+        public Builder setPoolNodeConnectionLimit(int nodeConnectionLimit) {
             clientConfig.setPoolNodeConnectionLimit(nodeConnectionLimit);
             return this;
         }
 
-        public ClientBuilder setRetriesPerPoolNode(int retriesPerNode) {
+        public Builder setRetriesPerPoolNode(int retriesPerNode) {
             clientConfig.setRetriesPerPoolNode(retriesPerNode);
             return this;
         }
 
-        public ClientBuilder addServerNameForIdentification(String serverName) {
+        public Builder addServerNameForIdentification(String serverName) {
             clientConfig.addServerNameForIdentification(serverName);
             return this;
         }
 
-        public ClientBuilder setHttp2Settings(Http2Settings http2Settings) {
+        public Builder setHttp2Settings(Http2Settings http2Settings) {
             clientConfig.setHttp2Settings(http2Settings);
             return this;
         }
 
-        public ClientBuilder setWriteBufferWaterMark(WriteBufferWaterMark writeBufferWaterMark) {
+        public Builder setWriteBufferWaterMark(WriteBufferWaterMark writeBufferWaterMark) {
             clientConfig.setWriteBufferWaterMark(writeBufferWaterMark);
             return this;
         }
 
-        public ClientBuilder enableNegotiation(boolean enableNegotiation) {
+        public Builder enableNegotiation(boolean enableNegotiation) {
             clientConfig.setEnableNegotiation(enableNegotiation);
             return this;
         }
