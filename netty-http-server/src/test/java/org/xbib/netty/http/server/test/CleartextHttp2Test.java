@@ -9,6 +9,7 @@ import org.xbib.netty.http.client.listener.ResponseListener;
 import org.xbib.netty.http.client.transport.Transport;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
+import org.xbib.netty.http.server.ServerResponse;
 import org.xbib.netty.http.server.endpoint.NamedServer;
 
 import java.io.IOException;
@@ -116,11 +117,11 @@ class CleartextHttp2Test {
     @Test
     void testMultithreadPooledClearTextHttp2() throws Exception {
         int threads = 2;
-        int loop = 4 * 1024;
+        int loop = 2 * 1024;
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
         NamedServer namedServer = NamedServer.builder(httpAddress)
                 .singleEndpoint("/", (request, response) ->
-                        response.write(HttpResponseStatus.OK, "text/plain",
+                        ServerResponse.write(response, HttpResponseStatus.OK, "text/plain",
                                 request.getRequest().content().toString(StandardCharsets.UTF_8)))
                 .build();
         Server server = Server.builder(namedServer).build();
@@ -184,7 +185,7 @@ class CleartextHttp2Test {
         AtomicInteger counter1 = new AtomicInteger();
         NamedServer namedServer1 = NamedServer.builder(httpAddress1)
                 .singleEndpoint("/", (request, response) -> {
-                        response.write(HttpResponseStatus.OK, "text/plain",
+                        ServerResponse.write(response, HttpResponseStatus.OK, "text/plain",
                                 request.getRequest().content().toString(StandardCharsets.UTF_8));
                         counter1.incrementAndGet();
                 })
@@ -195,7 +196,7 @@ class CleartextHttp2Test {
         AtomicInteger counter2 = new AtomicInteger();
         NamedServer namedServer2 = NamedServer.builder(httpAddress2)
                 .singleEndpoint("/", (request, response) -> {
-                    response.write(HttpResponseStatus.OK, "text/plain",
+                    ServerResponse.write(response, HttpResponseStatus.OK, "text/plain",
                             request.getRequest().content().toString(StandardCharsets.UTF_8));
                     counter2.incrementAndGet();
                 })

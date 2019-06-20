@@ -21,6 +21,7 @@ import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.SniHandler;
 import io.netty.handler.ssl.SslContext;
+import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.util.AsciiString;
 import io.netty.util.DomainNameMapping;
 import org.xbib.netty.http.common.HttpAddress;
@@ -83,12 +84,14 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
                 protected void initChannel(Channel channel) {
                     ServerTransport serverTransport = server.newTransport(httpAddress.getVersion());
                     channel.attr(ServerTransport.TRANSPORT_ATTRIBUTE_KEY).set(serverTransport);
-                    ChannelPipeline p = channel.pipeline();
-                    p.addLast("multiplex-server-frame-converter",
+                    ChannelPipeline pipeline = channel.pipeline();
+                    pipeline.addLast("multiplex-server-frame-converter",
                             new Http2StreamFrameToHttpObjectCodec(true));
-                    p.addLast("multiplex-server-chunk-aggregator",
+                    pipeline.addLast("multiplex-server-chunk-aggregator",
                             new HttpObjectAggregator(serverConfig.getMaxContentLength()));
-                    p.addLast("multiplex-server-request-handler",
+                    pipeline.addLast("multiplex-server-chunked-write",
+                            new ChunkedWriteHandler());
+                    pipeline.addLast("multiplex-server-request-handler",
                             new ServerRequestHandler());
                 }
             })

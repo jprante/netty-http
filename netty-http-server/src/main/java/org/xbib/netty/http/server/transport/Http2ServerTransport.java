@@ -32,17 +32,16 @@ public class Http2ServerTransport extends BaseServerTransport {
         }
         Integer streamId = fullHttpRequest.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text());
         HttpServerRequest serverRequest = new HttpServerRequest();
-        serverRequest.setNamedServer(namedServer);
         serverRequest.setChannelHandlerContext(ctx);
         serverRequest.setRequest(fullHttpRequest);
         serverRequest.setSequenceId(sequenceId);
         serverRequest.setRequestId(requestId);
         serverRequest.setStreamId(streamId);
         ServerResponse serverResponse = new Http2ServerResponse(serverRequest);
-        if (acceptRequest(serverRequest, serverResponse)) {
-            handle(serverRequest, serverResponse);
+        if (acceptRequest(namedServer, serverRequest, serverResponse)) {
+            handle(namedServer, serverRequest, serverResponse);
         } else {
-           serverResponse.write(HttpResponseStatus.NOT_ACCEPTABLE);
+           ServerResponse.write(serverResponse, HttpResponseStatus.NOT_ACCEPTABLE);
         }
     }
 

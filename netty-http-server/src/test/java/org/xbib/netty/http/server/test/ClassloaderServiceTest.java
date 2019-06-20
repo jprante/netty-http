@@ -9,7 +9,7 @@ import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.endpoint.NamedServer;
-import org.xbib.netty.http.server.endpoint.service.ClasspathService;
+import org.xbib.netty.http.server.endpoint.service.ClassLoaderService;
 
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -24,17 +24,18 @@ class ClassloaderServiceTest {
     private static final Logger logger = Logger.getLogger(ClassloaderServiceTest.class.getName());
 
     @Test
-    void testClassloader() throws Exception {
+    void testSimpleClassloader() throws Exception {
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         NamedServer namedServer = NamedServer.builder(httpAddress)
-                .singleEndpoint("/classloader", "/**", new ClasspathService(ClassloaderServiceTest.class, "/cl"))
+                .singleEndpoint("/classloader", "/**",
+                        new ClassLoaderService(ClassloaderServiceTest.class, "/cl"))
                 .build();
         Server server = Server.builder(namedServer)
                 .build();
         server.logDiagnostics(Level.INFO);
         Client client = Client.builder()
                 .build();
-        int max = 100;
+        int max = 1;
         final AtomicInteger count = new AtomicInteger(0);
         try {
             server.accept();

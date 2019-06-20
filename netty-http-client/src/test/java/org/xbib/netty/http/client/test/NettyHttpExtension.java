@@ -19,6 +19,7 @@ public class NettyHttpExtension implements BeforeAllCallback {
         //System.setProperty("io.netty.recycler.maxCapacity", Integer.toString(0));
         //System.setProperty("io.netty.leakDetection.level", "paranoid");
 
+        Level level = Level.INFO;
         System.setProperty("java.util.logging.SimpleFormatter.format",
                 "%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS.%1$tL %4$-7s [%3$s] %5$s %6$s%n");
         LogManager.getLogManager().reset();
@@ -26,10 +27,10 @@ public class NettyHttpExtension implements BeforeAllCallback {
         Handler handler = new ConsoleHandler();
         handler.setFormatter(new SimpleFormatter());
         rootLogger.addHandler(handler);
-        rootLogger.setLevel(Level.FINE);
+        rootLogger.setLevel(level);
         for (Handler h : rootLogger.getHandlers()) {
             handler.setFormatter(new SimpleFormatter());
-            h.setLevel(Level.FINE);
+            h.setLevel(level);
         }
     }
 }

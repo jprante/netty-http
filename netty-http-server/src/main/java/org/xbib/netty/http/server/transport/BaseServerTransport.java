@@ -8,6 +8,7 @@ import io.netty.handler.codec.http.HttpVersion;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.ServerRequest;
 import org.xbib.netty.http.server.ServerResponse;
+import org.xbib.netty.http.server.endpoint.NamedServer;
 
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -36,51 +37,49 @@ abstract class BaseServerTransport implements ServerTransport {
      * and required special header handling, possibly returning an
      * appropriate response.
      *
+     * @param namedServer the named server
      * @param serverRequest  the request
      * @param serverResponse the response
      * @return whether further processing should be performed
      */
-    static boolean acceptRequest(ServerRequest serverRequest, ServerResponse serverResponse) {
+    static boolean acceptRequest(NamedServer namedServer, ServerRequest serverRequest, ServerResponse serverResponse) {
         HttpHeaders reqHeaders = serverRequest.getRequest().headers();
-        HttpVersion version = serverRequest.getNamedServer().getHttpAddress().getVersion();
-        switch (version.majorVersion()) {
-            case 1:
-            case 2:
-                if (!reqHeaders.contains(HttpHeaderNames.HOST)) {
-                    // RFC2616#14.23: missing Host header gets 400
-                    serverResponse.writeError(HttpResponseStatus.BAD_REQUEST, "missing 'Host' header");
+        HttpVersion version = namedServer.getHttpAddress().getVersion();
+        if (version.majorVersion() == 1 || version.majorVersion() == 2) {
+            if (!reqHeaders.contains(HttpHeaderNames.HOST)) {
+                // RFC2616#14.23: missing Host header gets 400
+                ServerResponse.write(serverResponse, HttpResponseStatus.BAD_REQUEST, "missing 'Host' header");
+                return false;
+            }
+            // return a continue response before reading body
+            String expect = reqHeaders.get(HttpHeaderNames.EXPECT);
+            if (expect != null) {
+                if (expect.equalsIgnoreCase("100-continue")) {
+                    //ServerResponse tempResp = new ServerResponse(serverResponse);
+                    //tempResp.sendHeaders(100);
+                } else {
+                    // RFC2616#14.20: if unknown expect, send 417
+                    ServerResponse.write(serverResponse, HttpResponseStatus.EXPECTATION_FAILED);
                     return false;
                 }
-                // return a continue response before reading body
-                String expect = reqHeaders.get(HttpHeaderNames.EXPECT);
-                if (expect != null) {
-                    if (expect.equalsIgnoreCase("100-continue")) {
-                        //ServerResponse tempResp = new ServerResponse(serverResponse);
-                        //tempResp.sendHeaders(100);
-                    } else {
-                        // RFC2616#14.20: if unknown expect, send 417
-                        serverResponse.writeError(HttpResponseStatus.EXPECTATION_FAILED);
-                        return false;
-                    }
-                }
-                break;
-            default:
-                serverResponse.writeError(HttpResponseStatus.BAD_REQUEST, "Unknown version: " + version);
-                return false;
+            }
+        } else {
+            ServerResponse.write(serverResponse, HttpResponseStatus.BAD_REQUEST, "unsupported HTTP version: " + version);
+            return false;
         }
         return true;
     }
 
     /**
      * Handles a request according to the request method.
-     *
+     * @param namedServer the named server
      * @param serverRequest  the request
      * @param serverResponse the response (into which the response is written)
      * @throws IOException if and error occurs
      */
-    static void handle(HttpServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
-        // parse parameters from path and parse body, if required
+    static void handle(NamedServer namedServer, HttpServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
+        // create server URL and parse parameters from query string, path, and parse body, if exists
         serverRequest.createParameters();
-        serverRequest.getNamedServer().execute(serverRequest, serverResponse);
+        namedServer.execute(serverRequest, serverResponse);
     }
 }

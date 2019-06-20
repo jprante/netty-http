@@ -16,6 +16,7 @@ import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.SniHandler;
 import io.netty.handler.ssl.SslContext;
+import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.util.DomainNameMapping;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
@@ -76,16 +77,18 @@ public class HttpChannelInitializer extends ChannelInitializer<SocketChannel> {
 
     private void configureCleartext(SocketChannel channel) {
         ChannelPipeline pipeline = channel.pipeline();
-        pipeline.addLast(new HttpServerCodec(serverConfig.getMaxInitialLineLength(),
-                serverConfig.getMaxHeadersSize(), serverConfig.getMaxChunkSize()));
+        pipeline.addLast("http-server-codec",
+                new HttpServerCodec(serverConfig.getMaxInitialLineLength(),
+                        serverConfig.getMaxHeadersSize(), serverConfig.getMaxChunkSize()));
         if (serverConfig.isEnableGzip()) {
-            pipeline.addLast(new HttpContentDecompressor());
+            pipeline.addLast("http-server-decompressor", new HttpContentDecompressor());
         }
         HttpObjectAggregator httpObjectAggregator = new HttpObjectAggregator(serverConfig.getMaxContentLength(),
                 false);
         httpObjectAggregator.setMaxCumulationBufferComponents(serverConfig.getMaxCompositeBufferComponents());
-        pipeline.addLast(httpObjectAggregator);
-        pipeline.addLast(new HttpPipeliningHandler(1024));
+        pipeline.addLast("http-server-aggregator", httpObjectAggregator);
+        pipeline.addLast("http-server-pipelining", new HttpPipeliningHandler(1024));
+        pipeline.addLast("http-server-chunked-write", new ChunkedWriteHandler());
         pipeline.addLast(httpHandler);
     }
 

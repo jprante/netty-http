@@ -9,6 +9,7 @@ import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.HttpParameters;
 import org.xbib.netty.http.server.Server;
+import org.xbib.netty.http.server.ServerResponse;
 import org.xbib.netty.http.server.endpoint.NamedServer;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -29,7 +30,7 @@ class PostTest {
                 .singleEndpoint("/post", "/**", (req, resp) -> {
                     HttpParameters parameters = req.getParameters();
                     logger.log(Level.INFO, "got post " + parameters.toString());
-                    resp.write(HttpResponseStatus.OK);
+                    ServerResponse.write(resp, HttpResponseStatus.OK);
                 }, "POST")
                 .build();
         Server server = Server.builder(namedServer)
@@ -67,7 +68,7 @@ class PostTest {
                 .singleEndpoint("/post", "/**", (req, resp) -> {
                     HttpParameters parameters = req.getParameters();
                     logger.log(Level.INFO, "got post " + parameters.toString());
-                    resp.write(HttpResponseStatus.OK);
+                    ServerResponse.write(resp, HttpResponseStatus.OK);
                 }, "POST")
                 .build();
         Server server = Server.builder(namedServer)

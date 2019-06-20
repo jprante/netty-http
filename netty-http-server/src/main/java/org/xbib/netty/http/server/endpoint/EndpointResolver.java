@@ -12,9 +12,13 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public class EndpointResolver {
+
+    private static final Logger logger = Logger.getLogger(EndpointResolver.class.getName());
 
     private final Endpoint defaultEndpoint;
 
@@ -22,7 +26,7 @@ public class EndpointResolver {
 
     private final EndpointDispatcher endpointDispatcher;
 
-    private final LRUCache<Endpoint.EndpointInfo, List<Endpoint>> cache;
+    private final LRUCache<ServerRequest.EndpointInfo, List<Endpoint>> cache;
 
     private EndpointResolver(Endpoint defaultEndpoint,
                              List<Endpoint> endpoints,
@@ -35,11 +39,14 @@ public class EndpointResolver {
     }
 
     public void resolve(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
-        Endpoint.EndpointInfo endpointInfo = new Endpoint.EndpointInfo(serverRequest);
+        ServerRequest.EndpointInfo endpointInfo = serverRequest.getEndpointInfo();
         cache.putIfAbsent(endpointInfo, endpoints.stream()
                 .filter(endpoint -> endpoint.matches(endpointInfo))
-                .sorted(new Endpoint.EndpointPathComparator(serverRequest.getEffectiveRequestPath())).collect(Collectors.toList()));
+                .sorted(new Endpoint.EndpointPathComparator(endpointInfo.getPath())).collect(Collectors.toList()));
         List<Endpoint> matchingEndpoints = cache.get(endpointInfo);
+        if (logger.isLoggable(Level.FINEST)) {
+            logger.log(Level.FINEST, "endpoint info = " + endpointInfo + " matching endpoints = " + matchingEndpoints + " cache size=" + cache.size());
+        }
         if (matchingEndpoints.isEmpty()) {
             if (defaultEndpoint != null) {
                 defaultEndpoint.resolveUriTemplate(serverRequest);
@@ -48,7 +55,7 @@ public class EndpointResolver {
                     endpointDispatcher.dispatch(defaultEndpoint, serverRequest, serverResponse);
                 }
             } else {
-                serverResponse.write(HttpResponseStatus.NOT_IMPLEMENTED);
+                ServerResponse.write(serverResponse, HttpResponseStatus.NOT_IMPLEMENTED);
             }
         } else {
             for (Endpoint endpoint : matchingEndpoints) {
@@ -69,7 +76,7 @@ public class EndpointResolver {
         }
     }
 
-    public LRUCache<Endpoint.EndpointInfo, List<Endpoint>> getCache() {
+    public LRUCache<ServerRequest.EndpointInfo, List<Endpoint>> getCache() {
         return cache;
     }
 
@@ -79,7 +86,7 @@ public class EndpointResolver {
                 .addMethod("GET")
                 .addMethod("HEAD")
                 .addFilter((req, resp) -> {
-                    resp.writeError(HttpResponseStatus.NOT_FOUND,"No endpoint configured");
+                    ServerResponse.write(resp, HttpResponseStatus.NOT_FOUND,"No endpoint configured");
                 }).build();
     }
 
@@ -100,7 +107,7 @@ public class EndpointResolver {
         }
 
         protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
-            return size() >= cacheSize;
+            return size() > cacheSize;
         }
     }
 
@@ -148,8 +155,11 @@ public class EndpointResolver {
          */
         public Builder addEndpoint(Endpoint endpoint) {
             if (endpoint.getPrefix().equals("/") && prefix != null && !prefix.isEmpty()) {
-                endpoints.add(Endpoint.builder(endpoint).setPrefix(prefix).build());
+                Endpoint thisEndpoint = Endpoint.builder(endpoint).setPrefix(prefix).build();
+                logger.log(Level.FINEST, "adding endpoint = " + thisEndpoint);
+                endpoints.add(thisEndpoint);
             } else {
+                logger.log(Level.FINEST, "adding endpoint = " + endpoint);
                 endpoints.add(endpoint);
             }
             return this;

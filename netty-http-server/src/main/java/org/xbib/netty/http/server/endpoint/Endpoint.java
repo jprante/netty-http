@@ -2,6 +2,7 @@ package org.xbib.netty.http.server.endpoint;
 
 import org.xbib.net.QueryParameters;
 import org.xbib.net.path.PathMatcher;
+import org.xbib.net.path.PathNormalizer;
 import org.xbib.netty.http.server.ServerRequest;
 import org.xbib.netty.http.server.ServerResponse;
 import org.xbib.netty.http.server.endpoint.service.Service;
@@ -10,17 +11,13 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-
-import static io.netty.handler.codec.http.HttpHeaderNames.CONTENT_TYPE;
 
 public class Endpoint {
 
     private static final PathMatcher pathMatcher = new PathMatcher();
 
-    public  static final List<String> DEFAULT_METHODS = Arrays.asList("GET", "HEAD");
+    public static final List<String> DEFAULT_METHODS = Arrays.asList("GET", "HEAD");
 
     private final String prefix;
 
@@ -34,9 +31,8 @@ public class Endpoint {
 
     private Endpoint(String prefix, String path,
              List<String> methods, List<String> contentTypes, List<Service> filters) {
-        this.prefix = prefix;
-        this.path = path == null || path.isEmpty() ?
-                prefix + "/**" : path.startsWith("/") ? prefix + path : prefix + "/" + path;
+        this.prefix = PathNormalizer.normalize(prefix);
+        this.path = PathNormalizer.normalize(path);
         this.methods = methods;
         this.contentTypes = contentTypes;
         this.filters = filters;
@@ -63,21 +59,19 @@ public class Endpoint {
         return path;
     }
 
-    public boolean matches(EndpointInfo info) {
-        return pathMatcher.match(path, info.path) &&
-                (methods == null || methods.isEmpty() || (methods.contains(info.method))) &&
-                (contentTypes == null || contentTypes.isEmpty() || info.contentType == null ||
-                contentTypes.stream().anyMatch(info.contentType::startsWith));
+    public boolean matches(ServerRequest.EndpointInfo info) {
+        return pathMatcher.match(prefix + path, info.getPath()) &&
+                (methods == null || methods.isEmpty() || (methods.contains(info.getMethod()))) &&
+                (contentTypes == null || contentTypes.isEmpty() || info.getContentType() == null ||
+                contentTypes.stream().anyMatch(info.getContentType()::startsWith));
     }
 
-    public void resolveUriTemplate(ServerRequest serverRequest) {
-        if (pathMatcher.match(path, serverRequest.getEffectiveRequestPath())) {
-            QueryParameters queryParameters = pathMatcher.extractUriTemplateVariables(path, serverRequest.getEffectiveRequestPath());
-            Map<String, String> map = new LinkedHashMap<>();
+    public void resolveUriTemplate(ServerRequest serverRequest) throws IOException {
+        if (pathMatcher.match(prefix + path, serverRequest.getRequest().uri())) {
+            QueryParameters queryParameters = pathMatcher.extractUriTemplateVariables(prefix + path, serverRequest.getRequest().uri());
             for (QueryParameters.Pair<String, String> pair : queryParameters) {
-                map.put(pair.getFirst(), pair.getSecond());
+                serverRequest.addPathParameter(pair.getFirst(), pair.getSecond());
             }
-            serverRequest.setPathParameters(map);
         }
     }
 
@@ -93,42 +87,7 @@ public class Endpoint {
 
     @Override
     public String toString() {
-        return path + "_" + methods + "_" + contentTypes + " --> " + filters;
-    }
-
-    public static class EndpointInfo implements Comparable<EndpointInfo> {
-
-        private final String path;
-
-        private final String method;
-
-        private final String contentType;
-
-        public EndpointInfo(ServerRequest serverRequest) {
-            this.path = serverRequest.getEffectiveRequestPath();
-            this.method = serverRequest.getRequest().method().name();
-            this.contentType = serverRequest.getRequest().headers().get(CONTENT_TYPE);
-        }
-
-        @Override
-        public String toString() {
-            return path + "_" + method + "_" + contentType;
-        }
-
-        @Override
-        public int hashCode() {
-            return toString().hashCode();
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            return o instanceof EndpointInfo && toString().equals(o.toString());
-        }
-
-        @Override
-        public int compareTo(EndpointInfo o) {
-            return toString().compareTo(o.toString());
-        }
+        return "Endpoint[prefix=" + prefix + ",path=" + path + ",methods=" + methods + ",contentTypes=" + contentTypes + " --> " + filters +"]";
     }
 
     static class EndpointPathComparator implements Comparator<Endpoint> {

@@ -6,6 +6,7 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http2.Http2Settings;
 import org.xbib.netty.http.server.Server;
+import org.xbib.netty.http.server.ServerResponse;
 import org.xbib.netty.http.server.endpoint.NamedServer;
 
 import java.io.IOException;
@@ -30,16 +31,15 @@ public class HttpServerTransport extends BaseServerTransport {
             namedServer = server.getDefaultNamedServer();
         }
         HttpServerRequest serverRequest = new HttpServerRequest();
-        serverRequest.setNamedServer(namedServer);
         serverRequest.setChannelHandlerContext(ctx);
         serverRequest.setRequest(fullHttpRequest);
         serverRequest.setSequenceId(sequenceId);
         serverRequest.setRequestId(requestId);
         HttpServerResponse serverResponse = new HttpServerResponse(serverRequest);
-        if (acceptRequest(serverRequest, serverResponse)) {
-            handle(serverRequest, serverResponse);
+        if (acceptRequest(namedServer, serverRequest, serverResponse)) {
+            handle(namedServer, serverRequest, serverResponse);
         } else {
-            serverResponse.write(HttpResponseStatus.NOT_ACCEPTABLE);
+            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_ACCEPTABLE);
         }
     }
 

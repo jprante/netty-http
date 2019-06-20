@@ -109,7 +109,7 @@ public class NamedServer {
                 endpointResolver.resolve(serverRequest, serverResponse);
             }
         } else {
-            serverResponse.writeError(HttpResponseStatus.NOT_IMPLEMENTED);
+            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_IMPLEMENTED);
         }
     }
 

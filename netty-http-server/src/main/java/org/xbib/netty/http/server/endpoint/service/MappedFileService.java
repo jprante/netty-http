@@ -12,23 +12,30 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
-public class NioService implements Service {
+public class MappedFileService implements Service {
+
+    private static final Logger logger = Logger.getLogger(MappedFileService.class.getName());
 
     private final Path prefix;
 
-    public NioService(Path prefix) {
+    public MappedFileService(Path prefix) {
         this.prefix = prefix;
-        if (!Files.exists(prefix) || !Files.isDirectory(prefix)) {
-            throw new IllegalArgumentException("prefix: " + prefix + " (not a directory");
+        if (!Files.exists(prefix)) {
+            throw new IllegalArgumentException("prefix: " + prefix + " (does not exist)");
+        }
+        if (!Files.isDirectory(prefix)) {
+            throw new IllegalArgumentException("prefix: " + prefix + " (not a directory)");
         }
     }
 
     @Override
     public void handle(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
-        String requestPath = serverRequest.getEffectiveRequestPath();
+        String requestPath = serverRequest.getEffectiveRequestPath().substring(1); // always starts with '/'
         Path path = prefix.resolve(requestPath);
-        if (Files.exists(path) && Files.isReadable(path)) {
+        if (Files.isReadable(path)) {
             try (FileChannel fileChannel = (FileChannel) Files.newByteChannel(path)) {
                 MappedByteBuffer mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
                 ByteBuf byteBuf = Unpooled.wrappedBuffer(mappedByteBuffer);
@@ -36,7 +43,8 @@ public class NioService implements Service {
                 serverResponse.write(HttpResponseStatus.OK, contentType, byteBuf);
             }
         } else {
-            serverResponse.write(HttpResponseStatus.NOT_FOUND);
+            logger.log(Level.WARNING, "failed to access path " + path + " prefix = " + prefix + " requestPath=" + requestPath);
+            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
         }
     }
 }

@@ -8,7 +8,7 @@ import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.endpoint.NamedServer;
-import org.xbib.netty.http.server.endpoint.service.NioService;
+import org.xbib.netty.http.server.endpoint.service.MappedFileService;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -33,7 +33,7 @@ class SecureStaticFileServiceTest {
         Server server = Server.builder(NamedServer.builder(httpAddress, "*")
                   .setJdkSslProvider()
                   .setSelfCert()
-                  .singleEndpoint("/static", "/**", new NioService(vartmp))
+                  .singleEndpoint("/static", "/**", new MappedFileService(vartmp))
                 .build())
                 .setChildThreadCount(8)
                 .build();
@@ -73,7 +73,7 @@ class SecureStaticFileServiceTest {
         Server server = Server.builder(NamedServer.builder(httpAddress, "*")
                   .setOpenSSLSslProvider()
                   .setSelfCert()
-                  .singleEndpoint("/static", "/**", new NioService(vartmp))
+                  .singleEndpoint("/static", "/**", new MappedFileService(vartmp))
                   .build())
                 .build();
         Client client = Client.builder()

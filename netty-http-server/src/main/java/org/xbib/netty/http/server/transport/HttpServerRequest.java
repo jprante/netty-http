@@ -8,12 +8,12 @@ import org.xbib.net.QueryParameters;
 import org.xbib.net.URL;
 import org.xbib.netty.http.common.HttpParameters;
 import org.xbib.netty.http.server.ServerRequest;
-import org.xbib.netty.http.server.endpoint.NamedServer;
 
 import java.io.IOException;
 import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnmappableCharacterException;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
@@ -30,32 +30,27 @@ public class HttpServerRequest implements ServerRequest {
 
     private static final CharSequence APPLICATION_FORM_URL_ENCODED = "application/x-www-form-urlencoded";
 
-    private NamedServer namedServer;
-
     private ChannelHandlerContext ctx;
 
     private List<String> context;
 
-    private Map<String, String> pathParameters;
+    private String contextPath;
+
+    private Map<String, String> pathParameters = new LinkedHashMap<>();
 
     private FullHttpRequest httpRequest;
 
+    private EndpointInfo info;
+
     private HttpParameters parameters;
+
+    private URL url;
 
     private Integer sequenceId;
 
     private Integer streamId;
 
     private Integer requestId;
-
-    public void setNamedServer(NamedServer namedServer) {
-        this.namedServer = namedServer;
-    }
-
-    @Override
-    public NamedServer getNamedServer() {
-        return namedServer;
-    }
 
     public void setChannelHandlerContext(ChannelHandlerContext ctx) {
         this.ctx = ctx;
@@ -68,6 +63,7 @@ public class HttpServerRequest implements ServerRequest {
 
     public void setRequest(FullHttpRequest fullHttpRequest) {
         this.httpRequest = fullHttpRequest;
+        this.info = new EndpointInfo(this);
     }
 
     @Override
@@ -75,8 +71,20 @@ public class HttpServerRequest implements ServerRequest {
         return httpRequest;
     }
 
+    @Override
+    public URL getURL() {
+        return url;
+    }
+
+    @Override
+    public EndpointInfo getEndpointInfo() {
+        return info;
+    }
+
+    @Override
     public void setContext(List<String> context) {
         this.context = context;
+        this.contextPath = context != null ? PATH_SEPARATOR + String.join(PATH_SEPARATOR, context) : null;
     }
 
     @Override
@@ -86,18 +94,23 @@ public class HttpServerRequest implements ServerRequest {
 
     @Override
     public String getContextPath() {
-        return String.join(PATH_SEPARATOR, context);
+        return contextPath;
     }
 
     @Override
     public String getEffectiveRequestPath() {
-        String uri = httpRequest.uri();
-        return context != null && !context.isEmpty() && uri.length() > 1 ?
-                uri.substring(getContextPath().length() + 2) : uri;
+        String path = getEndpointInfo().getPath();
+        String effective = contextPath != null && !PATH_SEPARATOR.equals(contextPath) && path.startsWith(contextPath) ?
+                path.substring(contextPath.length()) : path;
+        effective = effective.isEmpty() ? PATH_SEPARATOR : effective;
+        logger.log(Level.FINE, "path=" + path + " contextpath=" + contextPath + " effective=" + effective);
+        return effective;
     }
 
-    public void setPathParameters(Map<String, String> pathParameters) {
-        this.pathParameters = pathParameters;
+    @Override
+    public void addPathParameter(String key, String value) throws IOException {
+        pathParameters.put(key, value);
+        parameters.add(key, value);
     }
 
     @Override
@@ -108,7 +121,19 @@ public class HttpServerRequest implements ServerRequest {
     @Override
     public void createParameters() throws IOException {
         try {
-            buildParameters();
+            HttpParameters httpParameters = new HttpParameters();
+            URL.Builder builder = URL.builder().path(getRequest().uri());
+            this.url = builder.build();
+            QueryParameters queryParameters = url.getQueryParams();
+            ByteBuf byteBuf = httpRequest.content();
+            if (APPLICATION_FORM_URL_ENCODED.equals(HttpUtil.getMimeType(httpRequest)) && byteBuf != null) {
+                String content = byteBuf.toString(HttpUtil.getCharset(httpRequest, StandardCharsets.ISO_8859_1));
+                queryParameters.addPercentEncodedBody(content);
+            }
+            for (QueryParameters.Pair<String, String> pair : queryParameters) {
+                httpParameters.add(pair.getFirst(), pair.getSecond());
+            }
+            this.parameters = httpParameters;
         } catch (MalformedInputException | UnmappableCharacterException e) {
             throw new IOException(e);
         }
@@ -146,30 +171,7 @@ public class HttpServerRequest implements ServerRequest {
         return requestId;
     }
 
-    private void buildParameters() throws MalformedInputException, UnmappableCharacterException {
-        HttpParameters httpParameters = new HttpParameters();
-        URL.Builder builder = URL.builder().path(getEffectiveRequestPath());
-        if (pathParameters != null && !pathParameters.isEmpty()) {
-            for (Map.Entry<String, String> entry : pathParameters.entrySet()) {
-                builder.queryParam(entry.getKey(), entry.getValue());
-            }
-        }
-        QueryParameters queryParameters = builder.build().getQueryParams();
-        ByteBuf byteBuf = httpRequest.content();
-        if (APPLICATION_FORM_URL_ENCODED.equals(HttpUtil.getMimeType(httpRequest)) && byteBuf != null) {
-            String content = byteBuf.toString(HttpUtil.getCharset(httpRequest, StandardCharsets.ISO_8859_1));
-            queryParameters.addPercentEncodedBody(content);
-        }
-        for (QueryParameters.Pair<String, String> pair : queryParameters) {
-            httpParameters.add(pair.getFirst(), pair.getSecond());
-        }
-        this.parameters = httpParameters;
-    }
-
     public String toString() {
-        return "ServerRequest[namedServer=" + namedServer +
-                ",context=" + context +
-                ",request=" + httpRequest +
-                "]";
+        return "ServerRequest[request=" + httpRequest + "]";
     }
 }

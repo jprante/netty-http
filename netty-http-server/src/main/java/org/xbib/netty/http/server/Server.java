@@ -156,10 +156,15 @@ public final class Server {
     /**
      * Start accepting incoming connections.
      * @return the channel future
+     * @throws IOException if channel future sync is interrupted
      */
-    public ChannelFuture accept() {
+    public ChannelFuture accept() throws IOException {
         logger.log(Level.INFO, () -> "trying to bind to " + serverConfig.getAddress());
-        this.channelFuture = bootstrap.bind(serverConfig.getAddress().getInetSocketAddress());
+        try {
+            this.channelFuture = bootstrap.bind(serverConfig.getAddress().getInetSocketAddress()).await().sync();
+        } catch (InterruptedException e) {
+            throw new IOException(e);
+        }
         logger.log(Level.INFO, () -> ServerName.getServerName() + " ready, listening on " + serverConfig.getAddress());
         return channelFuture;
     }
@@ -179,14 +184,14 @@ public final class Server {
         logger.log(level, NetworkUtils::displayNetworkInterfaces);
     }
 
-    public ServerRequest newRequest() {
+    /*public ServerRequest newRequest() {
         return new HttpServerRequest();
-    }
+    }*/
 
-    public ServerResponse newResponse(ServerRequest serverRequest) {
+    /*public ServerResponse newResponse(ServerRequest serverRequest) {
         return serverRequest.getNamedServer().getHttpAddress().getVersion().majorVersion() == 1 ?
                 new HttpServerResponse(serverRequest) : new Http2ServerResponse(serverRequest);
-    }
+    }*/
 
     public ServerTransport newTransport(HttpVersion httpVersion) {
         return httpVersion.majorVersion() == 1 ? new HttpServerTransport(this) : new Http2ServerTransport(this);
@@ -198,7 +203,9 @@ public final class Server {
         childEventLoopGroup.shutdownGracefully();
         parentEventLoopGroup.shutdownGracefully();
         try {
-            channelFuture.channel().closeFuture().sync();
+            if (channelFuture != null) {
+                channelFuture.channel().closeFuture().sync();
+            }
         } catch (InterruptedException e) {
             throw new IOException(e);
         }

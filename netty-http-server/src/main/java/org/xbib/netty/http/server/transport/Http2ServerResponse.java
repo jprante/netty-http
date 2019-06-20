@@ -1,8 +1,10 @@
 package org.xbib.netty.http.server.transport;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufUtil;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.HttpChunkedInput;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -13,13 +15,14 @@ import io.netty.handler.codec.http2.Http2DataFrame;
 import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2HeadersFrame;
 import io.netty.handler.codec.http2.HttpConversionUtil;
+import io.netty.handler.stream.ChunkedInput;
+import io.netty.handler.stream.ChunkedNioStream;
 import io.netty.util.AsciiString;
 import org.xbib.netty.http.server.ServerName;
 import org.xbib.netty.http.server.ServerRequest;
 import org.xbib.netty.http.server.ServerResponse;
 
-import java.nio.CharBuffer;
-import java.nio.charset.Charset;
+import java.nio.channels.ReadableByteChannel;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -53,44 +56,13 @@ public class Http2ServerResponse implements ServerResponse {
     }
 
     @Override
+    public ChannelHandlerContext getChannelHandlerContext() {
+        return ctx;
+    }
+
+    @Override
     public HttpResponseStatus getLastStatus() {
         return httpResponseStatus;
-    }
-
-    @Override
-    public void write(String text) {
-        write(HttpResponseStatus.OK, "text/plain; charset=utf-8", text);
-    }
-
-    @Override
-    public void writeError(HttpResponseStatus status) {
-        writeError(status, status.reasonPhrase());
-    }
-
-    /**
-     * Sends an error response with the given status and detailed message.
-     *
-     * @param status the response status
-     * @param text   the text body
-     */
-    @Override
-    public void writeError(HttpResponseStatus status, String text) {
-        write(status, "text/plain; charset=utf-8", status.code() + " " + text);
-    }
-
-    @Override
-    public void write(HttpResponseStatus status) {
-        write(status, null, (ByteBuf) null);
-    }
-
-    @Override
-    public void write(HttpResponseStatus status, String contentType, String text) {
-        write(status, contentType, ByteBufUtil.writeUtf8(ctx.alloc(), text));
-    }
-
-    @Override
-    public void write(HttpResponseStatus status, String contentType, String text, Charset charset) {
-        write(status, contentType, ByteBufUtil.encodeString(ctx.alloc(), CharBuffer.allocate(text.length()).append(text), charset));
     }
 
     @Override
@@ -124,60 +96,55 @@ public class Http2ServerResponse implements ServerResponse {
                 headers.setInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), streamId);
             }
         }
-        Http2Headers http2Headers = new DefaultHttp2Headers().status(status.codeAsText()).add(headers);
-        Http2HeadersFrame http2HeadersFrame = new DefaultHttp2HeadersFrame(http2Headers,byteBuf == null);
-        logger.log(Level.FINEST, http2HeadersFrame::toString);
-        ctx.channel().write(http2HeadersFrame);
-        this.httpResponseStatus = status;
-        if (byteBuf != null) {
-            Http2DataFrame http2DataFrame = new DefaultHttp2DataFrame(byteBuf, true);
-            logger.log(Level.FINEST, http2DataFrame::toString);
-            ctx.channel().write(http2DataFrame);
+        if (ctx.channel().isWritable()) {
+            Http2Headers http2Headers = new DefaultHttp2Headers().status(status.codeAsText()).add(headers);
+            Http2HeadersFrame http2HeadersFrame = new DefaultHttp2HeadersFrame(http2Headers, byteBuf == null);
+            logger.log(Level.FINEST, http2HeadersFrame::toString);
+            ctx.channel().write(http2HeadersFrame);
+            this.httpResponseStatus = status;
+            if (byteBuf != null) {
+                Http2DataFrame http2DataFrame = new DefaultHttp2DataFrame(byteBuf, true);
+                logger.log(Level.FINEST, http2DataFrame::toString);
+                ctx.channel().write(http2DataFrame);
+            }
+            ctx.channel().flush();
         }
-        ctx.channel().flush();
     }
 
     /**
-     * Returns an HTML-escaped version of the given string for safe display
-     * within a web page. The characters '&amp;', '&gt;' and '&lt;' must always
-     * be escaped, and single and double quotes must be escaped within
-     * attribute values; this method escapes them always. This method can
-     * be used for generating both HTML and XHTML valid content.
+     * Chunked response from a readable byte channel.
      *
-     * @param s the string to escape
-     * @return the escaped string
-     * @see <a href="http://www.w3.org/International/questions/qa-escapes">The W3C FAQ</a>
+     * @param status status
+     * @param contentType content type
+     * @param byteChannel byte channel
      */
-    private static String escapeHTML(String s) {
-        int len = s.length();
-        StringBuilder es = new StringBuilder(len + 30);
-        int start = 0;
-        for (int i = 0; i < len; i++) {
-            String ref = null;
-            switch (s.charAt(i)) {
-                case '&':
-                    ref = "&amp;";
-                    break;
-                case '>':
-                    ref = "&gt;";
-                    break;
-                case '<':
-                    ref = "&lt;";
-                    break;
-                case '"':
-                    ref = "&quot;";
-                    break;
-                case '\'':
-                    ref = "&#39;";
-                    break;
-                default:
-                    break;
-            }
-            if (ref != null) {
-                es.append(s, start, i).append(ref);
-                start = i + 1;
-            }
+    @Override
+    public void write(HttpResponseStatus status, String contentType, ReadableByteChannel byteChannel) {
+        CharSequence s = headers.get(HttpHeaderNames.CONTENT_TYPE);
+        if (s == null) {
+            s = contentType != null ? contentType : HttpHeaderValues.APPLICATION_OCTET_STREAM;
+            headers.add(HttpHeaderNames.CONTENT_TYPE, s);
         }
-        return start == 0 ? s : es.append(s.substring(start)).toString();
+        headers.add(HttpHeaderNames.TRANSFER_ENCODING, "chunked");
+        if (!headers.contains(HttpHeaderNames.DATE)) {
+            headers.add(HttpHeaderNames.DATE, DateTimeFormatter.RFC_1123_DATE_TIME.format(ZonedDateTime.now(ZoneOffset.UTC)));
+        }
+        headers.add(HttpHeaderNames.SERVER, ServerName.getServerName());
+        if (ctx.channel().isWritable()) {
+            Http2Headers http2Headers = new DefaultHttp2Headers().status(status.codeAsText()).add(headers);
+            Http2HeadersFrame http2HeadersFrame = new DefaultHttp2HeadersFrame(http2Headers,false);
+            logger.log(Level.FINEST, http2HeadersFrame::toString);
+            ctx.channel().write(http2HeadersFrame);
+            ChunkedInput<ByteBuf> input = new ChunkedNioStream(byteChannel);
+            HttpChunkedInput httpChunkedInput = new HttpChunkedInput(input);
+            ChannelFuture channelFuture = ctx.channel().writeAndFlush(httpChunkedInput);
+            if ("close".equalsIgnoreCase(serverRequest.getRequest().headers().get(HttpHeaderNames.CONNECTION)) &&
+                    !headers.contains(HttpHeaderNames.CONNECTION)) {
+                channelFuture.addListener(ChannelFutureListener.CLOSE);
+            }
+            httpResponseStatus = status;
+        } else {
+            logger.log(Level.WARNING, "channel not writeable");
+        }
     }
 }
