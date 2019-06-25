@@ -3,12 +3,12 @@ package org.xbib.netty.http.client.transport;
 import io.netty.channel.Channel;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.cookie.Cookie;
-import io.netty.handler.codec.http2.Http2Exception;
 import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.util.AttributeKey;
 import org.xbib.netty.http.client.Request;
 
+import javax.net.ssl.SSLSession;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -46,6 +46,8 @@ public interface Transport {
     boolean isFailed();
 
     Throwable getFailure();
+
+    SSLSession getSession();
 
     void close() throws IOException;
 }

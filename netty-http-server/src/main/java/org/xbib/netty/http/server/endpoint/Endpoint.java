@@ -79,7 +79,7 @@ public class Endpoint {
         serverRequest.setContext(pathMatcher.tokenizePath(getPrefix()));
         for (Service service : filters) {
             service.handle(serverRequest, serverResponse);
-            if (serverResponse.getLastStatus() != null) {
+            if (serverResponse.getStatus() != null) {
                 break;
             }
         }

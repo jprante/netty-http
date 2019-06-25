@@ -40,7 +40,7 @@ public class MappedFileService implements Service {
                 MappedByteBuffer mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
                 ByteBuf byteBuf = Unpooled.wrappedBuffer(mappedByteBuffer);
                 String contentType = MimeTypeUtils.guessFromPath(requestPath, false);
-                serverResponse.write(HttpResponseStatus.OK, contentType, byteBuf);
+                serverResponse.withStatus(HttpResponseStatus.OK).withContentType(contentType).write(byteBuf);
             }
         } else {
             logger.log(Level.WARNING, "failed to access path " + path + " prefix = " + prefix + " requestPath=" + requestPath);

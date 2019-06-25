@@ -211,7 +211,8 @@ public final class Client {
         Channel channel;
         if (httpAddress != null) {
             HttpVersion httpVersion = httpAddress.getVersion();
-            SslHandlerFactory sslHandlerFactory = new SslHandlerFactory(clientConfig, httpAddress, byteBufAllocator);
+            SslContext sslContext = newSslContext(clientConfig, httpAddress.getVersion());
+            SslHandlerFactory sslHandlerFactory = new SslHandlerFactory(sslContext, clientConfig, httpAddress, byteBufAllocator);
             ChannelInitializer<Channel> initializer;
             if (httpVersion.majorVersion() == 1) {
                 initializer = new HttpChannelInitializer(clientConfig, httpAddress, sslHandlerFactory,
@@ -330,40 +331,35 @@ public final class Client {
         }
     }
 
-    private static SslHandler newSslHandler(ClientConfig clientConfig, ByteBufAllocator allocator, HttpAddress httpAddress) {
-        try {
-            SslContext sslContext = newSslContext(clientConfig, httpAddress.getVersion());
-            logger.log(Level.FINE, () -> "installed ciphers: " + sslContext.cipherSuites());
-            InetSocketAddress peer = httpAddress.getInetSocketAddress();
-            SslHandler sslHandler = sslContext.newHandler(allocator, peer.getHostName(), peer.getPort());
-            SSLEngine engine = sslHandler.engine();
-            List<String> serverNames = clientConfig.getServerNamesForIdentification();
-            if (serverNames.isEmpty()) {
-                serverNames = Collections.singletonList(peer.getHostName());
-            }
-            SSLParameters params = engine.getSSLParameters();
-            // use sslContext.newHandler(allocator, peerHost, peerPort) when using params.setEndpointIdentificationAlgorithm
-            params.setEndpointIdentificationAlgorithm("HTTPS");
-            List<SNIServerName> sniServerNames = new ArrayList<>();
-            for (String serverName : serverNames) {
-                sniServerNames.add(new SNIHostName(serverName));
-            }
-            params.setServerNames(sniServerNames);
-            engine.setSSLParameters(params);
-            switch (clientConfig.getClientAuthMode()) {
-                case NEED:
-                    engine.setNeedClientAuth(true);
-                    break;
-                case WANT:
-                    engine.setWantClientAuth(true);
-                    break;
-                default:
-                    break;
-            }
-            return sslHandler;
-        } catch (SSLException e) {
-            throw new IllegalArgumentException(e);
+    private static SslHandler newSslHandler(SslContext sslContext,
+                                            ClientConfig clientConfig, ByteBufAllocator allocator, HttpAddress httpAddress) {
+        InetSocketAddress peer = httpAddress.getInetSocketAddress();
+        SslHandler sslHandler = sslContext.newHandler(allocator, peer.getHostName(), peer.getPort());
+        SSLEngine engine = sslHandler.engine();
+        List<String> serverNames = clientConfig.getServerNamesForIdentification();
+        if (serverNames.isEmpty()) {
+            serverNames = Collections.singletonList(peer.getHostName());
         }
+        SSLParameters params = engine.getSSLParameters();
+        // use sslContext.newHandler(allocator, peerHost, peerPort) when using params.setEndpointIdentificationAlgorithm
+        params.setEndpointIdentificationAlgorithm("HTTPS");
+        List<SNIServerName> sniServerNames = new ArrayList<>();
+        for (String serverName : serverNames) {
+            sniServerNames.add(new SNIHostName(serverName));
+        }
+        params.setServerNames(sniServerNames);
+        engine.setSSLParameters(params);
+        switch (clientConfig.getClientAuthMode()) {
+            case NEED:
+                engine.setNeedClientAuth(true);
+                break;
+            case WANT:
+                engine.setWantClientAuth(true);
+                break;
+            default:
+                break;
+        }
+        return sslHandler;
     }
 
     private static SslContext newSslContext(ClientConfig clientConfig, HttpVersion httpVersion) throws SSLException {
@@ -415,14 +411,16 @@ public final class Client {
         }
 
         @Override
-        public void channelCreated(Channel channel) {
+        public void channelCreated(Channel channel) throws IOException {
             HttpAddress httpAddress = channel.attr(pool.getAttributeKey()).get();
             HttpVersion httpVersion = httpAddress.getVersion();
-            SslHandlerFactory sslHandlerFactory = new SslHandlerFactory(clientConfig, httpAddress, byteBufAllocator);
-            Http2ChannelInitializer http2ChannelInitializer = new Http2ChannelInitializer(clientConfig, httpAddress, sslHandlerFactory);
+            SslContext sslContext = newSslContext(clientConfig, httpAddress.getVersion());
+            SslHandlerFactory sslHandlerFactory = new SslHandlerFactory(sslContext, clientConfig, httpAddress, byteBufAllocator);
+            Http2ChannelInitializer http2ChannelInitializer =
+                    new Http2ChannelInitializer(clientConfig, httpAddress, sslHandlerFactory);
             if (httpVersion.majorVersion() == 1) {
-                HttpChannelInitializer initializer = new HttpChannelInitializer(clientConfig, httpAddress, sslHandlerFactory,
-                        http2ChannelInitializer);
+                HttpChannelInitializer initializer =
+                        new HttpChannelInitializer(clientConfig, httpAddress, sslHandlerFactory, http2ChannelInitializer);
                 initializer.initChannel(channel);
             } else {
                 http2ChannelInitializer.initChannel(channel);
@@ -432,20 +430,23 @@ public final class Client {
 
     public class SslHandlerFactory {
 
+        private final SslContext sslContext;
+
         private final ClientConfig clientConfig;
 
         private final HttpAddress httpAddress;
 
         private final ByteBufAllocator allocator;
 
-        SslHandlerFactory(ClientConfig clientConfig, HttpAddress httpAddress, ByteBufAllocator allocator) {
+        SslHandlerFactory(SslContext sslContext, ClientConfig clientConfig, HttpAddress httpAddress, ByteBufAllocator allocator) {
+            this.sslContext = sslContext;
             this.clientConfig = clientConfig;
             this.httpAddress = httpAddress;
             this.allocator = allocator;
         }
 
         public SslHandler create() {
-            return newSslHandler(clientConfig, allocator, httpAddress);
+            return newSslHandler(sslContext, clientConfig, allocator, httpAddress);
         }
     }
 

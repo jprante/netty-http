@@ -7,6 +7,8 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpContentCompressor;
+import io.netty.handler.codec.http.HttpContentDecompressor;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpServerUpgradeHandler;
@@ -44,7 +46,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
 
     private final HttpAddress httpAddress;
 
-    private final DomainNameMapping<SslContext> domainNameMapping;
+    private final SniHandler sniHandler;
 
     public Http2ChannelInitializer(Server server,
                                    HttpAddress httpAddress,
@@ -52,7 +54,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
         this.server = server;
         this.serverConfig = server.getServerConfig();
         this.httpAddress = httpAddress;
-        this.domainNameMapping = domainNameMapping;
+        this.sniHandler = domainNameMapping != null ? new SniHandler(domainNameMapping) : null;
     }
 
     @Override
@@ -73,7 +75,9 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
     }
 
     private void configureEncrypted(Channel channel) {
-        channel.pipeline().addLast(new SniHandler(domainNameMapping));
+        if (sniHandler != null) {
+            channel.pipeline().addLast("sni-handler", sniHandler);
+        }
         configureCleartext(channel);
     }
 
@@ -87,7 +91,13 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
                     ChannelPipeline pipeline = channel.pipeline();
                     pipeline.addLast("multiplex-server-frame-converter",
                             new Http2StreamFrameToHttpObjectCodec(true));
-                    pipeline.addLast("multiplex-server-chunk-aggregator",
+                    if (serverConfig.isCompressionEnabled()) {
+                        pipeline.addLast("multiplex-server-compressor", new HttpContentCompressor());
+                    }
+                    if (serverConfig.isDecompressionEnabled()) {
+                        pipeline.addLast("multiplex-server-decompressor", new HttpContentDecompressor());
+                    }
+                    pipeline.addLast("multiplex-server-object-aggregator",
                             new HttpObjectAggregator(serverConfig.getMaxContentLength()));
                     pipeline.addLast("multiplex-server-chunked-write",
                             new ChunkedWriteHandler());
@@ -113,6 +123,13 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
                 new CleartextHttp2ServerUpgradeHandler(sourceCodec, upgradeHandler, serverMultiplexCodec);
         p.addLast("server-upgrade", cleartextHttp2ServerUpgradeHandler);
         p.addLast("server-messages", new ServerMessages());
+    }
+
+    public SslContext getSessionContext() {
+        if (httpAddress.isSecure()) {
+            return sniHandler.sslContext();
+        }
+        return null;
     }
 
     class ServerRequestHandler extends SimpleChannelInboundHandler<FullHttpRequest> {

@@ -24,9 +24,6 @@ import org.xbib.netty.http.server.endpoint.NamedServer;
 import org.xbib.netty.http.server.handler.http.HttpChannelInitializer;
 import org.xbib.netty.http.server.handler.http2.Http2ChannelInitializer;
 import org.xbib.netty.http.common.SecurityUtil;
-import org.xbib.netty.http.server.transport.Http2ServerResponse;
-import org.xbib.netty.http.server.transport.HttpServerRequest;
-import org.xbib.netty.http.server.transport.HttpServerResponse;
 import org.xbib.netty.http.server.transport.HttpServerTransport;
 import org.xbib.netty.http.server.transport.Http2ServerTransport;
 import org.xbib.netty.http.server.transport.ServerTransport;
@@ -183,15 +180,6 @@ public final class Server {
         logger.log(level, () -> "Allocator: " + byteBufAllocator.getClass().getName());
         logger.log(level, NetworkUtils::displayNetworkInterfaces);
     }
-
-    /*public ServerRequest newRequest() {
-        return new HttpServerRequest();
-    }*/
-
-    /*public ServerResponse newResponse(ServerRequest serverRequest) {
-        return serverRequest.getNamedServer().getHttpAddress().getVersion().majorVersion() == 1 ?
-                new HttpServerResponse(serverRequest) : new Http2ServerResponse(serverRequest);
-    }*/
 
     public ServerTransport newTransport(HttpVersion httpVersion) {
         return httpVersion.majorVersion() == 1 ? new HttpServerTransport(this) : new Http2ServerTransport(this);
@@ -429,8 +417,13 @@ public final class Server {
             return this;
         }
 
-        public Builder setEnableGzip(boolean enableGzip) {
-            this.serverConfig.setEnableGzip(enableGzip);
+        public Builder setEnablCcompression(boolean enablCcompression) {
+            this.serverConfig.setCompression(enablCcompression);
+            return this;
+        }
+
+        public Builder setEnableDecompression(boolean enableDecompression) {
+            this.serverConfig.setDecompression(enableDecompression);
             return this;
         }
 

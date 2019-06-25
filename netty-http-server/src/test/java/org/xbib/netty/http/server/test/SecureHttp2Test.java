@@ -33,7 +33,9 @@ class SecureHttp2Test {
         Server server = Server.builder(NamedServer.builder(httpAddress)
                 .setSelfCert()
                 .singleEndpoint("/", (request, response) ->
-                        response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()))
+                                response.withStatus(HttpResponseStatus.OK)
+                                        .withContentType("text/plain")
+                                        .write(request.getRequest().content().retain()))
                 .build())
                 .build();
         server.accept();
@@ -74,7 +76,9 @@ class SecureHttp2Test {
         Server server = Server.builder(NamedServer.builder(httpAddress)
                 .setSelfCert()
                 .singleEndpoint("/", (request, response) ->
-                        response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()))
+                                response.withStatus(HttpResponseStatus.OK)
+                                        .withContentType("text/plain")
+                                        .write(request.getRequest().content().retain()))
                 .build())
                 .build();
         server.accept();
@@ -123,7 +127,9 @@ class SecureHttp2Test {
         Server server = Server.builder(NamedServer.builder(httpAddress)
                 .setSelfCert()
                 .singleEndpoint("/", (request, response) ->
-                        response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain())
+                                response.withStatus(HttpResponseStatus.OK)
+                                        .withContentType("text/plain")
+                                        .write(request.getRequest().content().retain())
                 )
                 .build())
                 .build();

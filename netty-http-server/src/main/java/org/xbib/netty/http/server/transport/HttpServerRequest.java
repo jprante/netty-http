@@ -102,9 +102,7 @@ public class HttpServerRequest implements ServerRequest {
         String path = getEndpointInfo().getPath();
         String effective = contextPath != null && !PATH_SEPARATOR.equals(contextPath) && path.startsWith(contextPath) ?
                 path.substring(contextPath.length()) : path;
-        effective = effective.isEmpty() ? PATH_SEPARATOR : effective;
-        logger.log(Level.FINE, "path=" + path + " contextpath=" + contextPath + " effective=" + effective);
-        return effective;
+        return effective.isEmpty() ? PATH_SEPARATOR : effective;
     }
 
     @Override

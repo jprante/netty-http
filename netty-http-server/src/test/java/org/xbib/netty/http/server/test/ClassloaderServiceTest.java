@@ -31,6 +31,7 @@ class ClassloaderServiceTest {
                         new ClassLoaderService(ClassloaderServiceTest.class, "/cl"))
                 .build();
         Server server = Server.builder(namedServer)
+                .enableDebug()
                 .build();
         server.logDiagnostics(Level.INFO);
         Client client = Client.builder()

@@ -1,21 +1,352 @@
 package org.xbib.netty.http.server.endpoint.service;
 
+import io.netty.buffer.Unpooled;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.stream.ChunkedNioStream;
 import org.xbib.netty.http.server.ServerRequest;
 import org.xbib.netty.http.server.ServerResponse;
+import org.xbib.netty.http.server.util.MimeTypeUtils;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.FileChannel;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.SeekableByteChannel;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public abstract class ResourceService implements Service {
 
+    private static final Logger logger = Logger.getLogger(ResourceService.class.getName());
+
     @Override
     public void handle(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
-        String resourcePath = getResourcePath(serverRequest);
-        handleResource(resourcePath, serverRequest, serverResponse);
+        handleResource(serverRequest, serverResponse, createResource(serverRequest, serverResponse));
     }
 
-    protected abstract void handleResource(String resourcePath, ServerRequest serverRequest, ServerResponse serverResponse) throws IOException;
+    protected abstract Resource createResource(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException;
 
-    protected String getResourcePath(ServerRequest serverRequest) {
-        return serverRequest.getEffectiveRequestPath().substring(1);
+    protected abstract boolean isETagResponseEnabled();
+
+    protected abstract boolean isCacheResponseEnabled();
+
+    protected abstract boolean isRangeResponseEnabled();
+
+    protected void handleResource(ServerRequest serverRequest, ServerResponse serverResponse, Resource resource) {
+        HttpHeaders headers = serverRequest.getRequest().headers();
+        String contentType = MimeTypeUtils.guessFromPath(resource.getResourcePath(), false);
+        long maxAgeSeconds = 24 * 3600;
+        long expirationMillis = System.currentTimeMillis() + 1000 * maxAgeSeconds;
+        if (isCacheResponseEnabled()) {
+            serverResponse.setHeader(HttpHeaderNames.EXPIRES, formatMillis(expirationMillis));
+            serverResponse.setHeader(HttpHeaderNames.CACHE_CONTROL, "public, max-age=" + maxAgeSeconds);
+        }
+        boolean sent = false;
+        if (isETagResponseEnabled()) {
+            Instant lastModifiedInstant = resource.getLastModified();
+            String eTag = resource.getResourcePath().hashCode() + "/" + lastModifiedInstant.toEpochMilli() + "/" + resource.getLength();
+            Instant ifUnmodifiedSinceInstant = parseDate(headers.get(HttpHeaderNames.IF_UNMODIFIED_SINCE));
+            if (ifUnmodifiedSinceInstant != null &&
+                    ifUnmodifiedSinceInstant.plusMillis(1000L).isAfter(lastModifiedInstant)) {
+                ServerResponse.write(serverResponse, HttpResponseStatus.PRECONDITION_FAILED);
+                return;
+            }
+            String ifMatch = headers.get(HttpHeaderNames.IF_MATCH);
+            if (ifMatch != null && !matches(ifMatch, eTag)) {
+                ServerResponse.write(serverResponse, HttpResponseStatus.PRECONDITION_FAILED);
+                return;
+            }
+            String ifNoneMatch = headers.get(HttpHeaderNames.IF_NONE_MATCH);
+            if (ifNoneMatch != null && matches(ifNoneMatch, eTag)) {
+                serverResponse.setHeader(HttpHeaderNames.ETAG, eTag);
+                serverResponse.setHeader(HttpHeaderNames.EXPIRES, formatMillis(expirationMillis));
+                ServerResponse.write(serverResponse, HttpResponseStatus.NOT_MODIFIED);
+                return;
+            }
+            Instant ifModifiedSinceInstant = parseDate(headers.get(HttpHeaderNames.IF_MODIFIED_SINCE));
+            if (ifModifiedSinceInstant != null &&
+                    ifModifiedSinceInstant.plusMillis(1000L).isAfter(lastModifiedInstant)) {
+                serverResponse.setHeader(HttpHeaderNames.ETAG, eTag);
+                serverResponse.setHeader(HttpHeaderNames.EXPIRES, formatMillis(expirationMillis));
+                ServerResponse.write(serverResponse, HttpResponseStatus.NOT_MODIFIED);
+                return;
+            }
+            serverResponse.setHeader(HttpHeaderNames.ETAG, eTag);
+            serverResponse.setHeader(HttpHeaderNames.LAST_MODIFIED, formatInstant(lastModifiedInstant));
+            if (isRangeResponseEnabled()) {
+                performRangeResponse(serverRequest, serverResponse, resource, contentType, eTag, headers);
+                sent = true;
+            }
+        }
+        if (!sent) {
+            serverResponse.setHeader(HttpHeaderNames.CONTENT_LENGTH, Long.toString(resource.getLength()));
+            send(resource.getURL(), HttpResponseStatus.OK, contentType, serverRequest, serverResponse);
+        }
+    }
+
+    protected void performRangeResponse(ServerRequest serverRequest, ServerResponse serverResponse,
+                                       Resource resource,
+                                       String contentType, String eTag,
+                                       HttpHeaders headers) {
+        long length = resource.getLength();
+        serverResponse.setHeader(HttpHeaderNames.ACCEPT_RANGES, "bytes");
+        Range full = new Range(0, length - 1, length);
+        List<Range> ranges = new ArrayList<>();
+        String range = headers.get(HttpHeaderNames.RANGE);
+        if (range != null) {
+            if (!range.matches("^bytes=\\d*-\\d*(,\\d*-\\d*)*$")) {
+                serverResponse.setHeader(HttpHeaderNames.CONTENT_RANGE, "bytes */" + length);
+                ServerResponse.write(serverResponse, HttpResponseStatus.REQUESTED_RANGE_NOT_SATISFIABLE);
+                return;
+            }
+            String ifRange = headers.get(HttpHeaderNames.IF_RANGE);
+            if (ifRange != null && !ifRange.equals(eTag)) {
+                try {
+                    Instant ifRangeTime = parseDate(ifRange);
+                    if (ifRangeTime != null && ifRangeTime.plusMillis(1000).isBefore(resource.getLastModified())) {
+                        ranges.add(full);
+                    }
+                } catch (IllegalArgumentException ignore) {
+                    ranges.add(full);
+                }
+            }
+            if (ranges.isEmpty()) {
+                for (String part : range.substring(6).split(",")) {
+                    long start = sublong(part, 0, part.indexOf('-'));
+                    long end = sublong(part, part.indexOf('-') + 1, part.length());
+                    if (start == -1L) {
+                        start = length - end;
+                        end = length - 1;
+                    } else if (end == -1L || end > length - 1) {
+                        end = length - 1;
+                    }
+                    if (start > end) {
+                        serverResponse.setHeader(HttpHeaderNames.CONTENT_RANGE, "bytes */" + length);
+                        ServerResponse.write(serverResponse, HttpResponseStatus.REQUESTED_RANGE_NOT_SATISFIABLE);
+                        return;
+                    }
+                    ranges.add(new Range(start, end, length));
+                }
+            }
+        }
+        if (ranges.isEmpty() || ranges.get(0) == full) {
+            serverResponse.setHeader(HttpHeaderNames.CONTENT_RANGE, "bytes " + full.start + '-' + full.end + '/' + full.total);
+            serverResponse.setHeader(HttpHeaderNames.CONTENT_LENGTH, Long.toString(full.length));
+            send(resource.getURL(), HttpResponseStatus.OK, contentType, serverRequest, serverResponse, full.start, full.length);
+        } else if (ranges.size() == 1) {
+            Range r = ranges.get(0);
+            serverResponse.setHeader(HttpHeaderNames.CONTENT_RANGE, "bytes " + r.start + '-' + r.end + '/' + r.total);
+            serverResponse.setHeader(HttpHeaderNames.CONTENT_LENGTH, Long.toString(r.length));
+            send(resource.getURL(), HttpResponseStatus.PARTIAL_CONTENT, contentType, serverRequest, serverResponse, r.start, r.length);
+        } else {
+            serverResponse.setHeader(HttpHeaderNames.CONTENT_TYPE, "multipart/byteranges; boundary=MULTIPART_BOUNDARY");
+            StringBuilder sb = new StringBuilder();
+            for (Range r : ranges) {
+                try {
+                    sb.append('\n')
+                        .append("--MULTIPART_BOUNDARY").append('\n')
+                        .append("content-type: ").append(contentType).append('\n')
+                        .append("content-range: bytes ").append(r.start).append('-').append(r.end).append('/').append(r.total).append('\n')
+                        .append(StandardCharsets.ISO_8859_1.decode(readBuffer(resource.getURL(), r.start, r.length))).append('\n')
+                        .append("--MULTIPART_BOUNDARY--").append('\n');
+                } catch (URISyntaxException | IOException e) {
+                    logger.log(Level.FINEST, e.getMessage(), e);
+                }
+            }
+            ServerResponse.write(serverResponse, HttpResponseStatus.OK, contentType, CharBuffer.wrap(sb), StandardCharsets.ISO_8859_1);
+        }
+    }
+
+    private static boolean matches(String matchHeader, String toMatch) {
+        String[] matchValues = matchHeader.split("\\s*,\\s*");
+        Arrays.sort(matchValues);
+        return Arrays.binarySearch(matchValues, toMatch) > -1 || Arrays.binarySearch(matchValues, "*") > -1;
+    }
+
+    private static String formatInstant(Instant instant) {
+        return DateTimeFormatter.RFC_1123_DATE_TIME
+                .format(ZonedDateTime.ofInstant(instant, ZoneOffset.UTC));
+    }
+
+    private static String formatMillis(long millis) {
+        return formatInstant(Instant.ofEpochMilli(millis));
+    }
+
+    private static String formatSeconds(long seconds) {
+        return formatInstant(Instant.now().plusSeconds(seconds));
+    }
+
+    private static final String RFC1036_PATTERN = "EEE, dd-MMM-yyyy HH:mm:ss zzz";
+
+    private static final String ASCIITIME_PATTERN = "EEE MMM d HH:mm:ss yyyyy";
+
+    private static final DateTimeFormatter[] dateTimeFormatters = {
+            DateTimeFormatter.RFC_1123_DATE_TIME,
+            DateTimeFormatter.ofPattern(RFC1036_PATTERN),
+            DateTimeFormatter.ofPattern(ASCIITIME_PATTERN)
+    };
+
+    private static Instant parseDate(String date) {
+        if (date == null) {
+            return null;
+        }
+        int semicolonIndex = date.indexOf(';');
+        String trimmedDate = semicolonIndex >= 0 ? date.substring(0, semicolonIndex) : date;
+        // RFC 2616 allows RFC 1123, RFC 1036, ASCII time
+        for (DateTimeFormatter formatter : dateTimeFormatters) {
+            try {
+                return Instant.from(formatter.withZone(ZoneId.of("UTC")).parse(trimmedDate));
+            } catch (DateTimeParseException e) {
+                logger.log(Level.FINEST, e.getMessage());
+            }
+        }
+        return null;
+    }
+
+    private static long sublong(String value, int beginIndex, int endIndex) {
+        String substring = value.substring(beginIndex, endIndex);
+        return substring.length() > 0 ? Long.parseLong(substring) : -1;
+    }
+
+    protected void send(URL url, HttpResponseStatus httpResponseStatus, String contentType,
+                        ServerRequest serverRequest, ServerResponse serverResponse) {
+        if (serverRequest.getRequest().method() == HttpMethod.HEAD) {
+            ServerResponse.write(serverResponse, HttpResponseStatus.OK, contentType);
+        } else {
+            if ("file".equals(url.getProtocol())) {
+                try {
+                    send((FileChannel) Files.newByteChannel(Paths.get(url.toURI())),
+                            httpResponseStatus, contentType, serverResponse);
+                } catch (URISyntaxException | IOException e) {
+                    logger.log(Level.SEVERE, e.getMessage(), e);
+                    ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
+                }
+            } else {
+                try (InputStream inputStream = url.openStream()) {
+                    send(inputStream, httpResponseStatus, contentType, serverResponse);
+                } catch (IOException e) {
+                    logger.log(Level.SEVERE, e.getMessage(), e);
+                    ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
+                }
+            }
+        }
+    }
+
+    protected void send(URL url, HttpResponseStatus httpResponseStatus, String contentType,
+                        ServerRequest serverRequest, ServerResponse serverResponse, long offset, long size) {
+        if (serverRequest.getRequest().method() == HttpMethod.HEAD) {
+            ServerResponse.write(serverResponse, HttpResponseStatus.OK, contentType);
+        } else {
+            if ("file".equals(url.getProtocol())) {
+                try {
+                    send((FileChannel) Files.newByteChannel(Paths.get(url.toURI())), httpResponseStatus,
+                            contentType, serverResponse, offset, size);
+                } catch (URISyntaxException | IOException e) {
+                    logger.log(Level.SEVERE, e.getMessage(), e);
+                    ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
+                }
+            } else {
+                try (InputStream inputStream = url.openStream()) {
+                    send(inputStream, httpResponseStatus, contentType, serverResponse, offset, size);
+                } catch (IOException e) {
+                    logger.log(Level.SEVERE, e.getMessage(), e);
+                    ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
+                }
+            }
+        }
+    }
+
+    protected void send(FileChannel fileChannel, HttpResponseStatus httpResponseStatus, String contentType,
+                        ServerResponse serverResponse) throws IOException {
+        send(fileChannel, httpResponseStatus, contentType, serverResponse, 0L, fileChannel.size());
+    }
+
+    protected void send(FileChannel fileChannel, HttpResponseStatus httpResponseStatus, String contentType,
+                        ServerResponse serverResponse, long offset, long size) throws IOException {
+        MappedByteBuffer mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, offset, size);
+        serverResponse.withStatus(httpResponseStatus)
+                .withContentType(contentType)
+                .write(Unpooled.wrappedBuffer(mappedByteBuffer));
+    }
+
+    protected void send(InputStream inputStream, HttpResponseStatus httpResponseStatus, String contentType,
+                        ServerResponse serverResponse) throws IOException {
+        try (ReadableByteChannel channel = Channels.newChannel(inputStream)) {
+            serverResponse.withStatus(httpResponseStatus)
+                    .withContentType(contentType)
+                    .write(new ChunkedNioStream(channel));
+        }
+    }
+
+    protected void send(InputStream inputStream, HttpResponseStatus httpResponseStatus, String contentType,
+                        ServerResponse serverResponse, long offset, long size) throws IOException {
+        serverResponse.withStatus(httpResponseStatus)
+                .withContentType(contentType)
+                .write(Unpooled.wrappedBuffer(readBuffer(inputStream, offset, size)));
+    }
+
+    protected static ByteBuffer readBuffer(URL url, long offset, long size) throws IOException, URISyntaxException {
+        if ("file".equals(url.getProtocol())) {
+            try (SeekableByteChannel channel = Files.newByteChannel(Paths.get(url.toURI()))) {
+                return readBuffer(channel, offset, size);
+            }
+        } else {
+            try (InputStream inputStream = url.openStream()) {
+                return readBuffer(inputStream, offset, size);
+            }
+        }
+    }
+
+    protected static ByteBuffer readBuffer(InputStream inputStream, long offset, long size) throws IOException {
+        long n = inputStream.skip(offset);
+        return readBuffer(Channels.newChannel(inputStream), size);
+    }
+
+    protected static ByteBuffer readBuffer(SeekableByteChannel channel, long offset, long size) throws IOException {
+        channel.position(offset);
+        return readBuffer(channel, size);
+    }
+
+    protected static ByteBuffer readBuffer(ReadableByteChannel channel, long size) throws IOException {
+        ByteBuffer buf = ByteBuffer.allocate((int) size);
+        buf.rewind();
+        channel.read(buf);
+        buf.flip();
+        return buf;
+    }
+
+    class Range {
+        long start;
+        long end;
+        long length;
+        long total;
+
+        Range(long start, long end, long total) {
+            this.start = start;
+            this.end = end;
+            this.length = end - start + 1;
+            this.total = total;
+        }
     }
 }

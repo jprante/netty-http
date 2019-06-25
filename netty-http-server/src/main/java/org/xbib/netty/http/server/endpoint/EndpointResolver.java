@@ -61,14 +61,14 @@ public class EndpointResolver {
             for (Endpoint endpoint : matchingEndpoints) {
                 endpoint.resolveUriTemplate(serverRequest);
                 endpoint.executeFilters(serverRequest, serverResponse);
-                if (serverResponse.getLastStatus() != null) {
+                if (serverResponse.getStatus() != null) {
                     break;
                 }
             }
             if (endpointDispatcher != null) {
                 for (Endpoint endpoint : matchingEndpoints) {
                     endpointDispatcher.dispatch(endpoint, serverRequest, serverResponse);
-                    if (serverResponse.getLastStatus() != null) {
+                    if (serverResponse.getStatus() != null) {
                         break;
                     }
                 }
@@ -86,7 +86,8 @@ public class EndpointResolver {
                 .addMethod("GET")
                 .addMethod("HEAD")
                 .addFilter((req, resp) -> {
-                    ServerResponse.write(resp, HttpResponseStatus.NOT_FOUND,"No endpoint configured");
+                    ServerResponse.write(resp, HttpResponseStatus.NOT_FOUND,
+                            "application/octet-stream","no endpoint configured");
                 }).build();
     }
 

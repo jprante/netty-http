@@ -16,13 +16,11 @@ import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2HeadersFrame;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.stream.ChunkedInput;
-import io.netty.handler.stream.ChunkedNioStream;
-import io.netty.util.AsciiString;
 import org.xbib.netty.http.server.ServerName;
 import org.xbib.netty.http.server.ServerRequest;
 import org.xbib.netty.http.server.ServerResponse;
 
-import java.nio.channels.ReadableByteChannel;
+import java.nio.charset.Charset;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -51,8 +49,13 @@ public class Http2ServerResponse implements ServerResponse {
     }
 
     @Override
-    public void setHeader(AsciiString name, String value) {
+    public void setHeader(CharSequence name, String value) {
         headers.set(name, value);
+    }
+
+    @Override
+    public CharSequence getHeader(CharSequence name) {
+        return headers.get(name);
     }
 
     @Override
@@ -61,35 +64,55 @@ public class Http2ServerResponse implements ServerResponse {
     }
 
     @Override
-    public HttpResponseStatus getLastStatus() {
+    public HttpResponseStatus getStatus() {
         return httpResponseStatus;
     }
 
     @Override
-    public void write(HttpResponseStatus status, String contentType, ByteBuf byteBuf) {
-        if (byteBuf != null) {
-            CharSequence s = headers.get(HttpHeaderNames.CONTENT_TYPE);
-            if (s == null) {
-                s = contentType != null ? contentType : HttpHeaderValues.APPLICATION_OCTET_STREAM;
-                headers.add(HttpHeaderNames.CONTENT_TYPE, s);
-            }
-            if (!headers.contains(HttpHeaderNames.CONTENT_LENGTH) && !headers.contains(HttpHeaderNames.TRANSFER_ENCODING)) {
-                int length = byteBuf.readableBytes();
-                if (length < 0) {
-                    headers.add(HttpHeaderNames.TRANSFER_ENCODING, "chunked");
-                } else {
-                    headers.add(HttpHeaderNames.CONTENT_LENGTH, Long.toString(length));
-                }
-            }
-            if (serverRequest != null && "close".equalsIgnoreCase(serverRequest.getRequest().headers().get(HttpHeaderNames.CONNECTION)) &&
-                    !headers.contains(HttpHeaderNames.CONNECTION)) {
-                headers.add(HttpHeaderNames.CONNECTION, "close");
-            }
-            if (!headers.contains(HttpHeaderNames.DATE)) {
-                headers.add(HttpHeaderNames.DATE, DateTimeFormatter.RFC_1123_DATE_TIME.format(ZonedDateTime.now(ZoneOffset.UTC)));
-            }
-            headers.add(HttpHeaderNames.SERVER, ServerName.getServerName());
+    public ServerResponse withStatus(HttpResponseStatus httpResponseStatus) {
+        this.httpResponseStatus = httpResponseStatus;
+        return this;
+    }
+
+    @Override
+    public ServerResponse withContentType(String contentType) {
+        headers.remove(HttpHeaderNames.CONTENT_TYPE);
+        headers.add(HttpHeaderNames.CONTENT_TYPE, contentType);
+        return this;
+    }
+
+    @Override
+    public ServerResponse withCharset(Charset charset) {
+        CharSequence contentType = headers.get(HttpHeaderNames.CONTENT_TYPE);
+        if (contentType != null) {
+            headers.remove(HttpHeaderNames.CONTENT_TYPE);
+            headers.add(HttpHeaderNames.CONTENT_TYPE, contentType + "; charset=" + charset.name());
         }
+        return this;
+    }
+
+    @Override
+    public void write(ByteBuf byteBuf) {
+        Objects.requireNonNull(byteBuf);
+        if (httpResponseStatus == null) {
+            httpResponseStatus = HttpResponseStatus.OK;
+        }
+        CharSequence contentType = headers.get(HttpHeaderNames.CONTENT_TYPE);
+        if (contentType == null) {
+            headers.add(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_OCTET_STREAM);
+        }
+        if (!headers.contains(HttpHeaderNames.CONTENT_LENGTH) && !headers.contains(HttpHeaderNames.TRANSFER_ENCODING)) {
+            headers.add(HttpHeaderNames.CONTENT_LENGTH, Long.toString(byteBuf.readableBytes()));
+        }
+        if (serverRequest != null && "close".equalsIgnoreCase(serverRequest.getRequest().headers().get(HttpHeaderNames.CONNECTION)) &&
+                !headers.contains(HttpHeaderNames.CONNECTION)) {
+            headers.add(HttpHeaderNames.CONNECTION, "close");
+        }
+        if (!headers.contains(HttpHeaderNames.DATE)) {
+            headers.add(HttpHeaderNames.DATE, DateTimeFormatter.RFC_1123_DATE_TIME.format(ZonedDateTime.now(ZoneOffset.UTC)));
+        }
+        headers.add(HttpHeaderNames.SERVER, ServerName.getServerName());
+
         if (serverRequest != null) {
             Integer streamId = serverRequest.streamId();
             if (streamId != null) {
@@ -97,16 +120,13 @@ public class Http2ServerResponse implements ServerResponse {
             }
         }
         if (ctx.channel().isWritable()) {
-            Http2Headers http2Headers = new DefaultHttp2Headers().status(status.codeAsText()).add(headers);
-            Http2HeadersFrame http2HeadersFrame = new DefaultHttp2HeadersFrame(http2Headers, byteBuf == null);
+            Http2Headers http2Headers = new DefaultHttp2Headers().status(httpResponseStatus.codeAsText()).add(headers);
+            Http2HeadersFrame http2HeadersFrame = new DefaultHttp2HeadersFrame(http2Headers, false);
             logger.log(Level.FINEST, http2HeadersFrame::toString);
             ctx.channel().write(http2HeadersFrame);
-            this.httpResponseStatus = status;
-            if (byteBuf != null) {
-                Http2DataFrame http2DataFrame = new DefaultHttp2DataFrame(byteBuf, true);
-                logger.log(Level.FINEST, http2DataFrame::toString);
-                ctx.channel().write(http2DataFrame);
-            }
+            Http2DataFrame http2DataFrame = new DefaultHttp2DataFrame(byteBuf, true);
+            logger.log(Level.FINEST, http2DataFrame::toString);
+            ctx.channel().write(http2DataFrame);
             ctx.channel().flush();
         }
     }
@@ -114,16 +134,17 @@ public class Http2ServerResponse implements ServerResponse {
     /**
      * Chunked response from a readable byte channel.
      *
-     * @param status status
-     * @param contentType content type
-     * @param byteChannel byte channel
+     * @param chunkedInput chunked input
      */
     @Override
-    public void write(HttpResponseStatus status, String contentType, ReadableByteChannel byteChannel) {
-        CharSequence s = headers.get(HttpHeaderNames.CONTENT_TYPE);
-        if (s == null) {
-            s = contentType != null ? contentType : HttpHeaderValues.APPLICATION_OCTET_STREAM;
-            headers.add(HttpHeaderNames.CONTENT_TYPE, s);
+    public void write(ChunkedInput<ByteBuf> chunkedInput) {
+        Objects.requireNonNull(chunkedInput);
+        if (httpResponseStatus == null) {
+            httpResponseStatus = HttpResponseStatus.OK;
+        }
+        CharSequence contentType = headers.get(HttpHeaderNames.CONTENT_TYPE);
+        if (contentType == null) {
+            headers.add(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_OCTET_STREAM);
         }
         headers.add(HttpHeaderNames.TRANSFER_ENCODING, "chunked");
         if (!headers.contains(HttpHeaderNames.DATE)) {
@@ -131,18 +152,15 @@ public class Http2ServerResponse implements ServerResponse {
         }
         headers.add(HttpHeaderNames.SERVER, ServerName.getServerName());
         if (ctx.channel().isWritable()) {
-            Http2Headers http2Headers = new DefaultHttp2Headers().status(status.codeAsText()).add(headers);
+            Http2Headers http2Headers = new DefaultHttp2Headers().status(httpResponseStatus.codeAsText()).add(headers);
             Http2HeadersFrame http2HeadersFrame = new DefaultHttp2HeadersFrame(http2Headers,false);
             logger.log(Level.FINEST, http2HeadersFrame::toString);
             ctx.channel().write(http2HeadersFrame);
-            ChunkedInput<ByteBuf> input = new ChunkedNioStream(byteChannel);
-            HttpChunkedInput httpChunkedInput = new HttpChunkedInput(input);
-            ChannelFuture channelFuture = ctx.channel().writeAndFlush(httpChunkedInput);
+            ChannelFuture channelFuture = ctx.channel().writeAndFlush(new HttpChunkedInput(chunkedInput));
             if ("close".equalsIgnoreCase(serverRequest.getRequest().headers().get(HttpHeaderNames.CONNECTION)) &&
                     !headers.contains(HttpHeaderNames.CONNECTION)) {
                 channelFuture.addListener(ChannelFutureListener.CLOSE);
             }
-            httpResponseStatus = status;
         } else {
             logger.log(Level.WARNING, "channel not writeable");
         }

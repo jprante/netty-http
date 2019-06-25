@@ -10,6 +10,7 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
+import io.netty.handler.ssl.SslHandler;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.ClientConfig;
 import org.xbib.netty.http.client.handler.http2.Http2ChannelInitializer;
@@ -60,7 +61,8 @@ public class HttpChannelInitializer extends ChannelInitializer<Channel> {
 
     private void configureEncrypted(Channel channel)  {
         ChannelPipeline pipeline = channel.pipeline();
-        pipeline.addLast(sslHandlerFactory.create());
+        SslHandler sslHandler = sslHandlerFactory.create();
+        pipeline.addLast("ssl-handler", sslHandler);
         if (clientConfig.isEnableNegotiation()) {
             ApplicationProtocolNegotiationHandler negotiationHandler =
                     new ApplicationProtocolNegotiationHandler(ApplicationProtocolNames.HTTP_1_1) {

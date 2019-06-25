@@ -12,7 +12,7 @@ import org.xbib.netty.http.server.ServerResponse;
 import org.xbib.netty.http.server.endpoint.Endpoint;
 import org.xbib.netty.http.server.endpoint.EndpointResolver;
 import org.xbib.netty.http.server.endpoint.NamedServer;
-import org.xbib.netty.http.server.endpoint.service.MappedFileService;
+import org.xbib.netty.http.server.endpoint.service.FileService;
 import org.xbib.netty.http.server.endpoint.service.Service;
 
 import java.io.IOException;
@@ -36,7 +36,7 @@ class EndpointTest {
     @Test
     void testEmptyPrefixEndpoint() throws Exception {
         Path vartmp = Paths.get("/var/tmp/");
-        Service service = new MappedFileService(vartmp);
+        Service service = new FileService(vartmp);
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         EndpointResolver endpointResolver = EndpointResolver.builder()
                 .addEndpoint(Endpoint.builder().setPath("/**").build())
@@ -76,7 +76,7 @@ class EndpointTest {
     @Test
     void testPlainPrefixEndpoint() throws Exception {
         Path vartmp = Paths.get("/var/tmp/");
-        Service service = new MappedFileService(vartmp);
+        Service service = new FileService(vartmp);
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         EndpointResolver endpointResolver = EndpointResolver.builder()
                 .addEndpoint(Endpoint.builder().setPrefix("/").setPath("/**").build())
@@ -117,7 +117,7 @@ class EndpointTest {
     @Test
     void testSimplePathEndpoints() throws Exception {
         Path vartmp = Paths.get("/var/tmp/");
-        Service service = new MappedFileService(vartmp);
+        Service service = new FileService(vartmp);
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         EndpointResolver endpointResolver = EndpointResolver.builder()
                 .addEndpoint(Endpoint.builder().setPrefix("/static").setPath("/**").build())
@@ -183,7 +183,7 @@ class EndpointTest {
     @Test
     void testQueryAndFragmentEndpoints() throws Exception {
         Path vartmp = Paths.get("/var/tmp/");
-        Service service = new MappedFileService(vartmp);
+        Service service = new FileService(vartmp);
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         EndpointResolver endpointResolver = EndpointResolver.builder()
                 .addEndpoint(Endpoint.builder().setPrefix("/static").setPath("/**").build())

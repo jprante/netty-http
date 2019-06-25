@@ -119,9 +119,14 @@ public class ServerConfig {
         WriteBufferWaterMark WRITE_BUFFER_WATER_MARK = WriteBufferWaterMark.DEFAULT;
 
         /**
-         * Default for gzip codec.
+         * Default for compression.
          */
-        boolean ENABLE_GZIP = true;
+        boolean ENABLE_COMPRESSION = true;
+
+        /**
+         * Default for decompression.
+         */
+        boolean ENABLE_DECOMPRESSION = true;
 
         /**
          * Default HTTP/2 settings.
@@ -175,7 +180,9 @@ public class ServerConfig {
 
     private WriteBufferWaterMark writeBufferWaterMark = Defaults.WRITE_BUFFER_WATER_MARK;
 
-    private boolean enableGzip = Defaults.ENABLE_GZIP;
+    private boolean enableCompression = Defaults.ENABLE_COMPRESSION;
+
+    private boolean enableDecompression = Defaults.ENABLE_DECOMPRESSION;
 
     private Http2Settings http2Settings = Defaults.HTTP_2_SETTINGS;
 
@@ -382,13 +389,22 @@ public class ServerConfig {
         return writeBufferWaterMark;
     }
 
-    public ServerConfig setEnableGzip(boolean enableGzip) {
-        this.enableGzip = enableGzip;
+    public ServerConfig setCompression(boolean enabled) {
+        this.enableCompression = enabled;
         return this;
     }
 
-    public boolean isEnableGzip() {
-        return enableGzip;
+    public boolean isCompressionEnabled() {
+        return enableCompression;
+    }
+
+    public ServerConfig setDecompression(boolean enabled) {
+        this.enableDecompression = enabled;
+        return this;
+    }
+
+    public boolean isDecompressionEnabled() {
+        return enableDecompression;
     }
 
     public ServerConfig setInstallHttp2Upgrade(boolean http2Upgrade) {

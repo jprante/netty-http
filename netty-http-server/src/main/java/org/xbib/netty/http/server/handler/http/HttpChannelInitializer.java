@@ -8,6 +8,7 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpContentCompressor;
 import io.netty.handler.codec.http.HttpContentDecompressor;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -40,7 +41,7 @@ public class HttpChannelInitializer extends ChannelInitializer<SocketChannel> {
 
     private final HttpHandler httpHandler;
 
-    private final DomainNameMapping<SslContext> domainNameMapping;
+    private final SniHandler sniHandler;
 
     public HttpChannelInitializer(Server server,
                                   HttpAddress httpAddress,
@@ -48,8 +49,8 @@ public class HttpChannelInitializer extends ChannelInitializer<SocketChannel> {
         this.server = server;
         this.serverConfig = server.getServerConfig();
         this.httpAddress = httpAddress;
-        this.domainNameMapping = domainNameMapping;
         this.httpHandler = new HttpHandler(server);
+        this.sniHandler = domainNameMapping != null ? new SniHandler(domainNameMapping) : null;
     }
 
     @Override
@@ -70,8 +71,9 @@ public class HttpChannelInitializer extends ChannelInitializer<SocketChannel> {
     }
 
     private void configureEncrypted(SocketChannel channel)  {
-        ChannelPipeline pipeline = channel.pipeline();
-        pipeline.addLast(new SniHandler(domainNameMapping));
+        if (sniHandler != null) {
+            channel.pipeline().addLast("sni-handker", sniHandler);
+        }
         configureCleartext(channel);
     }
 
@@ -80,7 +82,10 @@ public class HttpChannelInitializer extends ChannelInitializer<SocketChannel> {
         pipeline.addLast("http-server-codec",
                 new HttpServerCodec(serverConfig.getMaxInitialLineLength(),
                         serverConfig.getMaxHeadersSize(), serverConfig.getMaxChunkSize()));
-        if (serverConfig.isEnableGzip()) {
+        if (serverConfig.isCompressionEnabled()) {
+            pipeline.addLast("http-server-compressor", new HttpContentCompressor());
+        }
+        if (serverConfig.isDecompressionEnabled()) {
             pipeline.addLast("http-server-decompressor", new HttpContentDecompressor());
         }
         HttpObjectAggregator httpObjectAggregator = new HttpObjectAggregator(serverConfig.getMaxContentLength(),

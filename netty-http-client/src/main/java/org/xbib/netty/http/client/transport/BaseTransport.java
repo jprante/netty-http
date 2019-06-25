@@ -5,6 +5,7 @@ import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.cookie.Cookie;
+import io.netty.handler.ssl.SslHandler;
 import org.xbib.net.PercentDecoder;
 import org.xbib.net.URL;
 import org.xbib.net.URLSyntaxException;
@@ -13,6 +14,7 @@ import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.client.retry.BackOff;
 
+import javax.net.ssl.SSLSession;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.nio.charset.MalformedInputException;
@@ -22,6 +24,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.SortedMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -45,6 +48,8 @@ abstract class BaseTransport implements Transport {
     private static final Request DUMMY = Request.builder(HttpMethod.GET).build();
 
     private final Map<Request, Channel> channels;
+
+    private SSLSession sslSession;
 
     final Map<String, Flow> channelFlowMap;
 
@@ -70,8 +75,15 @@ abstract class BaseTransport implements Transport {
     @Override
     public <T> CompletableFuture<T> execute(Request request,
                                             Function<FullHttpResponse, T> supplier) throws IOException {
+        Objects.requireNonNull(supplier);
         final CompletableFuture<T> completableFuture = new CompletableFuture<>();
-        request.setResponseListener(response -> completableFuture.complete(supplier.apply(response)));
+        request.setResponseListener(response -> {
+            if (response != null) {
+                completableFuture.complete(supplier.apply(response));
+            } else {
+                completableFuture.cancel(true);
+            }
+        });
         execute(request);
         return completableFuture;
     }
@@ -179,6 +191,10 @@ abstract class BaseTransport implements Transport {
         requests.clear();
     }
 
+    public SSLSession getSession() {
+        return sslSession;
+    }
+
     protected abstract String getRequestKey(String channelId, Integer streamId);
 
     Channel mapChannel(Request request) throws IOException {
@@ -193,6 +209,8 @@ abstract class BaseTransport implements Transport {
             channel = switchNextChannel();
             channels.put(request, channel);
         }
+        SslHandler sslHandler = channel.pipeline().get(SslHandler.class);
+        sslSession = sslHandler != null ? sslHandler.engine().getSession() : null;
         return channel;
     }
 

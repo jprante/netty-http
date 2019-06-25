@@ -32,7 +32,9 @@ class CleartextHttp1Test {
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         NamedServer namedServer = NamedServer.builder(httpAddress)
                 .singleEndpoint("/**", (request, response) ->
-                        response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()))
+                        response.withStatus(HttpResponseStatus.OK)
+                                .withContentType("text/plain")
+                                .write(request.getRequest().content().retain()))
                 .build();
         Server server = Server.builder(namedServer).build();
         server.accept();
@@ -66,7 +68,9 @@ class CleartextHttp1Test {
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         NamedServer namedServer = NamedServer.builder(httpAddress)
                 .singleEndpoint("/**", (request, response) ->
-                    response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()))
+                                response.withStatus(HttpResponseStatus.OK)
+                                        .withContentType("text/plain")
+                                        .write(request.getRequest().content().retain()))
                 .build();
         Server server = Server.builder(namedServer).build();
         server.accept();
@@ -111,7 +115,9 @@ class CleartextHttp1Test {
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         NamedServer namedServer = NamedServer.builder(httpAddress)
                 .singleEndpoint("/**", (request, response) ->
-                    response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()))
+                                response.withStatus(HttpResponseStatus.OK)
+                                        .withContentType("text/plain")
+                                        .write(request.getRequest().content().retain()))
                 .build();
         Server server = Server.builder(namedServer).build();
         server.accept();

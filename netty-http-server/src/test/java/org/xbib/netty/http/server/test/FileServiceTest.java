@@ -8,7 +8,7 @@ import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.endpoint.NamedServer;
-import org.xbib.netty.http.server.endpoint.service.MappedFileService;
+import org.xbib.netty.http.server.endpoint.service.FileService;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -22,27 +22,22 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(NettyHttpExtension.class)
-class SecureStaticFileServiceTest {
+class FileServiceTest {
 
-    private static final Logger logger = Logger.getLogger(SecureStaticFileServiceTest.class.getName());
+    private static final Logger logger = Logger.getLogger(FileServiceTest.class.getName());
 
     @Test
-    void testSecureStaticFileServerHttp1() throws Exception {
+    void testFileServiceHttp1() throws Exception {
         Path vartmp = Paths.get("/var/tmp/");
-        HttpAddress httpAddress = HttpAddress.secureHttp1("localhost", 8143);
-        Server server = Server.builder(NamedServer.builder(httpAddress, "*")
-                  .setJdkSslProvider()
-                  .setSelfCert()
-                  .singleEndpoint("/static", "/**", new MappedFileService(vartmp))
-                .build())
-                .setChildThreadCount(8)
+        HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
+        NamedServer namedServer = NamedServer.builder(httpAddress)
+                .singleEndpoint("/static", "/**", new FileService(vartmp))
                 .build();
-        server.logDiagnostics(Level.INFO);
+        Server server = Server.builder(namedServer)
+                .enableDebug()
+                .build();
         Client client = Client.builder()
-                .setJdkSslProvider()
-                .trustInsecure()
                 .build();
-        client.logDiagnostics(Level.INFO);
         final AtomicBoolean success = new AtomicBoolean(false);
         try {
             Files.write(vartmp.resolve("test.txt"), "Hello Jörg".getBytes(StandardCharsets.UTF_8));
@@ -67,18 +62,16 @@ class SecureStaticFileServiceTest {
     }
 
     @Test
-    void testSecureStaticFileServerHttp2() throws Exception {
+    void testFileServiceHttp2() throws Exception {
         Path vartmp = Paths.get("/var/tmp/");
-        HttpAddress httpAddress = HttpAddress.secureHttp2("localhost", 8143);
-        Server server = Server.builder(NamedServer.builder(httpAddress, "*")
-                  .setOpenSSLSslProvider()
-                  .setSelfCert()
-                  .singleEndpoint("/static", "/**", new MappedFileService(vartmp))
-                  .build())
+        HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
+        NamedServer namedServer = NamedServer.builder(httpAddress)
+                .singleEndpoint("/static", "/**", new FileService(vartmp))
+                .build();
+        Server server = Server.builder(namedServer)
+                .enableDebug()
                 .build();
         Client client = Client.builder()
-                .setOpenSSLSslProvider()
-                .trustInsecure()
                 .build();
         final AtomicBoolean success = new AtomicBoolean(false);
         try {

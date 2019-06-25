@@ -1,30 +1,16 @@
 package org.xbib.netty.http.server.endpoint.service;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import io.netty.handler.codec.http.HttpResponseStatus;
 import org.xbib.netty.http.server.ServerRequest;
 import org.xbib.netty.http.server.ServerResponse;
-import org.xbib.netty.http.server.util.MimeTypeUtils;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.MappedByteBuffer;
-import java.nio.channels.Channels;
-import java.nio.channels.FileChannel;
-import java.nio.channels.ReadableByteChannel;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.net.URLConnection;
+import java.time.Instant;
 
-public class ClassLoaderService implements Service {
+public class ClassLoaderService extends ResourceService {
 
-    private static final Logger logger = Logger.getLogger(ClassLoaderService.class.getName());
-
-    private Class<?> clazz;
+    private final Class<?> clazz;
 
     private final String prefix;
 
@@ -34,40 +20,61 @@ public class ClassLoaderService implements Service {
     }
 
     @Override
-    public void handle(ServerRequest serverRequest, ServerResponse serverResponse) {
-        String requestPath = serverRequest.getEffectiveRequestPath().substring(1);
-        String contentType = MimeTypeUtils.guessFromPath(requestPath, false);
-        URL url = clazz.getResource(prefix + "/" + requestPath);
-        if (url != null) {
-            if ("file".equals(url.getProtocol())) {
-                doMappedResource(url, contentType, serverResponse);
-            } else {
-                doResource(url, contentType, serverResponse);
-            }
-        } else {
-            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
-        }
+    protected Resource createResource(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
+        return new ClassLoaderResource(serverRequest);
     }
 
-    private void doMappedResource(URL url, String contentType, ServerResponse serverResponse) {
-        try {
-            FileChannel fileChannel = (FileChannel) Files.newByteChannel(Paths.get(url.toURI()));
-            MappedByteBuffer mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
-            ByteBuf byteBuf = Unpooled.wrappedBuffer(mappedByteBuffer);
-            serverResponse.write(HttpResponseStatus.OK, contentType, byteBuf);
-        } catch (URISyntaxException | IOException e) {
-            logger.log(Level.SEVERE, e.getMessage(), e);
-            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
-        }
+    @Override
+    protected boolean isETagResponseEnabled() {
+        return true;
     }
 
-    private void doResource(URL url, String contentType, ServerResponse serverResponse) {
-        try (InputStream inputStream = url.openStream();
-             ReadableByteChannel byteChannel = Channels.newChannel(inputStream)) {
-            serverResponse.write(HttpResponseStatus.OK, contentType, byteChannel);
-        } catch (IOException e) {
-            logger.log(Level.SEVERE, e.getMessage(), e);
-            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
+    @Override
+    protected boolean isCacheResponseEnabled() {
+        return true;
+    }
+
+    @Override
+    protected boolean isRangeResponseEnabled() {
+        return true;
+    }
+
+    class ClassLoaderResource implements Resource {
+
+        private final String resourcePath;
+
+        private final URL url;
+
+        private final Instant lastModified;
+
+        private final long length;
+
+        ClassLoaderResource(ServerRequest serverRequest) throws IOException {
+            this.resourcePath = serverRequest.getEffectiveRequestPath().substring(1);
+            this.url = clazz.getResource(prefix + "/" + resourcePath);
+            URLConnection urlConnection = url.openConnection();
+            this.lastModified = Instant.ofEpochMilli(urlConnection.getLastModified());
+            this.length = urlConnection.getContentLength();
+        }
+
+        @Override
+        public String getResourcePath() {
+            return resourcePath;
+        }
+
+        @Override
+        public URL getURL() {
+            return url;
+        }
+
+        @Override
+        public Instant getLastModified() {
+            return lastModified;
+        }
+
+        @Override
+        public long getLength() {
+            return length;
         }
     }
 }

@@ -33,7 +33,9 @@ class CleartextHttp2Test {
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
         NamedServer namedServer = NamedServer.builder(httpAddress)
                 .singleEndpoint("/", (request, response) ->
-                        response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()))
+                                response.withStatus(HttpResponseStatus.OK)
+                                        .withContentType("text/plain")
+                                        .write(request.getRequest().content().retain()))
                 .build();
         Server server = Server.builder(namedServer).build();
         server.accept();
@@ -73,7 +75,9 @@ class CleartextHttp2Test {
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
         NamedServer namedServer = NamedServer.builder(httpAddress)
                 .singleEndpoint("/", (request, response) ->
-                        response.write(HttpResponseStatus.OK, "text/plain", request.getRequest().content().retain()))
+                                response.withStatus(HttpResponseStatus.OK)
+                                        .withContentType("text/plain")
+                                        .write(request.getRequest().content().retain()))
                 .build();
         Server server = Server.builder(namedServer).build();
         server.accept();
@@ -165,9 +169,9 @@ class CleartextHttp2Test {
                 });
             }
             executorService.shutdown();
-            boolean terminated = executorService.awaitTermination(30, TimeUnit.SECONDS);
+            boolean terminated = executorService.awaitTermination(60, TimeUnit.SECONDS);
             logger.log(Level.INFO, "terminated = " + terminated + ", now waiting for transport to complete");
-            transport.get(30, TimeUnit.SECONDS);
+            transport.get(60, TimeUnit.SECONDS);
         } finally {
             client.shutdownGracefully();
             server.shutdownGracefully();

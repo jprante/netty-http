@@ -16,22 +16,18 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.stream.ChunkedInput;
-import io.netty.handler.stream.ChunkedNioStream;
-import io.netty.util.AsciiString;
 import org.xbib.netty.http.server.ServerName;
 import org.xbib.netty.http.server.ServerRequest;
 import org.xbib.netty.http.server.ServerResponse;
 import org.xbib.netty.http.server.handler.http.HttpPipelinedResponse;
 
-import java.nio.channels.ReadableByteChannel;
+import java.nio.charset.Charset;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import static io.netty.handler.codec.http.LastHttpContent.EMPTY_LAST_CONTENT;
 
 public class HttpServerResponse implements ServerResponse {
 
@@ -57,8 +53,13 @@ public class HttpServerResponse implements ServerResponse {
     }
 
     @Override
-    public void setHeader(AsciiString name, String value) {
+    public void setHeader(CharSequence name, String value) {
         headers.set(name, value);
+    }
+
+    @Override
+    public CharSequence getHeader(CharSequence name) {
+        return headers.get(name);
     }
 
     @Override
@@ -67,17 +68,42 @@ public class HttpServerResponse implements ServerResponse {
     }
 
     @Override
-    public HttpResponseStatus getLastStatus() {
+    public HttpResponseStatus getStatus() {
         return httpResponseStatus;
     }
 
     @Override
-    public void write(HttpResponseStatus status, String contentType, ByteBuf byteBuf) {
+    public ServerResponse withStatus(HttpResponseStatus httpResponseStatus) {
+        this.httpResponseStatus = httpResponseStatus;
+        return this;
+    }
+
+    @Override
+    public ServerResponse withContentType(String contentType) {
+        headers.remove(HttpHeaderNames.CONTENT_TYPE);
+        headers.add(HttpHeaderNames.CONTENT_TYPE, contentType);
+        return this;
+    }
+
+    @Override
+    public ServerResponse withCharset(Charset charset) {
+        CharSequence contentType = headers.get(HttpHeaderNames.CONTENT_TYPE);
+        if (contentType != null) {
+            headers.remove(HttpHeaderNames.CONTENT_TYPE);
+            headers.add(HttpHeaderNames.CONTENT_TYPE, contentType + "; charset=" + charset.name());
+        }
+        return this;
+    }
+
+    @Override
+    public void write(ByteBuf byteBuf) {
         Objects.requireNonNull(byteBuf);
-        CharSequence s = headers.get(HttpHeaderNames.CONTENT_TYPE);
-        if (s == null) {
-            s = contentType != null ? contentType : HttpHeaderValues.APPLICATION_OCTET_STREAM;
-            headers.add(HttpHeaderNames.CONTENT_TYPE, s);
+        if (httpResponseStatus == null) {
+            httpResponseStatus = HttpResponseStatus.OK;
+        }
+        CharSequence contentType = headers.get(HttpHeaderNames.CONTENT_TYPE);
+        if (contentType == null) {
+            headers.add(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_OCTET_STREAM);
         }
         if (!headers.contains(HttpHeaderNames.CONTENT_LENGTH) && !headers.contains(HttpHeaderNames.TRANSFER_ENCODING)) {
             int length = byteBuf.readableBytes();
@@ -93,7 +119,8 @@ public class HttpServerResponse implements ServerResponse {
         headers.add(HttpHeaderNames.SERVER, ServerName.getServerName());
         if (ctx.channel().isWritable()) {
             FullHttpResponse fullHttpResponse =
-                    new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, status, byteBuf, headers, trailingHeaders);
+                    new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, httpResponseStatus, byteBuf, headers, trailingHeaders);
+            logger.log(Level.FINEST, fullHttpResponse.headers()::toString);
             if (serverRequest != null && serverRequest.getSequenceId() != null) {
                 HttpPipelinedResponse httpPipelinedResponse = new HttpPipelinedResponse(fullHttpResponse,
                         ctx.channel().newPromise(), serverRequest.getSequenceId());
@@ -101,25 +128,25 @@ public class HttpServerResponse implements ServerResponse {
             } else {
                 ctx.channel().writeAndFlush(fullHttpResponse);
             }
-            httpResponseStatus = status;
         } else {
             logger.log(Level.WARNING, "channel not writeable");
         }
     }
 
     /**
-     * Chunked response from a readable byte channel.
+     * Chunked response.
      *
-     * @param status status
-     * @param contentType content type
-     * @param byteChannel byte channel
+     * @param chunkedInput chunked input
      */
     @Override
-    public void write(HttpResponseStatus status, String contentType, ReadableByteChannel byteChannel) {
-        CharSequence s = headers.get(HttpHeaderNames.CONTENT_TYPE);
-        if (s == null) {
-            s = contentType != null ? contentType : HttpHeaderValues.APPLICATION_OCTET_STREAM;
-            headers.add(HttpHeaderNames.CONTENT_TYPE, s);
+    public void write(ChunkedInput<ByteBuf> chunkedInput) {
+        Objects.requireNonNull(chunkedInput);
+        if (httpResponseStatus == null) {
+            httpResponseStatus = HttpResponseStatus.OK;
+        }
+        CharSequence contentType = headers.get(HttpHeaderNames.CONTENT_TYPE);
+        if (contentType == null) {
+            headers.add(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_OCTET_STREAM);
         }
         headers.add(HttpHeaderNames.TRANSFER_ENCODING, "chunked");
         if (!headers.contains(HttpHeaderNames.DATE)) {
@@ -127,19 +154,15 @@ public class HttpServerResponse implements ServerResponse {
         }
         headers.add(HttpHeaderNames.SERVER, ServerName.getServerName());
         if (ctx.channel().isWritable()) {
-            HttpResponse httpResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, status);
+            HttpResponse httpResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, httpResponseStatus);
             httpResponse.headers().add(headers);
+            logger.log(Level.FINEST, httpResponse.headers()::toString);
             ctx.channel().write(httpResponse);
-            logger.log(Level.FINE, "written response " + httpResponse);
-            ChunkedInput<ByteBuf> input = new ChunkedNioStream(byteChannel);
-            HttpChunkedInput httpChunkedInput = new HttpChunkedInput(input);
-            ctx.channel().writeAndFlush(httpChunkedInput);
-            ChannelFuture channelFuture = ctx.channel().writeAndFlush(EMPTY_LAST_CONTENT);
+            ChannelFuture channelFuture = ctx.channel().writeAndFlush(new HttpChunkedInput(chunkedInput));
             if ("close".equalsIgnoreCase(serverRequest.getRequest().headers().get(HttpHeaderNames.CONNECTION)) &&
                     !headers.contains(HttpHeaderNames.CONNECTION)) {
                 channelFuture.addListener(ChannelFutureListener.CLOSE);
             }
-            httpResponseStatus = status;
         } else {
             logger.log(Level.WARNING, "channel not writeable");
         }

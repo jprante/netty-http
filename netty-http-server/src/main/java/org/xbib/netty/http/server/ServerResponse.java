@@ -4,50 +4,72 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.util.AsciiString;
+import io.netty.handler.stream.ChunkedInput;
 
 import java.nio.CharBuffer;
-import java.nio.channels.ReadableByteChannel;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 /**
  * HTTP server response.
  */
 public interface ServerResponse {
 
-    void setHeader(AsciiString name, String value);
+    void setHeader(CharSequence name, String value);
+
+    CharSequence getHeader(CharSequence name);
 
     ChannelHandlerContext getChannelHandlerContext();
 
-    HttpResponseStatus getLastStatus();
+    HttpResponseStatus getStatus();
 
-    void write(HttpResponseStatus status, String contentType, ByteBuf byteBuf);
+    ServerResponse withStatus(HttpResponseStatus httpResponseStatus);
 
-    void write(HttpResponseStatus status, String contentType, ReadableByteChannel byteChannel);
+    ServerResponse withContentType(String contentType);
+
+    ServerResponse withCharset(Charset charset);
+
+    void write(ByteBuf byteBuf);
+
+    void write(ChunkedInput<ByteBuf> chunkedInput);
 
     static void write(ServerResponse serverResponse, HttpResponseStatus status) {
-        write(serverResponse, status, status.reasonPhrase());
+        write(serverResponse, status, "application/octet-stream", status.reasonPhrase());
+    }
+
+    /**
+     * Responses to  a HEAD request.
+     * @param serverResponse server response
+     * @param status status
+     * @param contentType content-type as if it were for a GET request (RFC 2616)
+     */
+    static void write(ServerResponse serverResponse, HttpResponseStatus status, String contentType) {
+        write(serverResponse, status, contentType, EMPTY_STRING);
     }
 
     static void write(ServerResponse serverResponse, String text) {
-        write(serverResponse, HttpResponseStatus.OK, text);
+        write(serverResponse, HttpResponseStatus.OK, "text/plain; charset=utf-8", text);
     }
 
-    static void write(ServerResponse serverResponse, HttpResponseStatus status, String text) {
-        write(serverResponse, status, "text/plain; charset=utf-8", text);
-    }
-
-    static void write(ServerResponse serverResponse,
-                             HttpResponseStatus status, String contentType, String text) {
-        serverResponse.write(status, contentType,
-                ByteBufUtil.writeUtf8(serverResponse.getChannelHandlerContext().alloc(), text));
+    static void write(ServerResponse serverResponse, HttpResponseStatus status, String contentType, String text) {
+        serverResponse.withStatus(status)
+                .withContentType(contentType)
+                .withCharset(StandardCharsets.UTF_8).
+                write(ByteBufUtil.writeUtf8(serverResponse.getChannelHandlerContext().alloc(), text));
     }
 
     static void write(ServerResponse serverResponse,
                              HttpResponseStatus status, String contentType, String text, Charset charset) {
-        serverResponse.write(status, contentType,
-                ByteBufUtil.encodeString(serverResponse.getChannelHandlerContext().alloc(),
-                        CharBuffer.allocate(text.length()).append(text), charset));
+        write(serverResponse, status, contentType, CharBuffer.allocate(text.length()).append(text), charset);
     }
 
+    static void write(ServerResponse serverResponse, HttpResponseStatus status, String contentType,
+                      CharBuffer charBuffer, Charset charset) {
+        serverResponse.withStatus(status)
+                .withContentType(contentType)
+                .withCharset(charset)
+                .write(ByteBufUtil.encodeString(serverResponse.getChannelHandlerContext().alloc(), charBuffer, charset));
+    }
+
+    String EMPTY_STRING = "";
 }

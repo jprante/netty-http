@@ -48,13 +48,14 @@ abstract class BaseServerTransport implements ServerTransport {
         if (version.majorVersion() == 1 || version.majorVersion() == 2) {
             if (!reqHeaders.contains(HttpHeaderNames.HOST)) {
                 // RFC2616#14.23: missing Host header gets 400
-                ServerResponse.write(serverResponse, HttpResponseStatus.BAD_REQUEST, "missing 'Host' header");
+                ServerResponse.write(serverResponse,
+                        HttpResponseStatus.BAD_REQUEST, "application/octet-stream", "missing 'Host' header");
                 return false;
             }
             // return a continue response before reading body
             String expect = reqHeaders.get(HttpHeaderNames.EXPECT);
             if (expect != null) {
-                if (expect.equalsIgnoreCase("100-continue")) {
+                if ("100-continue".equalsIgnoreCase(expect)) {
                     //ServerResponse tempResp = new ServerResponse(serverResponse);
                     //tempResp.sendHeaders(100);
                 } else {
@@ -64,7 +65,8 @@ abstract class BaseServerTransport implements ServerTransport {
                 }
             }
         } else {
-            ServerResponse.write(serverResponse, HttpResponseStatus.BAD_REQUEST, "unsupported HTTP version: " + version);
+            ServerResponse.write(serverResponse, HttpResponseStatus.BAD_REQUEST,
+                    "application/octet-stream", "unsupported HTTP version: " + version);
             return false;
         }
         return true;
