@@ -30,7 +30,7 @@ import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.ServerConfig;
 import org.xbib.netty.http.server.handler.TrafficLoggingHandler;
-import org.xbib.netty.http.server.transport.ServerTransport;
+import org.xbib.netty.http.server.transport.Transport;
 
 import java.io.IOException;
 import java.util.logging.Level;
@@ -46,7 +46,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
 
     private final HttpAddress httpAddress;
 
-    private final SniHandler sniHandler;
+    private final DomainNameMapping<SslContext> domainNameMapping;
 
     public Http2ChannelInitializer(Server server,
                                    HttpAddress httpAddress,
@@ -54,13 +54,13 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
         this.server = server;
         this.serverConfig = server.getServerConfig();
         this.httpAddress = httpAddress;
-        this.sniHandler = domainNameMapping != null ? new SniHandler(domainNameMapping) : null;
+        this.domainNameMapping = domainNameMapping;
     }
 
     @Override
     public void initChannel(Channel channel) {
-        ServerTransport serverTransport = server.newTransport(httpAddress.getVersion());
-        channel.attr(ServerTransport.TRANSPORT_ATTRIBUTE_KEY).set(serverTransport);
+        Transport transport = server.newTransport(httpAddress.getVersion());
+        channel.attr(Transport.TRANSPORT_ATTRIBUTE_KEY).set(transport);
         if (serverConfig.isDebug()) {
             channel.pipeline().addLast(new TrafficLoggingHandler(LogLevel.DEBUG));
         }
@@ -75,9 +75,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
     }
 
     private void configureEncrypted(Channel channel) {
-        if (sniHandler != null) {
-            channel.pipeline().addLast("sni-handler", sniHandler);
-        }
+        channel.pipeline().addLast("sni-handler",  new SniHandler(domainNameMapping));
         configureCleartext(channel);
     }
 
@@ -86,8 +84,8 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
         Http2MultiplexCodecBuilder serverMultiplexCodecBuilder = Http2MultiplexCodecBuilder.forServer(new ChannelInitializer<Channel>() {
                 @Override
                 protected void initChannel(Channel channel) {
-                    ServerTransport serverTransport = server.newTransport(httpAddress.getVersion());
-                    channel.attr(ServerTransport.TRANSPORT_ATTRIBUTE_KEY).set(serverTransport);
+                    Transport transport = server.newTransport(httpAddress.getVersion());
+                    channel.attr(Transport.TRANSPORT_ATTRIBUTE_KEY).set(transport);
                     ChannelPipeline pipeline = channel.pipeline();
                     pipeline.addLast("multiplex-server-frame-converter",
                             new Http2StreamFrameToHttpObjectCodec(true));
@@ -125,19 +123,12 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
         p.addLast("server-messages", new ServerMessages());
     }
 
-    public SslContext getSessionContext() {
-        if (httpAddress.isSecure()) {
-            return sniHandler.sslContext();
-        }
-        return null;
-    }
-
     class ServerRequestHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest fullHttpRequest) throws IOException {
-            ServerTransport serverTransport = ctx.channel().attr(ServerTransport.TRANSPORT_ATTRIBUTE_KEY).get();
-            serverTransport.requestReceived(ctx, fullHttpRequest);
+            Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
+            transport.requestReceived(ctx, fullHttpRequest);
         }
     }
 
@@ -145,23 +136,23 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
 
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-            ServerTransport serverTransport = ctx.channel().attr(ServerTransport.TRANSPORT_ATTRIBUTE_KEY).get();
             if (msg instanceof DefaultHttp2SettingsFrame) {
                 DefaultHttp2SettingsFrame http2SettingsFrame = (DefaultHttp2SettingsFrame) msg;
-                serverTransport.settingsReceived(ctx, http2SettingsFrame.settings());
+                Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
+                transport.settingsReceived(ctx, http2SettingsFrame.settings());
             }
         }
 
         @Override
         public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
-            ServerTransport serverTransport = ctx.channel().attr(ServerTransport.TRANSPORT_ATTRIBUTE_KEY).get();
+            Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
             ctx.fireUserEventTriggered(evt);
         }
 
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws IOException {
-            ServerTransport serverTransport = ctx.channel().attr(ServerTransport.TRANSPORT_ATTRIBUTE_KEY).get();
-            serverTransport.exceptionReceived(ctx, cause);
+            Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
+            transport.exceptionReceived(ctx, cause);
         }
     }
 }

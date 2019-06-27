@@ -24,9 +24,9 @@ import org.xbib.netty.http.server.endpoint.NamedServer;
 import org.xbib.netty.http.server.handler.http.HttpChannelInitializer;
 import org.xbib.netty.http.server.handler.http2.Http2ChannelInitializer;
 import org.xbib.netty.http.common.SecurityUtil;
-import org.xbib.netty.http.server.transport.HttpServerTransport;
-import org.xbib.netty.http.server.transport.Http2ServerTransport;
-import org.xbib.netty.http.server.transport.ServerTransport;
+import org.xbib.netty.http.server.transport.HttpTransport;
+import org.xbib.netty.http.server.transport.Http2Transport;
+import org.xbib.netty.http.server.transport.Transport;
 
 import java.io.IOException;
 import java.util.Objects;
@@ -181,8 +181,8 @@ public final class Server {
         logger.log(level, NetworkUtils::displayNetworkInterfaces);
     }
 
-    public ServerTransport newTransport(HttpVersion httpVersion) {
-        return httpVersion.majorVersion() == 1 ? new HttpServerTransport(this) : new Http2ServerTransport(this);
+    public Transport newTransport(HttpVersion httpVersion) {
+        return httpVersion.majorVersion() == 1 ? new HttpTransport(this) : new Http2Transport(this);
     }
 
     public synchronized void shutdownGracefully() throws IOException {

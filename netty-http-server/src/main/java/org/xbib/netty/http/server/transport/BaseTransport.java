@@ -15,15 +15,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-abstract class BaseServerTransport implements ServerTransport {
+abstract class BaseTransport implements Transport {
 
-    private static final Logger logger = Logger.getLogger(BaseServerTransport.class.getName());
+    private static final Logger logger = Logger.getLogger(BaseTransport.class.getName());
 
     static final AtomicInteger requestCounter = new AtomicInteger();
 
     protected final Server server;
 
-    BaseServerTransport(Server server) {
+    BaseTransport(Server server) {
         this.server = server;
     }
 

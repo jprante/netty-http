@@ -2,15 +2,14 @@ package org.xbib.netty.http.client.transport;
 
 import io.netty.channel.Channel;
 import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.cookie.Cookie;
 import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.util.AttributeKey;
 import org.xbib.netty.http.client.Request;
+import org.xbib.netty.http.common.cookie.CookieBox;
 
 import javax.net.ssl.SSLSession;
 import java.io.IOException;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -31,9 +30,9 @@ public interface Transport {
 
     void pushPromiseReceived(Channel channel, Integer streamId, Integer promisedStreamId, Http2Headers headers);
 
-    void setCookieBox(Map<Cookie, Boolean> cookieBox);
+    void setCookieBox(CookieBox cookieBox);
 
-    Map<Cookie, Boolean> getCookieBox();
+    CookieBox getCookieBox();
 
     Transport get();
 

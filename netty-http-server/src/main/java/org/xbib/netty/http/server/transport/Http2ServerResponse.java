@@ -16,9 +16,11 @@ import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2HeadersFrame;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.stream.ChunkedInput;
+import org.xbib.netty.http.common.cookie.Cookie;
 import org.xbib.netty.http.server.ServerName;
 import org.xbib.netty.http.server.ServerRequest;
 import org.xbib.netty.http.server.ServerResponse;
+import org.xbib.netty.http.server.cookie.ServerCookieEncoder;
 
 import java.nio.charset.Charset;
 import java.time.ZoneOffset;
@@ -49,13 +51,16 @@ public class Http2ServerResponse implements ServerResponse {
     }
 
     @Override
-    public void setHeader(CharSequence name, String value) {
+    public ServerResponse withHeader(CharSequence name, String value) {
         headers.set(name, value);
+        return this;
     }
 
     @Override
-    public CharSequence getHeader(CharSequence name) {
-        return headers.get(name);
+    public ServerResponse withCookie(Cookie cookie) {
+        Objects.requireNonNull(cookie);
+        headers.add(HttpHeaderNames.SET_COOKIE, ServerCookieEncoder.STRICT.encode(cookie));
+        return this;
     }
 
     @Override

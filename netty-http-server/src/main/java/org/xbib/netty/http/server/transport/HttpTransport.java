@@ -5,15 +5,16 @@ import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http2.Http2Settings;
+import io.netty.handler.ssl.SslHandler;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.ServerResponse;
 import org.xbib.netty.http.server.endpoint.NamedServer;
 
 import java.io.IOException;
 
-public class HttpServerTransport extends BaseServerTransport {
+public class HttpTransport extends BaseTransport {
 
-    public HttpServerTransport(Server server) {
+    public HttpTransport(Server server) {
         super(server);
     }
 
@@ -35,6 +36,10 @@ public class HttpServerTransport extends BaseServerTransport {
         serverRequest.setRequest(fullHttpRequest);
         serverRequest.setSequenceId(sequenceId);
         serverRequest.setRequestId(requestId);
+        SslHandler sslHandler = ctx.channel().pipeline().get(SslHandler.class);
+        if (sslHandler != null) {
+            serverRequest.setSession(sslHandler.engine().getSession());
+        }
         HttpServerResponse serverResponse = new HttpServerResponse(serverRequest);
         if (acceptRequest(namedServer, serverRequest, serverResponse)) {
             handle(namedServer, serverRequest, serverResponse);

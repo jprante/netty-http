@@ -57,6 +57,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
     /**
      * Whether the given incoming message has a body.
+     * @param in input
      */
     protected abstract boolean hasBody(In in);
 
@@ -116,6 +117,8 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
      *
      * Provided so that the client subclass can intercept this to hold off sending the body of an expect 100 continue
      * request.
+     * @param msg msg
+     * @param subscriber subscriber
      */
     protected void subscribeSubscriberToStream(StreamedHttpMessage msg, Subscriber<HttpContent> subscriber) {
         msg.subscribe(subscriber);

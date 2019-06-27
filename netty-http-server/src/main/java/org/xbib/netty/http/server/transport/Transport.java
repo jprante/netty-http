@@ -7,9 +7,9 @@ import io.netty.util.AttributeKey;
 
 import java.io.IOException;
 
-public interface ServerTransport {
+public interface Transport {
 
-    AttributeKey<ServerTransport> TRANSPORT_ATTRIBUTE_KEY = AttributeKey.valueOf("transport");
+    AttributeKey<Transport> TRANSPORT_ATTRIBUTE_KEY = AttributeKey.valueOf("transport");
 
     void requestReceived(ChannelHandlerContext ctx, FullHttpRequest fullHttpRequest) throws IOException;
 

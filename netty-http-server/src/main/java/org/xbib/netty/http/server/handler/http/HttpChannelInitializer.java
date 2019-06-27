@@ -23,7 +23,7 @@ import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.ServerConfig;
 import org.xbib.netty.http.server.handler.TrafficLoggingHandler;
-import org.xbib.netty.http.server.transport.ServerTransport;
+import org.xbib.netty.http.server.transport.Transport;
 
 import java.nio.charset.StandardCharsets;
 import java.util.logging.Level;
@@ -41,7 +41,7 @@ public class HttpChannelInitializer extends ChannelInitializer<SocketChannel> {
 
     private final HttpHandler httpHandler;
 
-    private final SniHandler sniHandler;
+    private final DomainNameMapping<SslContext> domainNameMapping;
 
     public HttpChannelInitializer(Server server,
                                   HttpAddress httpAddress,
@@ -50,13 +50,13 @@ public class HttpChannelInitializer extends ChannelInitializer<SocketChannel> {
         this.serverConfig = server.getServerConfig();
         this.httpAddress = httpAddress;
         this.httpHandler = new HttpHandler(server);
-        this.sniHandler = domainNameMapping != null ? new SniHandler(domainNameMapping) : null;
+        this.domainNameMapping = domainNameMapping;
     }
 
     @Override
     public void initChannel(SocketChannel channel) {
-        ServerTransport serverTransport = server.newTransport(httpAddress.getVersion());
-        channel.attr(ServerTransport.TRANSPORT_ATTRIBUTE_KEY).set(serverTransport);
+        Transport transport = server.newTransport(httpAddress.getVersion());
+        channel.attr(Transport.TRANSPORT_ATTRIBUTE_KEY).set(transport);
         if (serverConfig.isDebug()) {
             channel.pipeline().addLast(new TrafficLoggingHandler(LogLevel.DEBUG));
         }
@@ -71,9 +71,7 @@ public class HttpChannelInitializer extends ChannelInitializer<SocketChannel> {
     }
 
     private void configureEncrypted(SocketChannel channel)  {
-        if (sniHandler != null) {
-            channel.pipeline().addLast("sni-handker", sniHandler);
-        }
+        channel.pipeline().addLast("sni-handker", new SniHandler(domainNameMapping));
         configureCleartext(channel);
     }
 
@@ -114,8 +112,8 @@ public class HttpChannelInitializer extends ChannelInitializer<SocketChannel> {
                 HttpPipelinedRequest httpPipelinedRequest = (HttpPipelinedRequest) msg;
                 if (httpPipelinedRequest.getRequest() instanceof FullHttpRequest) {
                     FullHttpRequest fullHttpRequest = (FullHttpRequest) httpPipelinedRequest.getRequest();
-                    ServerTransport serverTransport = server.newTransport(fullHttpRequest.protocolVersion());
-                    serverTransport.requestReceived(ctx, fullHttpRequest, httpPipelinedRequest.getSequenceId());
+                    Transport transport = server.newTransport(fullHttpRequest.protocolVersion());
+                    transport.requestReceived(ctx, fullHttpRequest, httpPipelinedRequest.getSequenceId());
                 }
             } else {
                 super.channelRead(ctx, msg);

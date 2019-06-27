@@ -1,6 +1,6 @@
 package org.xbib.netty.http.client.listener;
 
-import io.netty.handler.codec.http.cookie.Cookie;
+import org.xbib.netty.http.common.cookie.Cookie;
 
 @FunctionalInterface
 public interface CookieListener {

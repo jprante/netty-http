@@ -108,10 +108,7 @@ class PoolTest {
             long avgConnCountPerNode = connCountSum / 2;
             for (HttpAddress nodeAddr: nodeFreq.keySet()) {
                 assertTrue(nodeFreq.get(nodeAddr).sum() > 0);
-                assertEquals(/*"Node count: " + nodeCount + ", node: " + nodeAddr
-                            + ", expected connection count: " + avgConnCountPerNode + ", actual: "
-                            + nodeFreq.get(nodeAddr).sum(),*/
-                        avgConnCountPerNode, nodeFreq.get(nodeAddr).sum(), 1.5 * avgConnCountPerNode);
+                assertEquals(avgConnCountPerNode, nodeFreq.get(nodeAddr).sum(), 1.5 * avgConnCountPerNode);
             }
         }
     }

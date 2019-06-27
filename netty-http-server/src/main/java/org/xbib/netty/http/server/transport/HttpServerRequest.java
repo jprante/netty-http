@@ -4,11 +4,13 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpUtil;
+import io.netty.handler.ssl.SslContext;
 import org.xbib.net.QueryParameters;
 import org.xbib.net.URL;
 import org.xbib.netty.http.common.HttpParameters;
 import org.xbib.netty.http.server.ServerRequest;
 
+import javax.net.ssl.SSLSession;
 import java.io.IOException;
 import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
@@ -51,6 +53,8 @@ public class HttpServerRequest implements ServerRequest {
     private Integer streamId;
 
     private Integer requestId;
+
+    private SSLSession sslSession;
 
     public void setChannelHandlerContext(ChannelHandlerContext ctx) {
         this.ctx = ctx;
@@ -167,6 +171,15 @@ public class HttpServerRequest implements ServerRequest {
     @Override
     public Integer requestId() {
         return requestId;
+    }
+
+    public void setSession(SSLSession sslSession) {
+        this.sslSession = sslSession;
+    }
+
+    @Override
+    public SSLSession getSession() {
+        return sslSession;
     }
 
     public String toString() {

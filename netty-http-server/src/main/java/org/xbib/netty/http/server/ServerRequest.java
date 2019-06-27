@@ -2,9 +2,11 @@ package org.xbib.netty.http.server;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.ssl.SslContext;
 import org.xbib.net.URL;
 import org.xbib.netty.http.common.HttpParameters;
 
+import javax.net.ssl.SSLSession;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +44,8 @@ public interface ServerRequest {
     Integer streamId();
 
     Integer requestId();
+
+    SSLSession getSession();
 
     class EndpointInfo implements Comparable<EndpointInfo> {
 

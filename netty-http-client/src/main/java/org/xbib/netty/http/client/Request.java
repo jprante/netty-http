@@ -13,7 +13,6 @@ import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.QueryStringEncoder;
-import io.netty.handler.codec.http.cookie.Cookie;
 
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.util.AsciiString;
@@ -26,6 +25,7 @@ import org.xbib.netty.http.client.listener.StatusListener;
 import org.xbib.netty.http.client.retry.BackOff;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.HttpParameters;
+import org.xbib.netty.http.common.cookie.Cookie;
 
 import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
@@ -80,9 +80,9 @@ public class Request {
     private StatusListener statusListener;
 
     private Request(URL url, String uri, HttpVersion httpVersion, HttpMethod httpMethod,
-            HttpHeaders headers, Collection<Cookie> cookies, ByteBuf content,
-            long timeoutInMillis, boolean followRedirect, int maxRedirect, int redirectCount,
-            boolean isBackOff, BackOff backOff) {
+                    HttpHeaders headers, Collection<Cookie> cookies, ByteBuf content,
+                    long timeoutInMillis, boolean followRedirect, int maxRedirect, int redirectCount,
+                    boolean isBackOff, BackOff backOff) {
         this.url = url;
         this.uri = uri;
         this.httpVersion = httpVersion;

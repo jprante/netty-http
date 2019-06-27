@@ -16,9 +16,11 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.stream.ChunkedInput;
+import org.xbib.netty.http.common.cookie.Cookie;
 import org.xbib.netty.http.server.ServerName;
 import org.xbib.netty.http.server.ServerRequest;
 import org.xbib.netty.http.server.ServerResponse;
+import org.xbib.netty.http.server.cookie.ServerCookieEncoder;
 import org.xbib.netty.http.server.handler.http.HttpPipelinedResponse;
 
 import java.nio.charset.Charset;
@@ -53,13 +55,9 @@ public class HttpServerResponse implements ServerResponse {
     }
 
     @Override
-    public void setHeader(CharSequence name, String value) {
+    public ServerResponse withHeader(CharSequence name, String value) {
         headers.set(name, value);
-    }
-
-    @Override
-    public CharSequence getHeader(CharSequence name) {
-        return headers.get(name);
+        return this;
     }
 
     @Override
@@ -92,6 +90,13 @@ public class HttpServerResponse implements ServerResponse {
             headers.remove(HttpHeaderNames.CONTENT_TYPE);
             headers.add(HttpHeaderNames.CONTENT_TYPE, contentType + "; charset=" + charset.name());
         }
+        return this;
+    }
+
+    @Override
+    public ServerResponse withCookie(Cookie cookie) {
+        Objects.requireNonNull(cookie);
+        headers.add(HttpHeaderNames.SET_COOKIE, ServerCookieEncoder.STRICT.encode(cookie));
         return this;
     }
 

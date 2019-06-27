@@ -6,6 +6,7 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.stream.ChunkedNioStream;
+import org.xbib.netty.http.common.util.TimeUtils;
 import org.xbib.netty.http.server.ServerRequest;
 import org.xbib.netty.http.server.ServerResponse;
 import org.xbib.netty.http.server.util.MimeTypeUtils;
@@ -25,11 +26,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -59,14 +55,14 @@ public abstract class ResourceService implements Service {
         long maxAgeSeconds = 24 * 3600;
         long expirationMillis = System.currentTimeMillis() + 1000 * maxAgeSeconds;
         if (isCacheResponseEnabled()) {
-            serverResponse.setHeader(HttpHeaderNames.EXPIRES, formatMillis(expirationMillis));
-            serverResponse.setHeader(HttpHeaderNames.CACHE_CONTROL, "public, max-age=" + maxAgeSeconds);
+            serverResponse.withHeader(HttpHeaderNames.EXPIRES, TimeUtils.formatMillis(expirationMillis))
+                    .withHeader(HttpHeaderNames.CACHE_CONTROL, "public, max-age=" + maxAgeSeconds);
         }
         boolean sent = false;
         if (isETagResponseEnabled()) {
             Instant lastModifiedInstant = resource.getLastModified();
             String eTag = resource.getResourcePath().hashCode() + "/" + lastModifiedInstant.toEpochMilli() + "/" + resource.getLength();
-            Instant ifUnmodifiedSinceInstant = parseDate(headers.get(HttpHeaderNames.IF_UNMODIFIED_SINCE));
+            Instant ifUnmodifiedSinceInstant = TimeUtils.parseDate(headers.get(HttpHeaderNames.IF_UNMODIFIED_SINCE));
             if (ifUnmodifiedSinceInstant != null &&
                     ifUnmodifiedSinceInstant.plusMillis(1000L).isAfter(lastModifiedInstant)) {
                 ServerResponse.write(serverResponse, HttpResponseStatus.PRECONDITION_FAILED);
@@ -79,28 +75,28 @@ public abstract class ResourceService implements Service {
             }
             String ifNoneMatch = headers.get(HttpHeaderNames.IF_NONE_MATCH);
             if (ifNoneMatch != null && matches(ifNoneMatch, eTag)) {
-                serverResponse.setHeader(HttpHeaderNames.ETAG, eTag);
-                serverResponse.setHeader(HttpHeaderNames.EXPIRES, formatMillis(expirationMillis));
+                serverResponse.withHeader(HttpHeaderNames.ETAG, eTag)
+                        .withHeader(HttpHeaderNames.EXPIRES, TimeUtils.formatMillis(expirationMillis));
                 ServerResponse.write(serverResponse, HttpResponseStatus.NOT_MODIFIED);
                 return;
             }
-            Instant ifModifiedSinceInstant = parseDate(headers.get(HttpHeaderNames.IF_MODIFIED_SINCE));
+            Instant ifModifiedSinceInstant = TimeUtils.parseDate(headers.get(HttpHeaderNames.IF_MODIFIED_SINCE));
             if (ifModifiedSinceInstant != null &&
                     ifModifiedSinceInstant.plusMillis(1000L).isAfter(lastModifiedInstant)) {
-                serverResponse.setHeader(HttpHeaderNames.ETAG, eTag);
-                serverResponse.setHeader(HttpHeaderNames.EXPIRES, formatMillis(expirationMillis));
+                serverResponse.withHeader(HttpHeaderNames.ETAG, eTag)
+                        .withHeader(HttpHeaderNames.EXPIRES, TimeUtils.formatMillis(expirationMillis));
                 ServerResponse.write(serverResponse, HttpResponseStatus.NOT_MODIFIED);
                 return;
             }
-            serverResponse.setHeader(HttpHeaderNames.ETAG, eTag);
-            serverResponse.setHeader(HttpHeaderNames.LAST_MODIFIED, formatInstant(lastModifiedInstant));
+            serverResponse.withHeader(HttpHeaderNames.ETAG, eTag)
+                    .withHeader(HttpHeaderNames.LAST_MODIFIED, TimeUtils.formatInstant(lastModifiedInstant));
             if (isRangeResponseEnabled()) {
                 performRangeResponse(serverRequest, serverResponse, resource, contentType, eTag, headers);
                 sent = true;
             }
         }
         if (!sent) {
-            serverResponse.setHeader(HttpHeaderNames.CONTENT_LENGTH, Long.toString(resource.getLength()));
+            serverResponse.withHeader(HttpHeaderNames.CONTENT_LENGTH, Long.toString(resource.getLength()));
             send(resource.getURL(), HttpResponseStatus.OK, contentType, serverRequest, serverResponse);
         }
     }
@@ -110,20 +106,20 @@ public abstract class ResourceService implements Service {
                                        String contentType, String eTag,
                                        HttpHeaders headers) {
         long length = resource.getLength();
-        serverResponse.setHeader(HttpHeaderNames.ACCEPT_RANGES, "bytes");
+        serverResponse.withHeader(HttpHeaderNames.ACCEPT_RANGES, "bytes");
         Range full = new Range(0, length - 1, length);
         List<Range> ranges = new ArrayList<>();
         String range = headers.get(HttpHeaderNames.RANGE);
         if (range != null) {
             if (!range.matches("^bytes=\\d*-\\d*(,\\d*-\\d*)*$")) {
-                serverResponse.setHeader(HttpHeaderNames.CONTENT_RANGE, "bytes */" + length);
+                serverResponse.withHeader(HttpHeaderNames.CONTENT_RANGE, "bytes */" + length);
                 ServerResponse.write(serverResponse, HttpResponseStatus.REQUESTED_RANGE_NOT_SATISFIABLE);
                 return;
             }
             String ifRange = headers.get(HttpHeaderNames.IF_RANGE);
             if (ifRange != null && !ifRange.equals(eTag)) {
                 try {
-                    Instant ifRangeTime = parseDate(ifRange);
+                    Instant ifRangeTime = TimeUtils.parseDate(ifRange);
                     if (ifRangeTime != null && ifRangeTime.plusMillis(1000).isBefore(resource.getLastModified())) {
                         ranges.add(full);
                     }
@@ -142,7 +138,7 @@ public abstract class ResourceService implements Service {
                         end = length - 1;
                     }
                     if (start > end) {
-                        serverResponse.setHeader(HttpHeaderNames.CONTENT_RANGE, "bytes */" + length);
+                        serverResponse.withHeader(HttpHeaderNames.CONTENT_RANGE, "bytes */" + length);
                         ServerResponse.write(serverResponse, HttpResponseStatus.REQUESTED_RANGE_NOT_SATISFIABLE);
                         return;
                     }
@@ -151,16 +147,16 @@ public abstract class ResourceService implements Service {
             }
         }
         if (ranges.isEmpty() || ranges.get(0) == full) {
-            serverResponse.setHeader(HttpHeaderNames.CONTENT_RANGE, "bytes " + full.start + '-' + full.end + '/' + full.total);
-            serverResponse.setHeader(HttpHeaderNames.CONTENT_LENGTH, Long.toString(full.length));
+            serverResponse.withHeader(HttpHeaderNames.CONTENT_RANGE, "bytes " + full.start + '-' + full.end + '/' + full.total)
+                    .withHeader(HttpHeaderNames.CONTENT_LENGTH, Long.toString(full.length));
             send(resource.getURL(), HttpResponseStatus.OK, contentType, serverRequest, serverResponse, full.start, full.length);
         } else if (ranges.size() == 1) {
             Range r = ranges.get(0);
-            serverResponse.setHeader(HttpHeaderNames.CONTENT_RANGE, "bytes " + r.start + '-' + r.end + '/' + r.total);
-            serverResponse.setHeader(HttpHeaderNames.CONTENT_LENGTH, Long.toString(r.length));
+            serverResponse.withHeader(HttpHeaderNames.CONTENT_RANGE, "bytes " + r.start + '-' + r.end + '/' + r.total)
+                    .withHeader(HttpHeaderNames.CONTENT_LENGTH, Long.toString(r.length));
             send(resource.getURL(), HttpResponseStatus.PARTIAL_CONTENT, contentType, serverRequest, serverResponse, r.start, r.length);
         } else {
-            serverResponse.setHeader(HttpHeaderNames.CONTENT_TYPE, "multipart/byteranges; boundary=MULTIPART_BOUNDARY");
+            serverResponse.withHeader(HttpHeaderNames.CONTENT_TYPE, "multipart/byteranges; boundary=MULTIPART_BOUNDARY");
             StringBuilder sb = new StringBuilder();
             for (Range r : ranges) {
                 try {
@@ -184,45 +180,6 @@ public abstract class ResourceService implements Service {
         return Arrays.binarySearch(matchValues, toMatch) > -1 || Arrays.binarySearch(matchValues, "*") > -1;
     }
 
-    private static String formatInstant(Instant instant) {
-        return DateTimeFormatter.RFC_1123_DATE_TIME
-                .format(ZonedDateTime.ofInstant(instant, ZoneOffset.UTC));
-    }
-
-    private static String formatMillis(long millis) {
-        return formatInstant(Instant.ofEpochMilli(millis));
-    }
-
-    private static String formatSeconds(long seconds) {
-        return formatInstant(Instant.now().plusSeconds(seconds));
-    }
-
-    private static final String RFC1036_PATTERN = "EEE, dd-MMM-yyyy HH:mm:ss zzz";
-
-    private static final String ASCIITIME_PATTERN = "EEE MMM d HH:mm:ss yyyyy";
-
-    private static final DateTimeFormatter[] dateTimeFormatters = {
-            DateTimeFormatter.RFC_1123_DATE_TIME,
-            DateTimeFormatter.ofPattern(RFC1036_PATTERN),
-            DateTimeFormatter.ofPattern(ASCIITIME_PATTERN)
-    };
-
-    private static Instant parseDate(String date) {
-        if (date == null) {
-            return null;
-        }
-        int semicolonIndex = date.indexOf(';');
-        String trimmedDate = semicolonIndex >= 0 ? date.substring(0, semicolonIndex) : date;
-        // RFC 2616 allows RFC 1123, RFC 1036, ASCII time
-        for (DateTimeFormatter formatter : dateTimeFormatters) {
-            try {
-                return Instant.from(formatter.withZone(ZoneId.of("UTC")).parse(trimmedDate));
-            } catch (DateTimeParseException e) {
-                logger.log(Level.FINEST, e.getMessage());
-            }
-        }
-        return null;
-    }
 
     private static long sublong(String value, int beginIndex, int endIndex) {
         String substring = value.substring(beginIndex, endIndex);

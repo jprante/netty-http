@@ -15,6 +15,7 @@ public class SeekableChunkedNioStream extends ChunkedNioStream {
 
     /**
      * Creates a new instance that fetches data from the specified channel.
+     * @param in input
      */
     public SeekableChunkedNioStream(SeekableByteChannel in) {
         super(in);
@@ -23,6 +24,7 @@ public class SeekableChunkedNioStream extends ChunkedNioStream {
     /**
      * Creates a new instance that fetches data from the specified channel.
      *
+     * @param in channel
      * @param chunkSize the number of bytes to fetch on each call
      */
     public SeekableChunkedNioStream(SeekableByteChannel in, int chunkSize) {
@@ -32,8 +34,10 @@ public class SeekableChunkedNioStream extends ChunkedNioStream {
     /**
      * Creates a new instance that fetches data from the specified channel.
      *
+     * @param in channel
      * @param position the position in the byte channel
      * @param chunkSize the number of bytes to fetch on each call
+     * @throws IOException if creation fails
      */
     public SeekableChunkedNioStream(SeekableByteChannel in, long position, int chunkSize) throws IOException {
         super(in, chunkSize);

@@ -4,7 +4,6 @@ import io.netty.channel.Channel;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpMethod;
-import io.netty.handler.codec.http.cookie.Cookie;
 import io.netty.handler.ssl.SslHandler;
 import org.xbib.net.PercentDecoder;
 import org.xbib.net.URL;
@@ -13,6 +12,8 @@ import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.client.retry.BackOff;
+import org.xbib.netty.http.common.cookie.Cookie;
+import org.xbib.netty.http.common.cookie.CookieBox;
 
 import javax.net.ssl.SSLSession;
 import java.io.IOException;
@@ -21,7 +22,6 @@ import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnmappableCharacterException;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -55,7 +55,7 @@ abstract class BaseTransport implements Transport {
 
     final SortedMap<String, Request> requests;
 
-    private Map<Cookie, Boolean> cookieBox;
+    private CookieBox cookieBox;
 
     BaseTransport(Client client, HttpAddress httpAddress) {
         this.client = client;
@@ -336,17 +336,19 @@ abstract class BaseTransport implements Transport {
         return null;
     }
 
-    public void setCookieBox(Map<Cookie, Boolean> cookieBox) {
+    @Override
+    public void setCookieBox(CookieBox cookieBox) {
         this.cookieBox = cookieBox;
     }
 
-    public Map<Cookie, Boolean> getCookieBox() {
+    @Override
+    public CookieBox getCookieBox() {
         return cookieBox;
     }
 
     void addCookie(Cookie cookie) {
         if (cookieBox == null) {
-            this.cookieBox = Collections.synchronizedMap(new LRUCache<Cookie, Boolean>(32));
+            this.cookieBox = new CookieBox(32);
         }
         cookieBox.put(cookie, true);
     }
@@ -376,18 +378,4 @@ abstract class BaseTransport implements Transport {
         return (secureScheme && cookie.isSecure()) || (!secureScheme && !cookie.isSecure());
     }
 
-    @SuppressWarnings("serial")
-    static class LRUCache<K, V> extends LinkedHashMap<K, V> {
-
-        private final int cacheSize;
-
-        LRUCache(int cacheSize) {
-            super(16, 0.75f, true);
-            this.cacheSize = cacheSize;
-        }
-
-        protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
-            return size() >= cacheSize;
-        }
-    }
 }

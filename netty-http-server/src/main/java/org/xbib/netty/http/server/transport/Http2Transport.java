@@ -12,9 +12,9 @@ import org.xbib.netty.http.server.endpoint.NamedServer;
 
 import java.io.IOException;
 
-public class Http2ServerTransport extends BaseServerTransport {
+public class Http2Transport extends BaseTransport {
 
-    public Http2ServerTransport(Server server) {
+    public Http2Transport(Server server) {
         super(server);
     }
 

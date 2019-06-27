@@ -5,6 +5,7 @@ import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.stream.ChunkedInput;
+import org.xbib.netty.http.common.cookie.Cookie;
 
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
@@ -15,19 +16,19 @@ import java.nio.charset.StandardCharsets;
  */
 public interface ServerResponse {
 
-    void setHeader(CharSequence name, String value);
-
-    CharSequence getHeader(CharSequence name);
-
     ChannelHandlerContext getChannelHandlerContext();
 
     HttpResponseStatus getStatus();
 
     ServerResponse withStatus(HttpResponseStatus httpResponseStatus);
 
+    ServerResponse withHeader(CharSequence name, String value);
+
     ServerResponse withContentType(String contentType);
 
     ServerResponse withCharset(Charset charset);
+
+    ServerResponse withCookie(Cookie cookie);
 
     void write(ByteBuf byteBuf);
 
@@ -48,14 +49,14 @@ public interface ServerResponse {
     }
 
     static void write(ServerResponse serverResponse, String text) {
-        write(serverResponse, HttpResponseStatus.OK, "text/plain; charset=utf-8", text);
+        write(serverResponse, HttpResponseStatus.OK, "text/plain", text);
     }
 
     static void write(ServerResponse serverResponse, HttpResponseStatus status, String contentType, String text) {
         serverResponse.withStatus(status)
                 .withContentType(contentType)
-                .withCharset(StandardCharsets.UTF_8).
-                write(ByteBufUtil.writeUtf8(serverResponse.getChannelHandlerContext().alloc(), text));
+                .withCharset(StandardCharsets.UTF_8)
+                .write(ByteBufUtil.writeUtf8(serverResponse.getChannelHandlerContext().alloc(), text));
     }
 
     static void write(ServerResponse serverResponse,
