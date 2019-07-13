@@ -8,7 +8,7 @@ import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.endpoint.NamedServer;
+import org.xbib.netty.http.server.Domain;
 import org.xbib.netty.http.server.endpoint.service.ClassLoaderService;
 
 import java.nio.charset.StandardCharsets;
@@ -26,11 +26,11 @@ class ClassloaderServiceTest {
     @Test
     void testSimpleClassloader() throws Exception {
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        NamedServer namedServer = NamedServer.builder(httpAddress)
+        Domain domain = Domain.builder(httpAddress)
                 .singleEndpoint("/classloader", "/**",
                         new ClassLoaderService(ClassloaderServiceTest.class, "/cl"))
                 .build();
-        Server server = Server.builder(namedServer)
+        Server server = Server.builder(domain)
                 .enableDebug()
                 .build();
         server.logDiagnostics(Level.INFO);

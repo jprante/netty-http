@@ -10,7 +10,7 @@ import org.xbib.netty.http.client.transport.Transport;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.ServerResponse;
-import org.xbib.netty.http.server.endpoint.NamedServer;
+import org.xbib.netty.http.server.Domain;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -31,13 +31,13 @@ class CleartextHttp2Test {
     @Test
     void testSimpleCleartextHttp2() throws Exception {
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
-        NamedServer namedServer = NamedServer.builder(httpAddress)
+        Domain domain = Domain.builder(httpAddress)
                 .singleEndpoint("/", (request, response) ->
                                 response.withStatus(HttpResponseStatus.OK)
                                         .withContentType("text/plain")
-                                        .write(request.getRequest().content().retain()))
+                                        .write(request.getContent().retain()))
                 .build();
-        Server server = Server.builder(namedServer).build();
+        Server server = Server.builder(domain).build();
         server.accept();
         Client client = Client.builder()
                 .build();
@@ -73,13 +73,13 @@ class CleartextHttp2Test {
     void testPooledClearTextHttp2() throws Exception {
         int loop = 4096;
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
-        NamedServer namedServer = NamedServer.builder(httpAddress)
+        Domain domain = Domain.builder(httpAddress)
                 .singleEndpoint("/", (request, response) ->
                                 response.withStatus(HttpResponseStatus.OK)
                                         .withContentType("text/plain")
-                                        .write(request.getRequest().content().retain()))
+                                        .write(request.getContent().retain()))
                 .build();
-        Server server = Server.builder(namedServer).build();
+        Server server = Server.builder(domain).build();
         server.accept();
         Client client = Client.builder()
                 .addPoolNode(httpAddress)
@@ -123,12 +123,12 @@ class CleartextHttp2Test {
         int threads = 2;
         int loop = 2 * 1024;
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
-        NamedServer namedServer = NamedServer.builder(httpAddress)
+        Domain domain = Domain.builder(httpAddress)
                 .singleEndpoint("/", (request, response) ->
                         ServerResponse.write(response, HttpResponseStatus.OK, "text/plain",
-                                request.getRequest().content().toString(StandardCharsets.UTF_8)))
+                                request.getContent().toString(StandardCharsets.UTF_8)))
                 .build();
-        Server server = Server.builder(namedServer).build();
+        Server server = Server.builder(domain).build();
         server.accept();
         Client client = Client.builder()
                 .addPoolNode(httpAddress)
@@ -187,25 +187,25 @@ class CleartextHttp2Test {
 
         HttpAddress httpAddress1 = HttpAddress.http2("localhost", 8008);
         AtomicInteger counter1 = new AtomicInteger();
-        NamedServer namedServer1 = NamedServer.builder(httpAddress1)
+        Domain domain1 = Domain.builder(httpAddress1)
                 .singleEndpoint("/", (request, response) -> {
                         ServerResponse.write(response, HttpResponseStatus.OK, "text/plain",
-                                request.getRequest().content().toString(StandardCharsets.UTF_8));
+                                request.getContent().toString(StandardCharsets.UTF_8));
                         counter1.incrementAndGet();
                 })
                 .build();
-        Server server1 = Server.builder(namedServer1).build();
+        Server server1 = Server.builder(domain1).build();
         server1.accept();
         HttpAddress httpAddress2 = HttpAddress.http2("localhost", 8009);
         AtomicInteger counter2 = new AtomicInteger();
-        NamedServer namedServer2 = NamedServer.builder(httpAddress2)
+        Domain domain2 = Domain.builder(httpAddress2)
                 .singleEndpoint("/", (request, response) -> {
                     ServerResponse.write(response, HttpResponseStatus.OK, "text/plain",
-                            request.getRequest().content().toString(StandardCharsets.UTF_8));
+                            request.getContent().toString(StandardCharsets.UTF_8));
                     counter2.incrementAndGet();
                 })
                 .build();
-        Server server2 = Server.builder(namedServer2).build();
+        Server server2 = Server.builder(domain2).build();
         server2.accept();
         Client client = Client.builder()
                 .addPoolNode(httpAddress1)

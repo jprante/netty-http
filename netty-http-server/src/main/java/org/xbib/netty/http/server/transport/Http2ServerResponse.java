@@ -42,7 +42,7 @@ public class Http2ServerResponse implements ServerResponse {
 
     private HttpResponseStatus httpResponseStatus;
 
-    public Http2ServerResponse(ServerRequest serverRequest) {
+    public Http2ServerResponse(HttpServerRequest serverRequest) {
         Objects.requireNonNull(serverRequest);
         Objects.requireNonNull(serverRequest.getChannelHandlerContext());
         this.serverRequest = serverRequest;
@@ -109,7 +109,7 @@ public class Http2ServerResponse implements ServerResponse {
         if (!headers.contains(HttpHeaderNames.CONTENT_LENGTH) && !headers.contains(HttpHeaderNames.TRANSFER_ENCODING)) {
             headers.add(HttpHeaderNames.CONTENT_LENGTH, Long.toString(byteBuf.readableBytes()));
         }
-        if (serverRequest != null && "close".equalsIgnoreCase(serverRequest.getRequest().headers().get(HttpHeaderNames.CONNECTION)) &&
+        if (serverRequest != null && "close".equalsIgnoreCase(serverRequest.getHeaders().get(HttpHeaderNames.CONNECTION)) &&
                 !headers.contains(HttpHeaderNames.CONNECTION)) {
             headers.add(HttpHeaderNames.CONNECTION, "close");
         }
@@ -162,7 +162,7 @@ public class Http2ServerResponse implements ServerResponse {
             logger.log(Level.FINEST, http2HeadersFrame::toString);
             ctx.channel().write(http2HeadersFrame);
             ChannelFuture channelFuture = ctx.channel().writeAndFlush(new HttpChunkedInput(chunkedInput));
-            if ("close".equalsIgnoreCase(serverRequest.getRequest().headers().get(HttpHeaderNames.CONNECTION)) &&
+            if ("close".equalsIgnoreCase(serverRequest.getHeaders().get(HttpHeaderNames.CONNECTION)) &&
                     !headers.contains(HttpHeaderNames.CONNECTION)) {
                 channelFuture.addListener(ChannelFutureListener.CLOSE);
             }

@@ -6,9 +6,9 @@ import org.xbib.netty.http.common.cookie.CookieHeaderNames;
 import org.xbib.netty.http.common.cookie.DefaultCookie;
 
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
-import java.util.TreeSet;
 
 /**
  * A <a href="http://tools.ietf.org/html/rfc6265">RFC6265</a> compliant cookie decoder to be used server side.
@@ -20,13 +20,13 @@ import java.util.TreeSet;
  */
 public final class ServerCookieDecoder extends CookieDecoder {
 
-    private static final String RFC2965_VERSION = "\\$Version";
+    private static final String RFC2965_VERSION = "$Version";
 
-    private static final String RFC2965_PATH = "\\$" + CookieHeaderNames.PATH;
+    private static final String RFC2965_PATH = "$" + CookieHeaderNames.PATH;
 
-    private static final String RFC2965_DOMAIN = "\\$" + CookieHeaderNames.DOMAIN;
+    private static final String RFC2965_DOMAIN = "$" + CookieHeaderNames.DOMAIN;
 
-    private static final String RFC2965_PORT = "\\$Port";
+    private static final String RFC2965_PORT = "$Port";
 
     /**
      * Strict encoder that validates that name and value chars are in the valid scope
@@ -54,7 +54,7 @@ public final class ServerCookieDecoder extends CookieDecoder {
         if (headerLen == 0) {
             return Collections.emptySet();
         }
-        Set<Cookie> cookies = new TreeSet<Cookie>();
+        Set<Cookie> cookies = new LinkedHashSet<>();
         int i = 0;
         boolean rfc2965Style = false;
         if (header.regionMatches(true, 0, RFC2965_VERSION, 0, RFC2965_VERSION.length())) {

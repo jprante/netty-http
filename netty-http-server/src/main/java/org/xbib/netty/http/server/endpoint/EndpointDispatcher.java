@@ -8,5 +8,5 @@ import java.io.IOException;
 @FunctionalInterface
 public interface EndpointDispatcher {
 
-    void dispatch(Endpoint endpoint, ServerRequest serverRequest, ServerResponse serverResponse) throws IOException;
+    void dispatch(HttpEndpoint endpoint, ServerRequest serverRequest, ServerResponse serverResponse) throws IOException;
 }

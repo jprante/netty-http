@@ -8,7 +8,7 @@ import io.netty.handler.codec.http.HttpVersion;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.ServerRequest;
 import org.xbib.netty.http.server.ServerResponse;
-import org.xbib.netty.http.server.endpoint.NamedServer;
+import org.xbib.netty.http.server.Domain;
 
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -37,14 +37,14 @@ abstract class BaseTransport implements Transport {
      * and required special header handling, possibly returning an
      * appropriate response.
      *
-     * @param namedServer the named server
+     * @param domain the named server
      * @param serverRequest  the request
      * @param serverResponse the response
      * @return whether further processing should be performed
      */
-    static boolean acceptRequest(NamedServer namedServer, ServerRequest serverRequest, ServerResponse serverResponse) {
-        HttpHeaders reqHeaders = serverRequest.getRequest().headers();
-        HttpVersion version = namedServer.getHttpAddress().getVersion();
+    static boolean acceptRequest(Domain domain, ServerRequest serverRequest, ServerResponse serverResponse) {
+        HttpHeaders reqHeaders = serverRequest.getHeaders();
+        HttpVersion version = domain.getHttpAddress().getVersion();
         if (version.majorVersion() == 1 || version.majorVersion() == 2) {
             if (!reqHeaders.contains(HttpHeaderNames.HOST)) {
                 // RFC2616#14.23: missing Host header gets 400
@@ -74,14 +74,14 @@ abstract class BaseTransport implements Transport {
 
     /**
      * Handles a request according to the request method.
-     * @param namedServer the named server
+     * @param domain the named server
      * @param serverRequest  the request
      * @param serverResponse the response (into which the response is written)
      * @throws IOException if and error occurs
      */
-    static void handle(NamedServer namedServer, HttpServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
+    static void handle(Domain domain, HttpServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
         // create server URL and parse parameters from query string, path, and parse body, if exists
         serverRequest.createParameters();
-        namedServer.execute(serverRequest, serverResponse);
+        domain.execute(serverRequest, serverResponse);
     }
 }

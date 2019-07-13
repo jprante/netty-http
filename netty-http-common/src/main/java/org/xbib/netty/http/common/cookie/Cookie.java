@@ -124,7 +124,29 @@ public interface Cookie extends Comparable<Cookie> {
      */
     void setHttpOnly(boolean httpOnly);
 
-    String sameSite();
+    /**
+     * Checks to see if this {@link Cookie} is valid on same site.
+     *
+     * {@code SameSite.STRICT} being the default mode/
+     *
+     * @return the same site value
+     */
+    SameSite sameSite();
 
-    void setSameSite(String sameSite);
+    /**
+     * Determines if this {@link Cookie} is same site.
+     * If set to {@code SameSite.STRICT},
+     *
+     * {@code SameSite.LAX} mode is adding one exception for the cookie to be sent if we’re not in a Same-Site context.
+     * The defined {@link Cookie}  will also be sent for requests using a safe method (GET method for most)
+     * for top-level navigation, basically something resulting in the URL changing in the web browser address bar.
+     *
+     * {@code SameSite.STRICT} mode would prevent any session cookie to be sent for a website reached by following
+     * an external link (from an email, from search engines results, etc.), resulting for a user not being logged in.
+     *
+     * @param sameSite the same site value
+     */
+    void setSameSite(SameSite sameSite);
+
+    enum SameSite { STRICT, LAX }
 }

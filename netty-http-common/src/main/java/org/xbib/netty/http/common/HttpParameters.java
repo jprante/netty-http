@@ -3,8 +3,8 @@ package org.xbib.netty.http.common;
 import org.xbib.net.PercentDecoder;
 import org.xbib.net.PercentEncoder;
 import org.xbib.net.PercentEncoders;
-import org.xbib.netty.http.common.util.LimitedSortedStringSet;
-import org.xbib.netty.http.common.util.LimitedStringMap;
+import org.xbib.netty.http.common.util.LimitedSet;
+import org.xbib.netty.http.common.util.LimitedMap;
 
 import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
@@ -42,7 +42,7 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
 
     private final int elementSizeLimit;
 
-    private final LimitedStringMap map;
+    private final LimitedMap<String, String> map;
 
     private final PercentEncoder percentEncoder;
 
@@ -62,7 +62,7 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
         this.maxParam = maxParam;
         this.sizeLimit = sizeLimit;
         this.elementSizeLimit = elementSizeLimit;
-        this.map = new LimitedStringMap(maxParam);
+        this.map = new LimitedMap<>(maxParam);
         this.percentEncoder = PercentEncoders.getQueryEncoder(StandardCharsets.UTF_8);
         this.percentDecoder = new PercentDecoder();
         this.contentType = contentType;
@@ -183,7 +183,7 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
         String k  = percentEncode ? percentEncoder.encode(key) : key;
         SortedSet<String> values = map.get(k);
         if (values == null) {
-            values = new LimitedSortedStringSet(sizeLimit, elementSizeLimit);
+            values = new LimitedSet<>(sizeLimit, elementSizeLimit);
             map.put(k, values);
         }
         String v = null;
@@ -236,7 +236,7 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
         for (String key : m.keySet()) {
             SortedSet<String> vals = get(key);
             if (vals == null) {
-                vals = new LimitedSortedStringSet(sizeLimit, elementSizeLimit);
+                vals = new LimitedSet<>(sizeLimit, elementSizeLimit);
                 put(key, vals);
             }
             vals.addAll(m.get(key));

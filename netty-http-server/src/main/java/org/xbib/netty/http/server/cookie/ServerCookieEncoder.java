@@ -5,13 +5,16 @@ import org.xbib.netty.http.common.cookie.CookieEncoder;
 import org.xbib.netty.http.common.cookie.CookieHeaderNames;
 import org.xbib.netty.http.common.cookie.CookieUtil;
 import org.xbib.netty.http.common.cookie.DefaultCookie;
+import org.xbib.netty.http.common.util.DateTimeUtils;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -80,10 +83,10 @@ public final class ServerCookieEncoder extends CookieEncoder {
         }
         if (cookie.maxAge() != Long.MIN_VALUE) {
             CookieUtil.add(buf, CookieHeaderNames.MAX_AGE, cookie.maxAge());
-            //Date expires = new Date(cookie.maxAge() * 1000 + System.currentTimeMillis())
+            Instant expires = Instant.ofEpochMilli(cookie.maxAge() * 1000 + System.currentTimeMillis());
             buf.append(CookieHeaderNames.EXPIRES);
             buf.append(CookieUtil.EQUALS);
-            //DateFormatter.append(expires, buf)
+            buf.append(DateTimeUtils.formatMillis(expires.toEpochMilli()));
             buf.append(CookieUtil.SEMICOLON);
             buf.append(CookieUtil.SP);
         }
@@ -100,7 +103,9 @@ public final class ServerCookieEncoder extends CookieEncoder {
             CookieUtil.add(buf, CookieHeaderNames.HTTPONLY);
         }
         if (cookie.sameSite() != null) {
-            CookieUtil.add(buf, CookieHeaderNames.SAMESITE, cookie.sameSite());
+            String s = cookie.sameSite().name();
+            CookieUtil.add(buf, CookieHeaderNames.SAMESITE,
+                    s.substring(0, 1).toUpperCase(Locale.ROOT) + s.substring(1).toLowerCase(Locale.ROOT));
         }
         return CookieUtil.stripTrailingSeparator(buf);
     }

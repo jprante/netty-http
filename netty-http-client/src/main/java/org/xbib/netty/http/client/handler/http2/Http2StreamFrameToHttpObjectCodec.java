@@ -29,7 +29,6 @@ import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame;
 import io.netty.handler.codec.http2.Http2DataFrame;
 import io.netty.handler.codec.http2.Http2Exception;
 import io.netty.handler.codec.http2.Http2Headers;
-import io.netty.handler.codec.http2.Http2MultiplexCodec;
 import io.netty.handler.codec.http2.Http2HeadersFrame;
 import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamFrame;
@@ -41,8 +40,7 @@ import java.util.List;
 
 /**
  * This handler converts from {@link Http2StreamFrame} to {@link HttpObject},
- * and back. It can be used as an adapter in conjunction with {@link
- * Http2MultiplexCodec} to make http/2 connections backward-compatible with
+ * and back. It can be used as an adapter to make http/2 connections backward-compatible with
  * {@link ChannelHandler}s expecting {@link HttpObject}.
  *
  * For simplicity, it converts to chunked encoding unless the entire stream

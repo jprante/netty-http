@@ -1,6 +1,7 @@
 package org.xbib.netty.http.server.handler.http2;
 
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
@@ -69,64 +70,66 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
         } else {
             configureCleartext(channel);
         }
-        if (server.getServerConfig().isDebug()) {
+        if (server.getServerConfig().isDebug() && logger.isLoggable(Level.FINE)) {
             logger.log(Level.FINE, "HTTP/2 server channel initialized: " + channel.pipeline().names());
         }
     }
 
     private void configureEncrypted(Channel channel) {
-        channel.pipeline().addLast("sni-handler",  new SniHandler(domainNameMapping));
+        channel.pipeline().addLast("sni-handler", new SniHandler(domainNameMapping));
         configureCleartext(channel);
     }
 
     private void configureCleartext(Channel ch) {
-        ChannelPipeline p = ch.pipeline();
-        Http2MultiplexCodecBuilder serverMultiplexCodecBuilder = Http2MultiplexCodecBuilder.forServer(new ChannelInitializer<Channel>() {
-                @Override
-                protected void initChannel(Channel channel) {
-                    Transport transport = server.newTransport(httpAddress.getVersion());
-                    channel.attr(Transport.TRANSPORT_ATTRIBUTE_KEY).set(transport);
-                    ChannelPipeline pipeline = channel.pipeline();
-                    pipeline.addLast("multiplex-server-frame-converter",
-                            new Http2StreamFrameToHttpObjectCodec(true));
-                    if (serverConfig.isCompressionEnabled()) {
-                        pipeline.addLast("multiplex-server-compressor", new HttpContentCompressor());
-                    }
-                    if (serverConfig.isDecompressionEnabled()) {
-                        pipeline.addLast("multiplex-server-decompressor", new HttpContentDecompressor());
-                    }
-                    pipeline.addLast("multiplex-server-object-aggregator",
-                            new HttpObjectAggregator(serverConfig.getMaxContentLength()));
-                    pipeline.addLast("multiplex-server-chunked-write",
-                            new ChunkedWriteHandler());
-                    pipeline.addLast("multiplex-server-request-handler",
-                            new ServerRequestHandler());
+        ChannelHandler channelHandler = new ChannelInitializer<Channel>() {
+            @Override
+            protected void initChannel(Channel channel) {
+                Transport transport = server.newTransport(httpAddress.getVersion());
+                channel.attr(Transport.TRANSPORT_ATTRIBUTE_KEY).set(transport);
+                ChannelPipeline pipeline = channel.pipeline();
+                pipeline.addLast("server-frame-converter",
+                        new Http2StreamFrameToHttpObjectCodec(true));
+                if (serverConfig.isCompressionEnabled()) {
+                    pipeline.addLast("server-compressor", new HttpContentCompressor());
                 }
-            })
+                if (serverConfig.isDecompressionEnabled()) {
+                    pipeline.addLast("server-decompressor", new HttpContentDecompressor());
+                }
+                pipeline.addLast("server-object-aggregator",
+                        new HttpObjectAggregator(serverConfig.getMaxContentLength()));
+                pipeline.addLast("server-chunked-write", new ChunkedWriteHandler());
+                pipeline.addLast("server-request-handler", new ServerRequestHandler());
+            }
+        };
+        Http2MultiplexCodecBuilder multiplexCodecBuilder = Http2MultiplexCodecBuilder.forServer(channelHandler)
             .initialSettings(Http2Settings.defaultSettings());
         if (serverConfig.isDebug()) {
-            serverMultiplexCodecBuilder.frameLogger(new Http2FrameLogger(LogLevel.DEBUG, "server"));
+            multiplexCodecBuilder.frameLogger(new Http2FrameLogger(LogLevel.DEBUG, "server"));
         }
-        Http2MultiplexCodec serverMultiplexCodec = serverMultiplexCodecBuilder.build();
-        HttpServerUpgradeHandler.UpgradeCodecFactory upgradeCodecFactory = protocol -> {
+        Http2MultiplexCodec multiplexCodec = multiplexCodecBuilder.build();
+
+        HttpServerCodec serverCodec = new HttpServerCodec();
+        HttpServerUpgradeHandler upgradeHandler = new HttpServerUpgradeHandler(serverCodec, protocol -> {
             if (AsciiString.contentEquals(Http2CodecUtil.HTTP_UPGRADE_PROTOCOL_NAME, protocol)) {
-                return new Http2ServerUpgradeCodec("server-codec", serverMultiplexCodec);
+                return new Http2ServerUpgradeCodec(multiplexCodec);
             } else {
                 return null;
             }
-        };
-        HttpServerCodec sourceCodec = new HttpServerCodec();
-        HttpServerUpgradeHandler upgradeHandler = new HttpServerUpgradeHandler(sourceCodec, upgradeCodecFactory);
+        });
         CleartextHttp2ServerUpgradeHandler cleartextHttp2ServerUpgradeHandler =
-                new CleartextHttp2ServerUpgradeHandler(sourceCodec, upgradeHandler, serverMultiplexCodec);
-        p.addLast("server-upgrade", cleartextHttp2ServerUpgradeHandler);
-        p.addLast("server-messages", new ServerMessages());
+                new CleartextHttp2ServerUpgradeHandler(serverCodec, upgradeHandler, multiplexCodec);
+        ChannelPipeline pipeline = ch.pipeline();
+        pipeline.addLast("server-upgrade", cleartextHttp2ServerUpgradeHandler);
+        pipeline.addLast("server-messages", new ServerMessages());
     }
 
     class ServerRequestHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest fullHttpRequest) throws IOException {
+            if (server.getServerConfig().isDebug() && logger.isLoggable(Level.FINE)) {
+                logger.log(Level.FINE, "HTTP/2 server pipeline: " + ctx.channel().pipeline().names());
+            }
             Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
             transport.requestReceived(ctx, fullHttpRequest);
         }

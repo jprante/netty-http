@@ -10,7 +10,7 @@ import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.HttpParameters;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.ServerResponse;
-import org.xbib.netty.http.server.endpoint.NamedServer;
+import org.xbib.netty.http.server.Domain;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
@@ -26,14 +26,14 @@ class PostTest {
     @Test
     void testPostHttp1() throws Exception {
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        NamedServer namedServer = NamedServer.builder(httpAddress)
+        Domain domain = Domain.builder(httpAddress)
                 .singleEndpoint("/post", "/**", (req, resp) -> {
                     HttpParameters parameters = req.getParameters();
                     logger.log(Level.INFO, "got post " + parameters.toString());
                     ServerResponse.write(resp, HttpResponseStatus.OK);
                 }, "POST")
                 .build();
-        Server server = Server.builder(namedServer)
+        Server server = Server.builder(domain)
                 .build();
         Client client = Client.builder()
                 .build();
@@ -64,14 +64,14 @@ class PostTest {
     @Test
     void testPostHttp2() throws Exception {
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
-        NamedServer namedServer = NamedServer.builder(httpAddress)
+        Domain domain = Domain.builder(httpAddress)
                 .singleEndpoint("/post", "/**", (req, resp) -> {
                     HttpParameters parameters = req.getParameters();
                     logger.log(Level.INFO, "got post " + parameters.toString());
                     ServerResponse.write(resp, HttpResponseStatus.OK);
                 }, "POST")
                 .build();
-        Server server = Server.builder(namedServer)
+        Server server = Server.builder(domain)
                 .build();
         Client client = Client.builder()
                 .build();

@@ -7,7 +7,7 @@ import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.endpoint.NamedServer;
+import org.xbib.netty.http.server.Domain;
 import org.xbib.netty.http.server.endpoint.service.FileService;
 
 import java.nio.charset.StandardCharsets;
@@ -30,11 +30,10 @@ class FileServiceTest {
     void testFileServiceHttp1() throws Exception {
         Path vartmp = Paths.get("/var/tmp/");
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        NamedServer namedServer = NamedServer.builder(httpAddress)
+        Domain domain = Domain.builder(httpAddress)
                 .singleEndpoint("/static", "/**", new FileService(vartmp))
                 .build();
-        Server server = Server.builder(namedServer)
-                .enableDebug()
+        Server server = Server.builder(domain)
                 .build();
         Client client = Client.builder()
                 .build();
@@ -65,11 +64,10 @@ class FileServiceTest {
     void testFileServiceHttp2() throws Exception {
         Path vartmp = Paths.get("/var/tmp/");
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
-        NamedServer namedServer = NamedServer.builder(httpAddress)
+        Domain domain = Domain.builder(httpAddress)
                 .singleEndpoint("/static", "/**", new FileService(vartmp))
                 .build();
-        Server server = Server.builder(namedServer)
-                .enableDebug()
+        Server server = Server.builder(domain)
                 .build();
         Client client = Client.builder()
                 .build();
@@ -77,7 +75,8 @@ class FileServiceTest {
         try {
             Files.write(vartmp.resolve("test.txt"), "Hello Jörg".getBytes(StandardCharsets.UTF_8));
             server.accept();
-            Request request = Request.get().setVersion(HttpVersion.valueOf("HTTP/2.0"))
+            Request request = Request.get()
+                    .setVersion(HttpVersion.valueOf("HTTP/2.0"))
                     .url(server.getServerConfig().getAddress().base().resolve("/static/test.txt"))
                     .build()
                     .setResponseListener(r -> {

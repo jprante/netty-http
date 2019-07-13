@@ -1,4 +1,4 @@
-package org.xbib.netty.http.server.endpoint;
+package org.xbib.netty.http.server.annotation;
 
 import org.xbib.netty.http.server.endpoint.service.Service;
 
@@ -8,26 +8,28 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * The {@code Context} annotation decorates methods which are mapped
- * to a context path within the server, and provide its contents.
+ * The {@code Endpoint} annotation decorates methods which are mapped
+ * to a HTTP endpoint within the server, and provide its contents.
  * The annotated methods must have the same signature and contract
  * as {@link Service#handle}, but can have arbitrary names.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
-public @interface Context {
+public @interface Endpoint {
 
     /**
-     * The context (path) that this field maps to (must begin with '/').
+     * The path that this field maps to (must begin with '/').
      *
-     * @return the context (path) that this field maps to
+     * @return the path that this field maps to
      */
-    String value();
+    String path();
 
     /**
-     * The HTTP methods supported by this context handler (default is "GET" and "HEAD").
+     * The HTTP methods supported by this endpoint (default is "GET" and "HEAD").
      *
-     * @return the HTTP methods supported by this context handler
+     * @return the HTTP methods supported by this endpoint
      */
     String[] methods() default {"GET", "HEAD"};
+
+    String[] contentTypes();
 }

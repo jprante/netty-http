@@ -9,7 +9,7 @@ import org.xbib.netty.http.client.listener.ResponseListener;
 import org.xbib.netty.http.client.transport.Transport;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.endpoint.NamedServer;
+import org.xbib.netty.http.server.Domain;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -30,12 +30,12 @@ class SecureHttp2Test {
     @Test
     void testSimpleSecureHttp2() throws Exception {
         HttpAddress httpAddress = HttpAddress.secureHttp2("localhost", 8143);
-        Server server = Server.builder(NamedServer.builder(httpAddress)
+        Server server = Server.builder(Domain.builder(httpAddress)
                 .setSelfCert()
                 .singleEndpoint("/", (request, response) ->
                                 response.withStatus(HttpResponseStatus.OK)
                                         .withContentType("text/plain")
-                                        .write(request.getRequest().content().retain()))
+                                        .write(request.getContent().retain()))
                 .build())
                 .build();
         server.accept();
@@ -73,12 +73,12 @@ class SecureHttp2Test {
     void testPooledSecureHttp2() throws Exception {
         int loop = 4096;
         HttpAddress httpAddress = HttpAddress.secureHttp2("localhost", 8143);
-        Server server = Server.builder(NamedServer.builder(httpAddress)
+        Server server = Server.builder(Domain.builder(httpAddress)
                 .setSelfCert()
                 .singleEndpoint("/", (request, response) ->
                                 response.withStatus(HttpResponseStatus.OK)
                                         .withContentType("text/plain")
-                                        .write(request.getRequest().content().retain()))
+                                        .write(request.getContent().retain()))
                 .build())
                 .build();
         server.accept();
@@ -124,12 +124,12 @@ class SecureHttp2Test {
         int threads = 4;
         int loop = 4 * 1024;
         HttpAddress httpAddress = HttpAddress.secureHttp2("localhost", 8143);
-        Server server = Server.builder(NamedServer.builder(httpAddress)
+        Server server = Server.builder(Domain.builder(httpAddress)
                 .setSelfCert()
                 .singleEndpoint("/", (request, response) ->
                                 response.withStatus(HttpResponseStatus.OK)
                                         .withContentType("text/plain")
-                                        .write(request.getRequest().content().retain())
+                                        .write(request.getContent().retain())
                 )
                 .build())
                 .build();

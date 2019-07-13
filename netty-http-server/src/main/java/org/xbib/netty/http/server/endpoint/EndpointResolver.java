@@ -3,6 +3,7 @@ package org.xbib.netty.http.server.endpoint;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import org.xbib.netty.http.server.ServerRequest;
 import org.xbib.netty.http.server.ServerResponse;
+import org.xbib.netty.http.server.annotation.Endpoint;
 import org.xbib.netty.http.server.endpoint.service.MethodService;
 
 import java.io.IOException;
@@ -20,32 +21,32 @@ public class EndpointResolver {
 
     private static final Logger logger = Logger.getLogger(EndpointResolver.class.getName());
 
-    private final Endpoint defaultEndpoint;
+    private final HttpEndpoint defaultEndpoint;
 
-    private final List<Endpoint> endpoints;
+    private final List<HttpEndpoint> endpoints;
 
     private final EndpointDispatcher endpointDispatcher;
 
-    private final LRUCache<ServerRequest.EndpointInfo, List<Endpoint>> cache;
+    private final LRUCache<EndpointInfo, List<HttpEndpoint>> endpointInfos;
 
-    private EndpointResolver(Endpoint defaultEndpoint,
-                             List<Endpoint> endpoints,
+    private EndpointResolver(HttpEndpoint defaultEndpoint,
+                             List<HttpEndpoint> endpoints,
                              EndpointDispatcher endpointDispatcher,
                              int cacheSize) {
         this.defaultEndpoint = defaultEndpoint == null ? createDefaultEndpoint() : defaultEndpoint;
         this.endpoints = endpoints;
         this.endpointDispatcher = endpointDispatcher;
-        this.cache = new LRUCache<>(cacheSize);
+        this.endpointInfos = new LRUCache<>(cacheSize);
     }
 
     public void resolve(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
-        ServerRequest.EndpointInfo endpointInfo = serverRequest.getEndpointInfo();
-        cache.putIfAbsent(endpointInfo, endpoints.stream()
+        EndpointInfo endpointInfo = serverRequest.getEndpointInfo();
+        endpointInfos.putIfAbsent(endpointInfo, endpoints.stream()
                 .filter(endpoint -> endpoint.matches(endpointInfo))
-                .sorted(new Endpoint.EndpointPathComparator(endpointInfo.getPath())).collect(Collectors.toList()));
-        List<Endpoint> matchingEndpoints = cache.get(endpointInfo);
-        if (logger.isLoggable(Level.FINEST)) {
-            logger.log(Level.FINEST, "endpoint info = " + endpointInfo + " matching endpoints = " + matchingEndpoints + " cache size=" + cache.size());
+                .sorted(new HttpEndpoint.EndpointPathComparator(endpointInfo.getPath())).collect(Collectors.toList()));
+        List<HttpEndpoint> matchingEndpoints = endpointInfos.get(endpointInfo);
+        if (logger.isLoggable(Level.FINE)) {
+            logger.log(Level.FINE, "endpoint info = " + endpointInfo + " matching endpoints = " + matchingEndpoints + " cache size=" + endpointInfos.size());
         }
         if (matchingEndpoints.isEmpty()) {
             if (defaultEndpoint != null) {
@@ -58,7 +59,7 @@ public class EndpointResolver {
                 ServerResponse.write(serverResponse, HttpResponseStatus.NOT_IMPLEMENTED);
             }
         } else {
-            for (Endpoint endpoint : matchingEndpoints) {
+            for (HttpEndpoint endpoint : matchingEndpoints) {
                 endpoint.resolveUriTemplate(serverRequest);
                 endpoint.executeFilters(serverRequest, serverResponse);
                 if (serverResponse.getStatus() != null) {
@@ -66,7 +67,7 @@ public class EndpointResolver {
                 }
             }
             if (endpointDispatcher != null) {
-                for (Endpoint endpoint : matchingEndpoints) {
+                for (HttpEndpoint endpoint : matchingEndpoints) {
                     endpointDispatcher.dispatch(endpoint, serverRequest, serverResponse);
                     if (serverResponse.getStatus() != null) {
                         break;
@@ -76,12 +77,12 @@ public class EndpointResolver {
         }
     }
 
-    public LRUCache<ServerRequest.EndpointInfo, List<Endpoint>> getCache() {
-        return cache;
+    public Map<EndpointInfo, List<HttpEndpoint>> getEndpointInfos() {
+        return endpointInfos;
     }
 
-    protected Endpoint createDefaultEndpoint() {
-        return Endpoint.builder()
+    protected HttpEndpoint createDefaultEndpoint() {
+        return HttpEndpoint.builder()
                 .setPath("/**")
                 .addMethod("GET")
                 .addMethod("HEAD")
@@ -122,9 +123,9 @@ public class EndpointResolver {
 
         private String prefix;
 
-        private Endpoint defaultEndpoint;
+        private HttpEndpoint defaultEndpoint;
 
-        private List<Endpoint> endpoints;
+        private List<HttpEndpoint> endpoints;
 
         private EndpointDispatcher endpointDispatcher;
 
@@ -143,7 +144,7 @@ public class EndpointResolver {
             return this;
         }
 
-        public Builder setDefaultEndpoint(Endpoint endpoint) {
+        public Builder setDefaultEndpoint(HttpEndpoint endpoint) {
             this.defaultEndpoint = endpoint;
             return this;
         }
@@ -154,13 +155,13 @@ public class EndpointResolver {
          * @param endpoint the endpoint
          * @return this builder
          */
-        public Builder addEndpoint(Endpoint endpoint) {
+        public Builder addEndpoint(HttpEndpoint endpoint) {
             if (endpoint.getPrefix().equals("/") && prefix != null && !prefix.isEmpty()) {
-                Endpoint thisEndpoint = Endpoint.builder(endpoint).setPrefix(prefix).build();
-                logger.log(Level.FINEST, "adding endpoint = " + thisEndpoint);
+                HttpEndpoint thisEndpoint = HttpEndpoint.builder(endpoint).setPrefix(prefix).build();
+                logger.log(Level.FINE, "adding endpoint = " + thisEndpoint);
                 endpoints.add(thisEndpoint);
             } else {
-                logger.log(Level.FINEST, "adding endpoint = " + endpoint);
+                logger.log(Level.FINE, "adding endpoint = " + endpoint);
                 endpoints.add(endpoint);
             }
             return this;
@@ -168,20 +169,22 @@ public class EndpointResolver {
 
         /**
          * Adds a service for the methods of the given object that
-         * are annotated with the {@link Context} annotation.
+         * are annotated with the {@link Endpoint} annotation.
          * @param classWithAnnotatedMethods class with annotated methods
          * @return this builder
          */
         public Builder addEndpoint(Object classWithAnnotatedMethods) {
             for (Class<?> clazz = classWithAnnotatedMethods.getClass(); clazz != null; clazz = clazz.getSuperclass()) {
                 for (Method method : clazz.getDeclaredMethods()) {
-                    Context context = method.getAnnotation(Context.class);
-                    if (context != null) {
-                        addEndpoint(Endpoint.builder()
+                    Endpoint endpoint = method.getAnnotation(Endpoint.class);
+                    if (endpoint != null) {
+                        MethodService methodService = new MethodService(method, classWithAnnotatedMethods);
+                        addEndpoint(HttpEndpoint.builder()
                                 .setPrefix(prefix)
-                                .setPath(context.value())
-                                .setMethods(Arrays.asList(context.methods()))
-                                .addFilter(new MethodService(method, classWithAnnotatedMethods))
+                                .setPath(endpoint.path())
+                                .setMethods(Arrays.asList(endpoint.methods()))
+                                .setContentTypes(Arrays.asList(endpoint.contentTypes()))
+                                .addFilter(methodService)
                                 .build());
                     }
                 }

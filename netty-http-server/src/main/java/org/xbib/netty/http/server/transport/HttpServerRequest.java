@@ -3,12 +3,14 @@ package org.xbib.netty.http.server.transport;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpUtil;
-import io.netty.handler.ssl.SslContext;
 import org.xbib.net.QueryParameters;
 import org.xbib.net.URL;
 import org.xbib.netty.http.common.HttpParameters;
 import org.xbib.netty.http.server.ServerRequest;
+import org.xbib.netty.http.server.endpoint.EndpointInfo;
 
 import javax.net.ssl.SSLSession;
 import java.io.IOException;
@@ -18,15 +20,11 @@ import java.nio.charset.UnmappableCharacterException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * The {@code HttpServerRequest} class encapsulates a single request. There must be a default constructor.
  */
 public class HttpServerRequest implements ServerRequest {
-
-    private static final Logger logger = Logger.getLogger(HttpServerRequest.class.getName());
 
     private static final String PATH_SEPARATOR = "/";
 
@@ -60,7 +58,6 @@ public class HttpServerRequest implements ServerRequest {
         this.ctx = ctx;
     }
 
-    @Override
     public ChannelHandlerContext getChannelHandlerContext() {
         return ctx;
     }
@@ -70,7 +67,6 @@ public class HttpServerRequest implements ServerRequest {
         this.info = new EndpointInfo(this);
     }
 
-    @Override
     public FullHttpRequest getRequest() {
         return httpRequest;
     }
@@ -118,6 +114,16 @@ public class HttpServerRequest implements ServerRequest {
     @Override
     public Map<String, String> getPathParameters() {
         return pathParameters;
+    }
+
+    @Override
+    public HttpMethod getMethod() {
+        return httpRequest.method();
+    }
+
+    @Override
+    public HttpHeaders getHeaders() {
+        return httpRequest.headers();
     }
 
     @Override
@@ -180,6 +186,11 @@ public class HttpServerRequest implements ServerRequest {
     @Override
     public SSLSession getSession() {
         return sslSession;
+    }
+
+    @Override
+    public ByteBuf getContent() {
+        return httpRequest.content();
     }
 
     public String toString() {

@@ -23,7 +23,7 @@ public class DefaultCookie implements Cookie {
 
     private boolean httpOnly;
 
-    private String sameSite;
+    private SameSite sameSite;
 
     /**
      * Creates a new cookie with the specified name and value.
@@ -36,6 +36,10 @@ public class DefaultCookie implements Cookie {
             throw new IllegalArgumentException("empty name");
         }
         setValue(value);
+    }
+
+    public DefaultCookie(String name, Payload payload) {
+        this(name, payload.toString());
     }
 
     @Override
@@ -114,12 +118,12 @@ public class DefaultCookie implements Cookie {
     }
 
     @Override
-    public void setSameSite(String sameSite) {
+    public void setSameSite(SameSite sameSite) {
         this.sameSite = sameSite;
     }
 
     @Override
-    public String sameSite() {
+    public SameSite sameSite() {
         return sameSite;
     }
 
@@ -161,7 +165,7 @@ public class DefaultCookie implements Cookie {
         } else if (that.sameSite() == null) {
             return false;
         } else {
-            return sameSite().equalsIgnoreCase(that.sameSite());
+            return sameSite().name().equalsIgnoreCase(that.sameSite().name());
         }
     }
 
@@ -216,7 +220,7 @@ public class DefaultCookie implements Cookie {
             buf.append(", HTTPOnly");
         }
         if (sameSite() != null) {
-            buf.append(", SameSite=").append(sameSite());
+            buf.append(", SameSite=").append(sameSite().name());
         }
         return buf.toString();
     }

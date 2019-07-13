@@ -135,9 +135,11 @@ abstract class BaseTransport implements Transport {
                     flow.get(key).get(value, timeUnit);
                 } catch (Exception e) {
                     String requestKey = getRequestKey(entry.getKey(), key);
-                    Request request = requests.get(requestKey);
-                    if (request != null && request.getCompletableFuture() != null) {
-                        request.getCompletableFuture().completeExceptionally(e);
+                    if (requestKey != null) {
+                        Request request = requests.get(requestKey);
+                        if (request != null && request.getCompletableFuture() != null) {
+                            request.getCompletableFuture().completeExceptionally(e);
+                        }
                     }
                     flow.fail(e);
                 } finally {

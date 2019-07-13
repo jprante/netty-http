@@ -45,7 +45,7 @@ public class HttpServerResponse implements ServerResponse {
 
     private HttpResponseStatus httpResponseStatus;
 
-    public HttpServerResponse(ServerRequest serverRequest) {
+    public HttpServerResponse(HttpServerRequest serverRequest) {
         Objects.requireNonNull(serverRequest, "serverRequest");
         Objects.requireNonNull(serverRequest.getChannelHandlerContext(), "serverRequest channelHandlerContext");
         this.serverRequest = serverRequest;
@@ -114,7 +114,7 @@ public class HttpServerResponse implements ServerResponse {
             int length = byteBuf.readableBytes();
             headers.add(HttpHeaderNames.CONTENT_LENGTH, Long.toString(length));
         }
-        if (serverRequest != null && "close".equalsIgnoreCase(serverRequest.getRequest().headers().get(HttpHeaderNames.CONNECTION)) &&
+        if (serverRequest != null && "close".equalsIgnoreCase(serverRequest.getHeaders().get(HttpHeaderNames.CONNECTION)) &&
                 !headers.contains(HttpHeaderNames.CONNECTION)) {
             headers.add(HttpHeaderNames.CONNECTION, "close");
         }
@@ -164,7 +164,7 @@ public class HttpServerResponse implements ServerResponse {
             logger.log(Level.FINEST, httpResponse.headers()::toString);
             ctx.channel().write(httpResponse);
             ChannelFuture channelFuture = ctx.channel().writeAndFlush(new HttpChunkedInput(chunkedInput));
-            if ("close".equalsIgnoreCase(serverRequest.getRequest().headers().get(HttpHeaderNames.CONNECTION)) &&
+            if ("close".equalsIgnoreCase(serverRequest.getHeaders().get(HttpHeaderNames.CONNECTION)) &&
                     !headers.contains(HttpHeaderNames.CONNECTION)) {
                 channelFuture.addListener(ChannelFutureListener.CLOSE);
             }

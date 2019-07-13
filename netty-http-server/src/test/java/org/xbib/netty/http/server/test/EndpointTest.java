@@ -9,9 +9,9 @@ import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.ServerResponse;
-import org.xbib.netty.http.server.endpoint.Endpoint;
+import org.xbib.netty.http.server.endpoint.HttpEndpoint;
 import org.xbib.netty.http.server.endpoint.EndpointResolver;
-import org.xbib.netty.http.server.endpoint.NamedServer;
+import org.xbib.netty.http.server.Domain;
 import org.xbib.netty.http.server.endpoint.service.FileService;
 import org.xbib.netty.http.server.endpoint.service.Service;
 
@@ -39,16 +39,16 @@ class EndpointTest {
         Service service = new FileService(vartmp);
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         EndpointResolver endpointResolver = EndpointResolver.builder()
-                .addEndpoint(Endpoint.builder().setPath("/**").build())
+                .addEndpoint(HttpEndpoint.builder().setPath("/**").build())
                 .setDispatcher((endpoint, req, resp) -> {
                     logger.log(Level.FINE, "dispatching endpoint=" + endpoint + " req=" + req);
                     service.handle(req, resp);
                 })
                 .build();
-        NamedServer namedServer = NamedServer.builder(httpAddress)
+        Domain domain = Domain.builder(httpAddress)
                 .addEndpointResolver(endpointResolver)
                 .build();
-        Server server = Server.builder(namedServer)
+        Server server = Server.builder(domain)
                 .build();
         Client client = Client.builder()
                 .build();
@@ -79,16 +79,16 @@ class EndpointTest {
         Service service = new FileService(vartmp);
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         EndpointResolver endpointResolver = EndpointResolver.builder()
-                .addEndpoint(Endpoint.builder().setPrefix("/").setPath("/**").build())
+                .addEndpoint(HttpEndpoint.builder().setPrefix("/").setPath("/**").build())
                 .setDispatcher((endpoint, req, resp) -> {
                     logger.log(Level.FINE, "dispatching endpoint=" + endpoint + " req=" + req);
                     service.handle(req, resp);
                 })
                 .build();
-        NamedServer namedServer = NamedServer.builder(httpAddress)
+        Domain domain = Domain.builder(httpAddress)
                 .addEndpointResolver(endpointResolver)
                 .build();
-        Server server = Server.builder(namedServer)
+        Server server = Server.builder(domain)
                 .build();
         Client client = Client.builder()
                 .build();
@@ -120,18 +120,18 @@ class EndpointTest {
         Service service = new FileService(vartmp);
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         EndpointResolver endpointResolver = EndpointResolver.builder()
-                .addEndpoint(Endpoint.builder().setPrefix("/static").setPath("/**").build())
-                .addEndpoint(Endpoint.builder().setPrefix("/static1").setPath("/**").build())
-                .addEndpoint(Endpoint.builder().setPrefix("/static2").setPath("/**").build())
+                .addEndpoint(HttpEndpoint.builder().setPrefix("/static").setPath("/**").build())
+                .addEndpoint(HttpEndpoint.builder().setPrefix("/static1").setPath("/**").build())
+                .addEndpoint(HttpEndpoint.builder().setPrefix("/static2").setPath("/**").build())
                 .setDispatcher((endpoint, req, resp) -> {
                     logger.log(Level.FINE, "dispatching endpoint=" + endpoint + " req=" + req);
                     service.handle(req, resp);
                 })
                 .build();
-        NamedServer namedServer = NamedServer.builder(httpAddress)
+        Domain domain = Domain.builder(httpAddress)
                 .addEndpointResolver(endpointResolver)
                 .build();
-        Server server = Server.builder(namedServer)
+        Server server = Server.builder(domain)
                 .build();
         Client client = Client.builder()
                 .build();
@@ -186,19 +186,19 @@ class EndpointTest {
         Service service = new FileService(vartmp);
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         EndpointResolver endpointResolver = EndpointResolver.builder()
-                .addEndpoint(Endpoint.builder().setPrefix("/static").setPath("/**").build())
-                .addEndpoint(Endpoint.builder().setPrefix("/static1").setPath("/**").build())
-                .addEndpoint(Endpoint.builder().setPrefix("/static2").setPath("/**").build())
+                .addEndpoint(HttpEndpoint.builder().setPrefix("/static").setPath("/**").build())
+                .addEndpoint(HttpEndpoint.builder().setPrefix("/static1").setPath("/**").build())
+                .addEndpoint(HttpEndpoint.builder().setPrefix("/static2").setPath("/**").build())
                 .setDispatcher((endpoint, req, resp) -> {
                     logger.log(Level.FINE, "dispatching endpoint=" + endpoint + " req=" + req +
                             " fragment=" + req.getURL().getFragment());
                     service.handle(req, resp);
                 })
                 .build();
-        NamedServer namedServer = NamedServer.builder(httpAddress)
+        Domain domain = Domain.builder(httpAddress)
                 .addEndpointResolver(endpointResolver)
                 .build();
-        Server server = Server.builder(namedServer)
+        Server server = Server.builder(domain)
                 .build();
         Client client = Client.builder()
                 .build();
@@ -269,15 +269,15 @@ class EndpointTest {
         EndpointResolver.Builder endpointResolverBuilder = EndpointResolver.builder()
                 .setPrefix("/static");
         for (int i = 0; i < max; i++) {
-            endpointResolverBuilder.addEndpoint(Endpoint.builder()
+            endpointResolverBuilder.addEndpoint(HttpEndpoint.builder()
                     .setPath("/" + i + "/**")
                     .addFilter((req, resp) -> ServerResponse.write(resp, HttpResponseStatus.OK))
                     .build());
         }
-        NamedServer namedServer = NamedServer.builder(httpAddress)
+        Domain domain = Domain.builder(httpAddress)
                 .addEndpointResolver(endpointResolverBuilder.build())
                 .build();
-        Server server = Server.builder(namedServer)
+        Server server = Server.builder(domain)
                 .build();
         Client client = Client.builder()
                 .build();

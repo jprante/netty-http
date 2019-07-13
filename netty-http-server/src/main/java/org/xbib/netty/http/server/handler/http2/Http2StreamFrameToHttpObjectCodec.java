@@ -30,7 +30,6 @@ import io.netty.handler.codec.http2.Http2DataFrame;
 import io.netty.handler.codec.http2.Http2Exception;
 import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2HeadersFrame;
-import io.netty.handler.codec.http2.Http2MultiplexCodec;
 import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamFrame;
 import io.netty.handler.codec.http2.HttpConversionUtil;
@@ -38,13 +37,10 @@ import io.netty.handler.ssl.SslHandler;
 import io.netty.util.internal.UnstableApi;
 
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * This handler converts from {@link Http2StreamFrame} to {@link HttpObject},
- * and back. It can be used as an adapter in conjunction with {@link
- * Http2MultiplexCodec} to make http/2 connections backward-compatible with
+ * and back. It can be used as an adapter to make http/2 connections backward-compatible with
  * {@link ChannelHandler}s expecting {@link HttpObject}.
  *
  * For simplicity, it converts to chunked encoding unless the entire stream
@@ -53,8 +49,6 @@ import java.util.logging.Logger;
 @UnstableApi
 @Sharable
 public class Http2StreamFrameToHttpObjectCodec extends MessageToMessageCodec<Http2StreamFrame, HttpObject> {
-
-    private static final Logger logger = Logger.getLogger(Http2StreamFrameToHttpObjectCodec.class.getName());
 
     private final boolean isServer;
 

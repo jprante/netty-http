@@ -66,15 +66,15 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
                 throw new IllegalStateException();
             }
         };
-        Http2MultiplexCodecBuilder clientMultiplexCodecBuilder = Http2MultiplexCodecBuilder.forClient(initializer)
+        Http2MultiplexCodecBuilder multiplexCodecBuilder = Http2MultiplexCodecBuilder.forClient(initializer)
                 .initialSettings(clientConfig.getHttp2Settings());
         if (clientConfig.isDebug()) {
-            clientMultiplexCodecBuilder.frameLogger(new PushPromiseHandler(LogLevel.DEBUG, "client"));
+            multiplexCodecBuilder.frameLogger(new PushPromiseHandler(LogLevel.DEBUG, "client"));
         }
-        Http2MultiplexCodec http2MultiplexCodec = clientMultiplexCodecBuilder.build();
-        ChannelPipeline p = ch.pipeline();
-        p.addLast("client-codec", http2MultiplexCodec);
-        p.addLast("client-messages", new ClientMessages());
+        Http2MultiplexCodec multiplexCodec = multiplexCodecBuilder.autoAckSettingsFrame(true) .build();
+        ChannelPipeline pipeline = ch.pipeline();
+        pipeline.addLast("client-multiplex", multiplexCodec);
+        pipeline.addLast("client-messages", new ClientMessages());
     }
 
     class ClientMessages extends ChannelInboundHandlerAdapter {

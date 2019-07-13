@@ -6,7 +6,7 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.stream.ChunkedNioStream;
-import org.xbib.netty.http.common.util.TimeUtils;
+import org.xbib.netty.http.common.util.DateTimeUtils;
 import org.xbib.netty.http.server.ServerRequest;
 import org.xbib.netty.http.server.ServerResponse;
 import org.xbib.netty.http.server.util.MimeTypeUtils;
@@ -49,20 +49,20 @@ public abstract class ResourceService implements Service {
 
     protected abstract boolean isRangeResponseEnabled();
 
-    protected void handleResource(ServerRequest serverRequest, ServerResponse serverResponse, Resource resource) {
-        HttpHeaders headers = serverRequest.getRequest().headers();
+    private void handleResource(ServerRequest serverRequest, ServerResponse serverResponse, Resource resource) {
+        HttpHeaders headers = serverRequest.getHeaders();
         String contentType = MimeTypeUtils.guessFromPath(resource.getResourcePath(), false);
         long maxAgeSeconds = 24 * 3600;
         long expirationMillis = System.currentTimeMillis() + 1000 * maxAgeSeconds;
         if (isCacheResponseEnabled()) {
-            serverResponse.withHeader(HttpHeaderNames.EXPIRES, TimeUtils.formatMillis(expirationMillis))
+            serverResponse.withHeader(HttpHeaderNames.EXPIRES, DateTimeUtils.formatMillis(expirationMillis))
                     .withHeader(HttpHeaderNames.CACHE_CONTROL, "public, max-age=" + maxAgeSeconds);
         }
         boolean sent = false;
         if (isETagResponseEnabled()) {
             Instant lastModifiedInstant = resource.getLastModified();
             String eTag = resource.getResourcePath().hashCode() + "/" + lastModifiedInstant.toEpochMilli() + "/" + resource.getLength();
-            Instant ifUnmodifiedSinceInstant = TimeUtils.parseDate(headers.get(HttpHeaderNames.IF_UNMODIFIED_SINCE));
+            Instant ifUnmodifiedSinceInstant = DateTimeUtils.parseDate(headers.get(HttpHeaderNames.IF_UNMODIFIED_SINCE));
             if (ifUnmodifiedSinceInstant != null &&
                     ifUnmodifiedSinceInstant.plusMillis(1000L).isAfter(lastModifiedInstant)) {
                 ServerResponse.write(serverResponse, HttpResponseStatus.PRECONDITION_FAILED);
@@ -76,20 +76,20 @@ public abstract class ResourceService implements Service {
             String ifNoneMatch = headers.get(HttpHeaderNames.IF_NONE_MATCH);
             if (ifNoneMatch != null && matches(ifNoneMatch, eTag)) {
                 serverResponse.withHeader(HttpHeaderNames.ETAG, eTag)
-                        .withHeader(HttpHeaderNames.EXPIRES, TimeUtils.formatMillis(expirationMillis));
+                        .withHeader(HttpHeaderNames.EXPIRES, DateTimeUtils.formatMillis(expirationMillis));
                 ServerResponse.write(serverResponse, HttpResponseStatus.NOT_MODIFIED);
                 return;
             }
-            Instant ifModifiedSinceInstant = TimeUtils.parseDate(headers.get(HttpHeaderNames.IF_MODIFIED_SINCE));
+            Instant ifModifiedSinceInstant = DateTimeUtils.parseDate(headers.get(HttpHeaderNames.IF_MODIFIED_SINCE));
             if (ifModifiedSinceInstant != null &&
                     ifModifiedSinceInstant.plusMillis(1000L).isAfter(lastModifiedInstant)) {
                 serverResponse.withHeader(HttpHeaderNames.ETAG, eTag)
-                        .withHeader(HttpHeaderNames.EXPIRES, TimeUtils.formatMillis(expirationMillis));
+                        .withHeader(HttpHeaderNames.EXPIRES, DateTimeUtils.formatMillis(expirationMillis));
                 ServerResponse.write(serverResponse, HttpResponseStatus.NOT_MODIFIED);
                 return;
             }
             serverResponse.withHeader(HttpHeaderNames.ETAG, eTag)
-                    .withHeader(HttpHeaderNames.LAST_MODIFIED, TimeUtils.formatInstant(lastModifiedInstant));
+                    .withHeader(HttpHeaderNames.LAST_MODIFIED, DateTimeUtils.formatInstant(lastModifiedInstant));
             if (isRangeResponseEnabled()) {
                 performRangeResponse(serverRequest, serverResponse, resource, contentType, eTag, headers);
                 sent = true;
@@ -97,11 +97,11 @@ public abstract class ResourceService implements Service {
         }
         if (!sent) {
             serverResponse.withHeader(HttpHeaderNames.CONTENT_LENGTH, Long.toString(resource.getLength()));
-            send(resource.getURL(), HttpResponseStatus.OK, contentType, serverRequest, serverResponse);
+            send(resource.getURL(), contentType, serverRequest, serverResponse);
         }
     }
 
-    protected void performRangeResponse(ServerRequest serverRequest, ServerResponse serverResponse,
+    private void performRangeResponse(ServerRequest serverRequest, ServerResponse serverResponse,
                                        Resource resource,
                                        String contentType, String eTag,
                                        HttpHeaders headers) {
@@ -119,7 +119,7 @@ public abstract class ResourceService implements Service {
             String ifRange = headers.get(HttpHeaderNames.IF_RANGE);
             if (ifRange != null && !ifRange.equals(eTag)) {
                 try {
-                    Instant ifRangeTime = TimeUtils.parseDate(ifRange);
+                    Instant ifRangeTime = DateTimeUtils.parseDate(ifRange);
                     if (ifRangeTime != null && ifRangeTime.plusMillis(1000).isBefore(resource.getLastModified())) {
                         ranges.add(full);
                     }
@@ -180,28 +180,27 @@ public abstract class ResourceService implements Service {
         return Arrays.binarySearch(matchValues, toMatch) > -1 || Arrays.binarySearch(matchValues, "*") > -1;
     }
 
-
     private static long sublong(String value, int beginIndex, int endIndex) {
         String substring = value.substring(beginIndex, endIndex);
         return substring.length() > 0 ? Long.parseLong(substring) : -1;
     }
 
-    protected void send(URL url, HttpResponseStatus httpResponseStatus, String contentType,
+    private void send(URL url, String contentType,
                         ServerRequest serverRequest, ServerResponse serverResponse) {
-        if (serverRequest.getRequest().method() == HttpMethod.HEAD) {
+        if (serverRequest.getMethod() == HttpMethod.HEAD) {
             ServerResponse.write(serverResponse, HttpResponseStatus.OK, contentType);
         } else {
             if ("file".equals(url.getProtocol())) {
                 try {
                     send((FileChannel) Files.newByteChannel(Paths.get(url.toURI())),
-                            httpResponseStatus, contentType, serverResponse);
+                            HttpResponseStatus.OK, contentType, serverResponse);
                 } catch (URISyntaxException | IOException e) {
                     logger.log(Level.SEVERE, e.getMessage(), e);
                     ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
                 }
             } else {
                 try (InputStream inputStream = url.openStream()) {
-                    send(inputStream, httpResponseStatus, contentType, serverResponse);
+                    send(inputStream, HttpResponseStatus.OK, contentType, serverResponse);
                 } catch (IOException e) {
                     logger.log(Level.SEVERE, e.getMessage(), e);
                     ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
@@ -210,9 +209,9 @@ public abstract class ResourceService implements Service {
         }
     }
 
-    protected void send(URL url, HttpResponseStatus httpResponseStatus, String contentType,
+    private void send(URL url, HttpResponseStatus httpResponseStatus, String contentType,
                         ServerRequest serverRequest, ServerResponse serverResponse, long offset, long size) {
-        if (serverRequest.getRequest().method() == HttpMethod.HEAD) {
+        if (serverRequest.getMethod() == HttpMethod.HEAD) {
             ServerResponse.write(serverResponse, HttpResponseStatus.OK, contentType);
         } else {
             if ("file".equals(url.getProtocol())) {
@@ -234,21 +233,21 @@ public abstract class ResourceService implements Service {
         }
     }
 
-    protected void send(FileChannel fileChannel, HttpResponseStatus httpResponseStatus, String contentType,
-                        ServerResponse serverResponse) throws IOException {
+    private void send(FileChannel fileChannel, HttpResponseStatus httpResponseStatus, String contentType,
+                      ServerResponse serverResponse) throws IOException {
         send(fileChannel, httpResponseStatus, contentType, serverResponse, 0L, fileChannel.size());
     }
 
-    protected void send(FileChannel fileChannel, HttpResponseStatus httpResponseStatus, String contentType,
-                        ServerResponse serverResponse, long offset, long size) throws IOException {
+    private void send(FileChannel fileChannel, HttpResponseStatus httpResponseStatus, String contentType,
+                      ServerResponse serverResponse, long offset, long size) throws IOException {
         MappedByteBuffer mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, offset, size);
         serverResponse.withStatus(httpResponseStatus)
                 .withContentType(contentType)
                 .write(Unpooled.wrappedBuffer(mappedByteBuffer));
     }
 
-    protected void send(InputStream inputStream, HttpResponseStatus httpResponseStatus, String contentType,
-                        ServerResponse serverResponse) throws IOException {
+    private void send(InputStream inputStream, HttpResponseStatus httpResponseStatus, String contentType,
+                      ServerResponse serverResponse) throws IOException {
         try (ReadableByteChannel channel = Channels.newChannel(inputStream)) {
             serverResponse.withStatus(httpResponseStatus)
                     .withContentType(contentType)
@@ -256,14 +255,14 @@ public abstract class ResourceService implements Service {
         }
     }
 
-    protected void send(InputStream inputStream, HttpResponseStatus httpResponseStatus, String contentType,
-                        ServerResponse serverResponse, long offset, long size) throws IOException {
+    private void send(InputStream inputStream, HttpResponseStatus httpResponseStatus, String contentType,
+                      ServerResponse serverResponse, long offset, long size) throws IOException {
         serverResponse.withStatus(httpResponseStatus)
                 .withContentType(contentType)
                 .write(Unpooled.wrappedBuffer(readBuffer(inputStream, offset, size)));
     }
 
-    protected static ByteBuffer readBuffer(URL url, long offset, long size) throws IOException, URISyntaxException {
+    private static ByteBuffer readBuffer(URL url, long offset, long size) throws IOException, URISyntaxException {
         if ("file".equals(url.getProtocol())) {
             try (SeekableByteChannel channel = Files.newByteChannel(Paths.get(url.toURI()))) {
                 return readBuffer(channel, offset, size);
@@ -275,17 +274,17 @@ public abstract class ResourceService implements Service {
         }
     }
 
-    protected static ByteBuffer readBuffer(InputStream inputStream, long offset, long size) throws IOException {
+    private static ByteBuffer readBuffer(InputStream inputStream, long offset, long size) throws IOException {
         long n = inputStream.skip(offset);
         return readBuffer(Channels.newChannel(inputStream), size);
     }
 
-    protected static ByteBuffer readBuffer(SeekableByteChannel channel, long offset, long size) throws IOException {
+    private static ByteBuffer readBuffer(SeekableByteChannel channel, long offset, long size) throws IOException {
         channel.position(offset);
         return readBuffer(channel, size);
     }
 
-    protected static ByteBuffer readBuffer(ReadableByteChannel channel, long size) throws IOException {
+    private static ByteBuffer readBuffer(ReadableByteChannel channel, long size) throws IOException {
         ByteBuffer buf = ByteBuffer.allocate((int) size);
         buf.rewind();
         channel.read(buf);

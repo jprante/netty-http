@@ -99,7 +99,7 @@ public final class ClientCookieEncoder extends CookieEncoder {
      *            some cookies
      * @return a Rfc6265 style Cookie header value, null if no cookies are passed.
      */
-    public String encode(Cookie[] cookies) {
+    public String encode(Cookie... cookies) {
         if (Objects.requireNonNull(cookies, "cookies").length == 0) {
             return null;
         }

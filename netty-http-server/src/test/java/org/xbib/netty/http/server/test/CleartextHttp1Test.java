@@ -10,7 +10,7 @@ import org.xbib.netty.http.client.listener.ResponseListener;
 import org.xbib.netty.http.client.transport.Transport;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.endpoint.NamedServer;
+import org.xbib.netty.http.server.Domain;
 
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutorService;
@@ -30,13 +30,13 @@ class CleartextHttp1Test {
     @Test
     void testSimpleClearTextHttp1() throws Exception {
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        NamedServer namedServer = NamedServer.builder(httpAddress)
+        Domain domain = Domain.builder(httpAddress)
                 .singleEndpoint("/**", (request, response) ->
                         response.withStatus(HttpResponseStatus.OK)
                                 .withContentType("text/plain")
-                                .write(request.getRequest().content().retain()))
+                                .write(request.getContent().retain()))
                 .build();
-        Server server = Server.builder(namedServer).build();
+        Server server = Server.builder(domain).build();
         server.accept();
         Client client = Client.builder()
                 .build();
@@ -66,13 +66,13 @@ class CleartextHttp1Test {
     void testPooledClearTextHttp1() throws Exception {
         int loop = 4096;
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        NamedServer namedServer = NamedServer.builder(httpAddress)
+        Domain domain = Domain.builder(httpAddress)
                 .singleEndpoint("/**", (request, response) ->
                                 response.withStatus(HttpResponseStatus.OK)
                                         .withContentType("text/plain")
-                                        .write(request.getRequest().content().retain()))
+                                        .write(request.getContent().retain()))
                 .build();
-        Server server = Server.builder(namedServer).build();
+        Server server = Server.builder(domain).build();
         server.accept();
         Client client = Client.builder()
                 .addPoolNode(httpAddress)
@@ -113,13 +113,13 @@ class CleartextHttp1Test {
         int threads = 4;
         int loop = 4 * 1024;
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        NamedServer namedServer = NamedServer.builder(httpAddress)
+        Domain domain = Domain.builder(httpAddress)
                 .singleEndpoint("/**", (request, response) ->
                                 response.withStatus(HttpResponseStatus.OK)
                                         .withContentType("text/plain")
-                                        .write(request.getRequest().content().retain()))
+                                        .write(request.getContent().retain()))
                 .build();
-        Server server = Server.builder(namedServer).build();
+        Server server = Server.builder(domain).build();
         server.accept();
         Client client = Client.builder()
                 .addPoolNode(httpAddress)

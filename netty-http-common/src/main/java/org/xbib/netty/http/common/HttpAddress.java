@@ -10,7 +10,7 @@ import java.net.InetSocketAddress;
  */
 public class HttpAddress implements PoolKey {
 
-    private static final HttpVersion HTTP_2_0 = HttpVersion.valueOf("HTTP/2.0");
+    public static final HttpVersion HTTP_2_0 = HttpVersion.valueOf("HTTP/2.0");
 
     private final String host;
 
@@ -21,7 +21,6 @@ public class HttpAddress implements PoolKey {
     private final Boolean secure;
 
     private InetSocketAddress inetSocketAddress;
-
 
     public static HttpAddress http1(String host) {
         return new HttpAddress(host, 80, HttpVersion.HTTP_1_1, false);
@@ -86,9 +85,10 @@ public class HttpAddress implements PoolKey {
         this.secure = secure;
     }
 
+    @Override
     public InetSocketAddress getInetSocketAddress() {
         if (inetSocketAddress == null) {
-            // this may execute DNS lookup
+            // this may execute a DNS lookup, cache the result here
             this.inetSocketAddress = new InetSocketAddress(host, port);
         }
         return inetSocketAddress;
@@ -106,6 +106,7 @@ public class HttpAddress implements PoolKey {
         return secure;
     }
 
+    @Override
     public String toString() {
         return host + ":" + port + " (version:" + version + ",secure:" + secure + ")";
     }

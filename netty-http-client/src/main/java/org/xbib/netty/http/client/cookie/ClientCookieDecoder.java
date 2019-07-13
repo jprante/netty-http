@@ -4,9 +4,10 @@ import org.xbib.netty.http.common.cookie.Cookie;
 import org.xbib.netty.http.common.cookie.CookieDecoder;
 import org.xbib.netty.http.common.cookie.CookieHeaderNames;
 import org.xbib.netty.http.common.cookie.DefaultCookie;
-import org.xbib.netty.http.common.util.TimeUtils;
+import org.xbib.netty.http.common.util.DateTimeUtils;
 
 import java.time.Instant;
+import java.util.Locale;
 import java.util.Objects;
 
 /**
@@ -19,13 +20,12 @@ import java.util.Objects;
 public final class ClientCookieDecoder extends CookieDecoder {
 
     /**
-     * Strict encoder that validates that name and value chars are in the valid scope
-     * defined in RFC6265
+     * Strict encoder that validates that name and value chars are in the valid scope defined in RFC6265.
      */
     public static final ClientCookieDecoder STRICT = new ClientCookieDecoder(true);
 
     /**
-     * Lax instance that doesn't validate name and value
+     * Lax instance that doesn't validate name and value.
      */
     public static final ClientCookieDecoder LAX = new ClientCookieDecoder(false);
 
@@ -139,25 +139,11 @@ public final class ClientCookieDecoder extends CookieDecoder {
 
         private boolean httpOnly;
 
-        private String sameSite;
+        private Cookie.SameSite sameSite = Cookie.SameSite.STRICT;
 
         CookieBuilder(DefaultCookie cookie, String header) {
             this.cookie = cookie;
             this.header = header;
-        }
-
-        private long mergeMaxAgeAndExpires() {
-            if (maxAge != Long.MIN_VALUE) {
-                return maxAge;
-            } else if (isValueDefined(expiresStart, expiresEnd)) {
-                Instant expiresDate = TimeUtils.parseDate(header); //DateFormatter.parseHttpDate(header, expiresStart, expiresEnd)
-                if (expiresDate != null) {
-                    Instant now = Instant.now();
-                    long maxAgeMillis = expiresDate.toEpochMilli() - now.toEpochMilli();
-                    return maxAgeMillis / 1000 + (maxAgeMillis % 1000 != 0 ? 1 : 0);
-                }
-            }
-            return Long.MIN_VALUE;
         }
 
         Cookie cookie() {
@@ -218,6 +204,20 @@ public final class ClientCookieDecoder extends CookieDecoder {
             }
         }
 
+        private long mergeMaxAgeAndExpires() {
+            if (maxAge != Long.MIN_VALUE) {
+                return maxAge;
+            } else if (isValueDefined(expiresStart, expiresEnd)) {
+                Instant expiresDate = DateTimeUtils.parseDate(header, expiresStart, expiresEnd);
+                if (expiresDate != null) {
+                    Instant now = Instant.now();
+                    long maxAgeMillis = expiresDate.toEpochMilli() - now.toEpochMilli();
+                    return maxAgeMillis / 1000 + (maxAgeMillis % 1000 != 0 ? 1 : 0);
+                }
+            }
+            return Long.MIN_VALUE;
+        }
+
         private void parse7(int nameStart, int valueStart, int valueEnd) {
             if (header.regionMatches(true, nameStart, CookieHeaderNames.EXPIRES, 0, 7)) {
                 expiresStart = valueStart;
@@ -231,7 +231,10 @@ public final class ClientCookieDecoder extends CookieDecoder {
             if (header.regionMatches(true, nameStart, CookieHeaderNames.HTTPONLY, 0, 8)) {
                 httpOnly = true;
             } else if (header.regionMatches(true, nameStart, CookieHeaderNames.SAMESITE, 0, 8)) {
-                setSameSite(computeValue(valueStart, valueEnd));
+                String string = computeValue(valueStart, valueEnd);
+                if (string != null) {
+                    setSameSite(Cookie.SameSite.valueOf(string.toUpperCase(Locale.ROOT)));
+                }
             }
         }
 
@@ -243,7 +246,7 @@ public final class ClientCookieDecoder extends CookieDecoder {
             return isValueDefined(valueStart, valueEnd) ? header.substring(valueStart, valueEnd) : null;
         }
 
-        private void setSameSite(String value) {
+        private void setSameSite(Cookie.SameSite value) {
             sameSite = value;
         }
     }

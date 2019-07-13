@@ -58,6 +58,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     /**
      * Whether the given incoming message has a body.
      * @param in input
+     * @return true if message has a body
      */
     protected abstract boolean hasBody(In in);
 
@@ -73,6 +74,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
      * Create a streamed incoming message with the given stream.
      * @param in input
      * @param stream stream
+     * @return input
      */
     protected abstract In createStreamedMessage(In in, Publisher<HttpContent> stream);
 

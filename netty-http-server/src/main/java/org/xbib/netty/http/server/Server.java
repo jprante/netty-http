@@ -20,7 +20,6 @@ import io.netty.util.DomainNameMapping;
 import io.netty.util.DomainNameMappingBuilder;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.NetworkUtils;
-import org.xbib.netty.http.server.endpoint.NamedServer;
 import org.xbib.netty.http.server.handler.http.HttpChannelInitializer;
 import org.xbib.netty.http.server.handler.http2.Http2ChannelInitializer;
 import org.xbib.netty.http.common.SecurityUtil;
@@ -120,15 +119,15 @@ public final class Server {
     }
 
     public static Builder builder() {
-        return new Builder(HttpAddress.http1("localhost", 8008));
+        return builder(HttpAddress.http1("localhost", 8008));
     }
 
     public static Builder builder(HttpAddress httpAddress) {
         return new Builder(httpAddress);
     }
 
-    public static Builder builder(NamedServer namedServer) {
-        return new Builder(namedServer.getHttpAddress(), namedServer);
+    public static Builder builder(Domain domain) {
+        return new Builder(domain);
     }
 
     public ServerConfig getServerConfig() {
@@ -142,12 +141,12 @@ public final class Server {
      *             the default virtual host
      * @return the virtual host with the given name, or null if it doesn't exist
      */
-    public NamedServer getNamedServer(String name) {
-        return serverConfig.getNamedServers().get(name);
+    public Domain getNamedServer(String name) {
+        return serverConfig.getDomain(name);
     }
 
-    public NamedServer getDefaultNamedServer() {
-        return serverConfig.getDefaultNamedServer();
+    public Domain getDefaultNamedServer() {
+        return serverConfig.getDefaultDomain();
     }
 
     /**
@@ -235,17 +234,17 @@ public final class Server {
     }
 
     private DomainNameMapping<SslContext> createDomainNameMapping() {
-        if (serverConfig.getDefaultNamedServer() == null) {
+        if (serverConfig.getDefaultDomain() == null) {
             throw new IllegalStateException("no default named server (with name '*') configured, unable to continue");
         }
         DomainNameMapping<SslContext> domainNameMapping = null;
-        if (serverConfig.getAddress().isSecure() && serverConfig.getDefaultNamedServer().getSslContext() != null) {
+        if (serverConfig.getAddress().isSecure() && serverConfig.getDefaultDomain().getSslContext() != null) {
             DomainNameMappingBuilder<SslContext> mappingBuilder =
-                    new DomainNameMappingBuilder<>(serverConfig.getDefaultNamedServer().getSslContext());
-            for (NamedServer namedServer : serverConfig.getNamedServers().values()) {
-                String name = namedServer.getName();
+                    new DomainNameMappingBuilder<>(serverConfig.getDefaultDomain().getSslContext());
+            for (Domain domain : serverConfig.getDomains()) {
+                String name = domain.getName();
                 if (!"*".equals(name)) {
-                    mappingBuilder.add(name, namedServer.getSslContext());
+                    mappingBuilder.add(name, domain.getSslContext());
                 }
             }
             domainNameMapping = mappingBuilder.build();
@@ -292,14 +291,14 @@ public final class Server {
 
         private ServerConfig serverConfig;
 
-        Builder(HttpAddress httpAddress) {
-            this(httpAddress, NamedServer.builder(httpAddress, "*").build());
+        private Builder(HttpAddress httpAddress) {
+            this(Domain.builder(httpAddress, "*").build());
         }
 
-        Builder(HttpAddress httpAddress, NamedServer defaultNamedServer) {
+        private Builder(Domain defaultDomain) {
             this.serverConfig = new ServerConfig();
-            this.serverConfig.setAddress(httpAddress);
-            this.serverConfig.add(defaultNamedServer);
+            this.serverConfig.setAddress(defaultDomain.getHttpAddress());
+            addServer(defaultDomain);
         }
 
         public Builder enableDebug() {
@@ -432,8 +431,9 @@ public final class Server {
             return this;
         }
 
-        public Builder addServer(NamedServer namedServer) {
-            this.serverConfig.add(namedServer);
+        public Builder addServer(Domain domain) {
+            this.serverConfig.putDomain(domain);
+            logger.log(Level.FINE, "adding named server: " + domain);
             return this;
         }
 

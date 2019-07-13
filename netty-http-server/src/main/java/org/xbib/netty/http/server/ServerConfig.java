@@ -5,8 +5,8 @@ import io.netty.channel.epoll.Epoll;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.logging.LogLevel;
 import org.xbib.netty.http.common.HttpAddress;
-import org.xbib.netty.http.server.endpoint.NamedServer;
 
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -188,10 +188,10 @@ public class ServerConfig {
 
     private boolean installHttp2Upgrade = Defaults.INSTALL_HTTP_UPGRADE2;
 
-    private Map<String, NamedServer> namedServers;
+    private final Map<String, Domain> domains;
 
     public ServerConfig() {
-        this.namedServers = new LinkedHashMap<>();
+        this.domains = new LinkedHashMap<>();
     }
 
     public ServerConfig enableDebug() {
@@ -425,20 +425,41 @@ public class ServerConfig {
         return http2Settings;
     }
 
-    public ServerConfig add(NamedServer namedServer) {
-        this.namedServers.put(namedServer.getName(), namedServer);
-        for (String alias : namedServer.getAliases()) {
-            this.namedServers.put(alias, namedServer);
+    public ServerConfig putDomain(Domain domain) {
+        synchronized (domains) {
+            domains.put(domain.getName(), domain);
+            for (String alias : domain.getAliases()) {
+                domains.put(alias, domain);
+            }
         }
         return this;
     }
 
-    public NamedServer getDefaultNamedServer() {
-        return namedServers.get("*");
+    public Collection<Domain> getDomains() {
+        return domains.values();
     }
 
-    public Map<String, NamedServer> getNamedServers() {
-        return namedServers;
+    public ServerConfig removeDomain(String name) {
+        domains.remove(name);
+        return this;
+    }
+
+    public ServerConfig removeDomain(Domain domain) {
+        synchronized (domains) {
+            domains.remove(domain.getName());
+            for (String alias : domain.getAliases()) {
+                domains.remove(alias, domain);
+            }
+        }
+        return this;
+    }
+
+    public Domain getDefaultDomain() {
+        return getDomain("*");
+    }
+
+    public Domain getDomain(String name) {
+        return domains.get(name);
     }
 
 }

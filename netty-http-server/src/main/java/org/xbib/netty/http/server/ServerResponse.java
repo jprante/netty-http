@@ -34,6 +34,10 @@ public interface ServerResponse {
 
     void write(ChunkedInput<ByteBuf> chunkedInput);
 
+    static void write(ServerResponse serverResponse, int status) {
+        write(serverResponse, HttpResponseStatus.valueOf(status));
+    }
+
     static void write(ServerResponse serverResponse, HttpResponseStatus status) {
         write(serverResponse, status, "application/octet-stream", status.reasonPhrase());
     }

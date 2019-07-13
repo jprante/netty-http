@@ -81,23 +81,4 @@ public class FileService extends ResourceService {
             return length;
         }
     }
-
-    /*@Override
-    public void handle(ServerRequest serverRequest, ServerResponse serverResponse) {
-        String requestPath = serverRequest.getEffectiveRequestPath().substring(1); // always starts with '/'
-        Path path = prefix.resolve(requestPath);
-        if (Files.isReadable(path)) {
-            try (InputStream inputStream = Files.newInputStream(path);
-                    ReadableByteChannel byteChannel = Channels.newChannel(inputStream)) {
-                String contentType = MimeTypeUtils.guessFromPath(requestPath, false);
-                serverResponse.write(HttpResponseStatus.OK, contentType, new ChunkedNioStream(byteChannel));
-            } catch (IOException e) {
-                logger.log(Level.SEVERE, e.getMessage(), e);
-                ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
-            }
-        } else {
-            logger.log(Level.WARNING, "failed to access path " + path + " prefix = " + prefix + " requestPath=" + requestPath);
-            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
-        }
-    }*/
 }

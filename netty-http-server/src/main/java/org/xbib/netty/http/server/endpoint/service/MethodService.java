@@ -34,10 +34,8 @@ public class MethodService implements Service {
     public void handle(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
         try {
             m.invoke(obj, serverRequest, serverResponse);
-        } catch (InvocationTargetException ite) {
-            throw new IOException("error: " + ite.getCause().getMessage());
         } catch (Exception e) {
-            throw new IOException("error: " + e);
+            throw new IOException(e);
         }
     }
 }

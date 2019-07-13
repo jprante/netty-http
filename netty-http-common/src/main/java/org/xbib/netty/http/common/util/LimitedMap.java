@@ -4,16 +4,16 @@ import java.util.SortedSet;
 import java.util.TreeMap;
 
 @SuppressWarnings("serial")
-public class LimitedStringMap extends TreeMap<String, SortedSet<String>> {
+public class LimitedMap<K, V> extends TreeMap<K, SortedSet<V>> {
 
     private final int limit;
 
-    public LimitedStringMap(int limit) {
+    public LimitedMap(int limit) {
         this.limit = limit;
     }
 
     @Override
-    public SortedSet<String> put(String key, SortedSet<String> value) {
+    public SortedSet<V> put(K key, SortedSet<V> value) {
         if (size() < limit) {
             return super.put(key, value);
         }

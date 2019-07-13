@@ -8,7 +8,7 @@ import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.ssl.SslHandler;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.ServerResponse;
-import org.xbib.netty.http.server.endpoint.NamedServer;
+import org.xbib.netty.http.server.Domain;
 
 import java.io.IOException;
 
@@ -27,9 +27,9 @@ public class HttpTransport extends BaseTransport {
     public void requestReceived(ChannelHandlerContext ctx, FullHttpRequest fullHttpRequest, Integer sequenceId)
             throws IOException {
         int requestId = requestCounter.incrementAndGet();
-        NamedServer namedServer = server.getNamedServer(fullHttpRequest.headers().get(HttpHeaderNames.HOST));
-        if (namedServer == null) {
-            namedServer = server.getDefaultNamedServer();
+        Domain domain = server.getNamedServer(fullHttpRequest.headers().get(HttpHeaderNames.HOST));
+        if (domain == null) {
+            domain = server.getDefaultNamedServer();
         }
         HttpServerRequest serverRequest = new HttpServerRequest();
         serverRequest.setChannelHandlerContext(ctx);
@@ -41,8 +41,8 @@ public class HttpTransport extends BaseTransport {
             serverRequest.setSession(sslHandler.engine().getSession());
         }
         HttpServerResponse serverResponse = new HttpServerResponse(serverRequest);
-        if (acceptRequest(namedServer, serverRequest, serverResponse)) {
-            handle(namedServer, serverRequest, serverResponse);
+        if (acceptRequest(domain, serverRequest, serverResponse)) {
+            handle(domain, serverRequest, serverResponse);
         } else {
             ServerResponse.write(serverResponse, HttpResponseStatus.NOT_ACCEPTABLE);
         }
