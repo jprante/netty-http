@@ -4,7 +4,7 @@ import org.xbib.net.PercentDecoder;
 import org.xbib.net.PercentEncoder;
 import org.xbib.net.PercentEncoders;
 import org.xbib.netty.http.common.util.LimitedSet;
-import org.xbib.netty.http.common.util.LimitedMap;
+import org.xbib.netty.http.common.util.LimitedTreeMap;
 
 import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
@@ -42,7 +42,7 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
 
     private final int elementSizeLimit;
 
-    private final LimitedMap<String, String> map;
+    private final LimitedTreeMap<String, String> map;
 
     private final PercentEncoder percentEncoder;
 
@@ -62,7 +62,7 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
         this.maxParam = maxParam;
         this.sizeLimit = sizeLimit;
         this.elementSizeLimit = elementSizeLimit;
-        this.map = new LimitedMap<>(maxParam);
+        this.map = new LimitedTreeMap<>(maxParam);
         this.percentEncoder = PercentEncoders.getQueryEncoder(StandardCharsets.UTF_8);
         this.percentDecoder = new PercentDecoder();
         this.contentType = contentType;

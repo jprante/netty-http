@@ -1,6 +1,8 @@
 package org.xbib.netty.http.server.transport;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufOutputStream;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
@@ -23,6 +25,7 @@ import org.xbib.netty.http.server.ServerResponse;
 import org.xbib.netty.http.server.cookie.ServerCookieEncoder;
 import org.xbib.netty.http.server.handler.http.HttpPipelinedResponse;
 
+import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -44,6 +47,8 @@ public class HttpServerResponse implements ServerResponse {
     private HttpHeaders trailingHeaders;
 
     private HttpResponseStatus httpResponseStatus;
+
+    private ByteBufOutputStream byteBufOutputStream;
 
     public HttpServerResponse(HttpServerRequest serverRequest) {
         Objects.requireNonNull(serverRequest, "serverRequest");
@@ -101,8 +106,30 @@ public class HttpServerResponse implements ServerResponse {
     }
 
     @Override
+    public ByteBufOutputStream getOutputStream() {
+        this.byteBufOutputStream = new ByteBufOutputStream(ctx.alloc().buffer());
+        return byteBufOutputStream;
+    }
+
+    @Override
+    public void flush() {
+        write((ByteBuf) null);
+    }
+
+    @Override
+    public void write(byte[] bytes) {
+        ByteBuf byteBuf = ctx.alloc().buffer(bytes.length);
+        byteBuf.writeBytes(bytes);
+        write(byteBuf);
+    }
+
+    @Override
+    public void write(ByteBufOutputStream byteBufOutputStream) {
+        write(byteBufOutputStream.buffer());
+    }
+
+    @Override
     public void write(ByteBuf byteBuf) {
-        Objects.requireNonNull(byteBuf);
         if (httpResponseStatus == null) {
             httpResponseStatus = HttpResponseStatus.OK;
         }
@@ -110,9 +137,12 @@ public class HttpServerResponse implements ServerResponse {
         if (contentType == null) {
             headers.add(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_OCTET_STREAM);
         }
-        if (!headers.contains(HttpHeaderNames.CONTENT_LENGTH) && !headers.contains(HttpHeaderNames.TRANSFER_ENCODING)) {
-            int length = byteBuf.readableBytes();
-            headers.add(HttpHeaderNames.CONTENT_LENGTH, Long.toString(length));
+        if (httpResponseStatus.code() >= 200 && httpResponseStatus.code() != 204) {
+            if (!headers.contains(HttpHeaderNames.CONTENT_LENGTH) && !headers.contains(HttpHeaderNames.TRANSFER_ENCODING)) {
+                if (byteBuf != null) {
+                    headers.add(HttpHeaderNames.CONTENT_LENGTH, Long.toString(byteBuf.readableBytes()));
+                }
+            }
         }
         if (serverRequest != null && "close".equalsIgnoreCase(serverRequest.getHeaders().get(HttpHeaderNames.CONNECTION)) &&
                 !headers.contains(HttpHeaderNames.CONNECTION)) {
@@ -123,9 +153,9 @@ public class HttpServerResponse implements ServerResponse {
         }
         headers.add(HttpHeaderNames.SERVER, ServerName.getServerName());
         if (ctx.channel().isWritable()) {
-            FullHttpResponse fullHttpResponse =
-                    new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, httpResponseStatus, byteBuf, headers, trailingHeaders);
-            logger.log(Level.FINEST, fullHttpResponse.headers()::toString);
+            FullHttpResponse fullHttpResponse = byteBuf != null ?
+                    new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, httpResponseStatus, byteBuf, headers, trailingHeaders) :
+                    new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, httpResponseStatus, Unpooled.buffer(0), headers, trailingHeaders);
             if (serverRequest != null && serverRequest.getSequenceId() != null) {
                 HttpPipelinedResponse httpPipelinedResponse = new HttpPipelinedResponse(fullHttpResponse,
                         ctx.channel().newPromise(), serverRequest.getSequenceId());

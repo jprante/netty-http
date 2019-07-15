@@ -21,6 +21,7 @@ public class LimitedSet<T extends CharSequence> extends TreeSet<T> {
         if (size() < sizeLimit && t.length() <= elementMaximumLength) {
             return super.add(t);
         }
-        return false;
+        throw new IllegalArgumentException("limit exceeded");
+
     }
 }

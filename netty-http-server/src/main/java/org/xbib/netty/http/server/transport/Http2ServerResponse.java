@@ -1,6 +1,7 @@
 package org.xbib.netty.http.server.transport;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufOutputStream;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
@@ -41,6 +42,8 @@ public class Http2ServerResponse implements ServerResponse {
     private Http2Headers headers;
 
     private HttpResponseStatus httpResponseStatus;
+
+    private ByteBufOutputStream byteBufOutputStream;
 
     public Http2ServerResponse(HttpServerRequest serverRequest) {
         Objects.requireNonNull(serverRequest);
@@ -97,8 +100,30 @@ public class Http2ServerResponse implements ServerResponse {
     }
 
     @Override
+    public ByteBufOutputStream getOutputStream() {
+        this.byteBufOutputStream = new ByteBufOutputStream(ctx.alloc().buffer());
+        return byteBufOutputStream;
+    }
+
+    @Override
+    public void flush() {
+        write((ByteBuf) null);
+    }
+
+    @Override
+    public void write(byte[] bytes) {
+        ByteBuf byteBuf = ctx.alloc().buffer(bytes.length);
+        byteBuf.writeBytes(bytes);
+        write(byteBuf);
+    }
+
+    @Override
+    public void write(ByteBufOutputStream byteBufOutputStream) {
+        write(byteBufOutputStream.buffer());
+    }
+
+    @Override
     public void write(ByteBuf byteBuf) {
-        Objects.requireNonNull(byteBuf);
         if (httpResponseStatus == null) {
             httpResponseStatus = HttpResponseStatus.OK;
         }
@@ -107,7 +132,9 @@ public class Http2ServerResponse implements ServerResponse {
             headers.add(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_OCTET_STREAM);
         }
         if (!headers.contains(HttpHeaderNames.CONTENT_LENGTH) && !headers.contains(HttpHeaderNames.TRANSFER_ENCODING)) {
-            headers.add(HttpHeaderNames.CONTENT_LENGTH, Long.toString(byteBuf.readableBytes()));
+            if (byteBuf != null) {
+                headers.add(HttpHeaderNames.CONTENT_LENGTH, Long.toString(byteBuf.readableBytes()));
+            }
         }
         if (serverRequest != null && "close".equalsIgnoreCase(serverRequest.getHeaders().get(HttpHeaderNames.CONNECTION)) &&
                 !headers.contains(HttpHeaderNames.CONNECTION)) {
@@ -117,21 +144,20 @@ public class Http2ServerResponse implements ServerResponse {
             headers.add(HttpHeaderNames.DATE, DateTimeFormatter.RFC_1123_DATE_TIME.format(ZonedDateTime.now(ZoneOffset.UTC)));
         }
         headers.add(HttpHeaderNames.SERVER, ServerName.getServerName());
-
         if (serverRequest != null) {
-            Integer streamId = serverRequest.streamId();
+            Integer streamId = serverRequest.getStreamId();
             if (streamId != null) {
                 headers.setInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), streamId);
             }
         }
         if (ctx.channel().isWritable()) {
             Http2Headers http2Headers = new DefaultHttp2Headers().status(httpResponseStatus.codeAsText()).add(headers);
-            Http2HeadersFrame http2HeadersFrame = new DefaultHttp2HeadersFrame(http2Headers, false);
-            logger.log(Level.FINEST, http2HeadersFrame::toString);
+            Http2HeadersFrame http2HeadersFrame = new DefaultHttp2HeadersFrame(http2Headers, byteBuf == null);
             ctx.channel().write(http2HeadersFrame);
-            Http2DataFrame http2DataFrame = new DefaultHttp2DataFrame(byteBuf, true);
-            logger.log(Level.FINEST, http2DataFrame::toString);
-            ctx.channel().write(http2DataFrame);
+            if (byteBuf != null) {
+                Http2DataFrame http2DataFrame = new DefaultHttp2DataFrame(byteBuf, true);
+                ctx.channel().write(http2DataFrame);
+            }
             ctx.channel().flush();
         }
     }

@@ -10,7 +10,7 @@ import io.netty.handler.ssl.SslProvider;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.SecurityUtil;
 import org.xbib.netty.http.server.endpoint.HttpEndpoint;
-import org.xbib.netty.http.server.endpoint.EndpointResolver;
+import org.xbib.netty.http.server.endpoint.HttpEndpointResolver;
 import org.xbib.netty.http.server.endpoint.service.Service;
 import org.xbib.netty.http.server.security.tls.SelfSignedCertificate;
 
@@ -39,7 +39,7 @@ public class Domain {
 
     private final SslContext sslContext;
 
-    private final List<EndpointResolver> endpointResolvers;
+    private final List<HttpEndpointResolver> httpEndpointResolvers;
 
     /**
      * Constructs a {@code NamedServer} with the given name.
@@ -47,18 +47,18 @@ public class Domain {
      * @param name the name, or null if it is the default server
      * @param aliases alias names for the named server
      * @param httpAddress HTTP address, used for determining if named server is secure or not
-     * @param endpointResolvers the endpoint resolvers
+     * @param httpEndpointResolvers the endpoint resolvers
      * @param sslContext SSL context or null
      */
     protected Domain(String name, Set<String> aliases,
                      HttpAddress httpAddress,
-                     List<EndpointResolver> endpointResolvers,
+                     List<HttpEndpointResolver> httpEndpointResolvers,
                      SslContext sslContext) {
         this.httpAddress = httpAddress;
         this.name = name;
         this.sslContext = sslContext;
         this.aliases = Collections.unmodifiableSet(aliases);
-        this.endpointResolvers = endpointResolvers;
+        this.httpEndpointResolvers = httpEndpointResolvers;
     }
 
     public static Builder builder() {
@@ -99,10 +99,10 @@ public class Domain {
         return aliases;
     }
 
-    public void execute(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
-        if (endpointResolvers != null && !endpointResolvers.isEmpty()) {
-            for (EndpointResolver endpointResolver : endpointResolvers) {
-                endpointResolver.resolve(serverRequest, serverResponse);
+    public void handle(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
+        if (httpEndpointResolvers != null && !httpEndpointResolvers.isEmpty()) {
+            for (HttpEndpointResolver httpEndpointResolver : httpEndpointResolvers) {
+                httpEndpointResolver.handle(serverRequest, serverResponse);
             }
         } else {
             ServerResponse.write(serverResponse, HttpResponseStatus.NOT_IMPLEMENTED);
@@ -122,7 +122,7 @@ public class Domain {
 
         private Set<String> aliases;
 
-        private List<EndpointResolver> endpointResolvers;
+        private List<HttpEndpointResolver> httpEndpointResolvers;
 
         private TrustManagerFactory trustManagerFactory;
 
@@ -146,7 +146,7 @@ public class Domain {
             this.httpAddress = httpAddress;
             this.serverName = serverName;
             this.aliases = new LinkedHashSet<>();
-            this.endpointResolvers = new ArrayList<>();
+            this.httpEndpointResolvers = new ArrayList<>();
             this.trustManagerFactory = SecurityUtil.Defaults.DEFAULT_TRUST_MANAGER_FACTORY; // InsecureTrustManagerFactory.INSTANCE;
             this.sslProvider = SecurityUtil.Defaults.DEFAULT_SSL_PROVIDER;
             this.ciphers = SecurityUtil.Defaults.DEFAULT_CIPHERS;
@@ -243,25 +243,25 @@ public class Domain {
             return this;
         }
 
-        public Builder addEndpointResolver(EndpointResolver endpointResolver) {
-            this.endpointResolvers.add(endpointResolver);
+        public Builder addEndpointResolver(HttpEndpointResolver httpEndpointResolver) {
+            this.httpEndpointResolvers.add(httpEndpointResolver);
             return this;
         }
 
         public Builder singleEndpoint(String path, Service service) {
-            addEndpointResolver(EndpointResolver.builder()
+            addEndpointResolver(HttpEndpointResolver.builder()
                     .addEndpoint(HttpEndpoint.builder().setPath(path).addFilter(service).build()).build());
             return this;
         }
 
         public Builder singleEndpoint(String prefix, String path, Service service) {
-            addEndpointResolver(EndpointResolver.builder()
+            addEndpointResolver(HttpEndpointResolver.builder()
                     .addEndpoint(HttpEndpoint.builder().setPrefix(prefix).setPath(path).addFilter(service).build()).build());
             return this;
         }
 
         public Builder singleEndpoint(String prefix, String path, Service service, String... methods) {
-            addEndpointResolver(EndpointResolver.builder()
+            addEndpointResolver(HttpEndpointResolver.builder()
                     .addEndpoint(HttpEndpoint.builder().setPrefix(prefix).setPath(path).addFilter(service)
                             .setMethods(Arrays.asList(methods)).build()).build());
             return this;
@@ -282,12 +282,12 @@ public class Domain {
                     if (httpAddress.getVersion().majorVersion() == 2) {
                         sslContextBuilder.applicationProtocolConfig(newApplicationProtocolConfig());
                     }
-                    return new Domain(serverName, aliases, httpAddress, endpointResolvers, sslContextBuilder.build());
+                    return new Domain(serverName, aliases, httpAddress, httpEndpointResolvers, sslContextBuilder.build());
                 } catch (Throwable t) {
                     throw new RuntimeException(t);
                 }
             } else {
-                return new Domain(serverName, aliases, httpAddress, endpointResolvers, null);
+                return new Domain(serverName, aliases, httpAddress, httpEndpointResolvers, null);
             }
         }
 

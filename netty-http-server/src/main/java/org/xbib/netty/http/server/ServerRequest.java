@@ -1,11 +1,13 @@
 package org.xbib.netty.http.server;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufInputStream;
+import io.netty.channel.Channel;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 import org.xbib.net.URL;
 import org.xbib.netty.http.common.HttpParameters;
-import org.xbib.netty.http.server.endpoint.EndpointInfo;
+import org.xbib.netty.http.server.endpoint.HttpEndpointDescriptor;
 
 import javax.net.ssl.SSLSession;
 import java.io.IOException;
@@ -16,15 +18,15 @@ public interface ServerRequest {
 
     URL getURL();
 
-    EndpointInfo getEndpointInfo();
+    Channel getChannel();
+
+    HttpEndpointDescriptor getEndpointDescriptor();
 
     void setContext(List<String> context);
 
     List<String> getContext();
 
     void addPathParameter(String key, String value) throws IOException;
-
-    void createParameters() throws IOException;
 
     Map<String, String> getPathParameters();
 
@@ -40,12 +42,14 @@ public interface ServerRequest {
 
     Integer getSequenceId();
 
-    Integer streamId();
+    Integer getStreamId();
 
-    Integer requestId();
+    Integer getRequestId();
 
     SSLSession getSession();
 
     ByteBuf getContent();
+
+    ByteBufInputStream getInputStream();
 
 }

@@ -1,5 +1,6 @@
 package org.xbib.netty.http.server.endpoint;
 
+import org.xbib.net.Pair;
 import org.xbib.net.QueryParameters;
 import org.xbib.net.path.PathMatcher;
 import org.xbib.net.path.PathNormalizer;
@@ -13,7 +14,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 
-public class HttpEndpoint {
+public class HttpEndpoint implements Endpoint<HttpEndpointDescriptor> {
 
     private static final PathMatcher pathMatcher = new PathMatcher();
 
@@ -50,32 +51,36 @@ public class HttpEndpoint {
                 .setFilters(endpoint.filters);
     }
 
+    @Override
     public String getPrefix() {
         return prefix;
     }
 
+    @Override
     public String getPath() {
         return path;
     }
 
-    public boolean matches(EndpointInfo info) {
+    @Override
+    public boolean matches(HttpEndpointDescriptor info) {
         return pathMatcher.match(prefix + path, info.getPath()) &&
                 (methods == null || methods.isEmpty() || (methods.contains(info.getMethod()))) &&
                 (contentTypes == null || contentTypes.isEmpty() || info.getContentType() == null ||
                 contentTypes.stream().anyMatch(info.getContentType()::startsWith));
     }
 
+    @Override
     public void resolveUriTemplate(ServerRequest serverRequest) throws IOException {
-        if (pathMatcher.match(prefix + path,  serverRequest.getEffectiveRequestPath() /*serverRequest.getRequest().uri()*/ )) {
+        if (pathMatcher.match(prefix + path,  serverRequest.getEffectiveRequestPath())) {
             QueryParameters queryParameters = pathMatcher.extractUriTemplateVariables(prefix + path,
-                    serverRequest.getEffectiveRequestPath() /*serverRequest.getRequest().uri()*/ );
-            for (QueryParameters.Pair<String, String> pair : queryParameters) {
+                    serverRequest.getEffectiveRequestPath());
+            for (Pair<String, String> pair : queryParameters) {
                 serverRequest.addPathParameter(pair.getFirst(), pair.getSecond());
             }
         }
     }
 
-    public void executeFilters(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
+    public void handle(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
         serverRequest.setContext(pathMatcher.tokenizePath(getPrefix()));
         for (Service service : filters) {
             service.handle(serverRequest, serverResponse);

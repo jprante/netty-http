@@ -81,7 +81,7 @@ abstract class BaseTransport implements Transport {
      */
     static void handle(Domain domain, HttpServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
         // create server URL and parse parameters from query string, path, and parse body, if exists
-        serverRequest.createParameters();
-        domain.execute(serverRequest, serverResponse);
+        serverRequest.handleParameters();
+        domain.handle(serverRequest, serverResponse);
     }
 }

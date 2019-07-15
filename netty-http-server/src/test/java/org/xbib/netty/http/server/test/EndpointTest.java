@@ -10,7 +10,7 @@ import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.ServerResponse;
 import org.xbib.netty.http.server.endpoint.HttpEndpoint;
-import org.xbib.netty.http.server.endpoint.EndpointResolver;
+import org.xbib.netty.http.server.endpoint.HttpEndpointResolver;
 import org.xbib.netty.http.server.Domain;
 import org.xbib.netty.http.server.endpoint.service.FileService;
 import org.xbib.netty.http.server.endpoint.service.Service;
@@ -38,15 +38,15 @@ class EndpointTest {
         Path vartmp = Paths.get("/var/tmp/");
         Service service = new FileService(vartmp);
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        EndpointResolver endpointResolver = EndpointResolver.builder()
+        HttpEndpointResolver httpEndpointResolver = HttpEndpointResolver.builder()
                 .addEndpoint(HttpEndpoint.builder().setPath("/**").build())
                 .setDispatcher((endpoint, req, resp) -> {
-                    logger.log(Level.FINE, "dispatching endpoint=" + endpoint + " req=" + req);
+                    logger.log(Level.FINE, "dispatching endpoint = " + endpoint + " req = " + req);
                     service.handle(req, resp);
                 })
                 .build();
         Domain domain = Domain.builder(httpAddress)
-                .addEndpointResolver(endpointResolver)
+                .addEndpointResolver(httpEndpointResolver)
                 .build();
         Server server = Server.builder(domain)
                 .build();
@@ -78,15 +78,15 @@ class EndpointTest {
         Path vartmp = Paths.get("/var/tmp/");
         Service service = new FileService(vartmp);
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        EndpointResolver endpointResolver = EndpointResolver.builder()
+        HttpEndpointResolver httpEndpointResolver = HttpEndpointResolver.builder()
                 .addEndpoint(HttpEndpoint.builder().setPrefix("/").setPath("/**").build())
                 .setDispatcher((endpoint, req, resp) -> {
-                    logger.log(Level.FINE, "dispatching endpoint=" + endpoint + " req=" + req);
+                    logger.log(Level.FINE, "dispatching endpoint = " + endpoint + " req = " + req);
                     service.handle(req, resp);
                 })
                 .build();
         Domain domain = Domain.builder(httpAddress)
-                .addEndpointResolver(endpointResolver)
+                .addEndpointResolver(httpEndpointResolver)
                 .build();
         Server server = Server.builder(domain)
                 .build();
@@ -119,17 +119,17 @@ class EndpointTest {
         Path vartmp = Paths.get("/var/tmp/");
         Service service = new FileService(vartmp);
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        EndpointResolver endpointResolver = EndpointResolver.builder()
+        HttpEndpointResolver httpEndpointResolver = HttpEndpointResolver.builder()
                 .addEndpoint(HttpEndpoint.builder().setPrefix("/static").setPath("/**").build())
                 .addEndpoint(HttpEndpoint.builder().setPrefix("/static1").setPath("/**").build())
                 .addEndpoint(HttpEndpoint.builder().setPrefix("/static2").setPath("/**").build())
                 .setDispatcher((endpoint, req, resp) -> {
-                    logger.log(Level.FINE, "dispatching endpoint=" + endpoint + " req=" + req);
+                    logger.log(Level.FINE, "dispatching endpoint = " + endpoint + " req = " + req);
                     service.handle(req, resp);
                 })
                 .build();
         Domain domain = Domain.builder(httpAddress)
-                .addEndpointResolver(endpointResolver)
+                .addEndpointResolver(httpEndpointResolver)
                 .build();
         Server server = Server.builder(domain)
                 .build();
@@ -185,18 +185,18 @@ class EndpointTest {
         Path vartmp = Paths.get("/var/tmp/");
         Service service = new FileService(vartmp);
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        EndpointResolver endpointResolver = EndpointResolver.builder()
+        HttpEndpointResolver httpEndpointResolver = HttpEndpointResolver.builder()
                 .addEndpoint(HttpEndpoint.builder().setPrefix("/static").setPath("/**").build())
                 .addEndpoint(HttpEndpoint.builder().setPrefix("/static1").setPath("/**").build())
                 .addEndpoint(HttpEndpoint.builder().setPrefix("/static2").setPath("/**").build())
                 .setDispatcher((endpoint, req, resp) -> {
-                    logger.log(Level.FINE, "dispatching endpoint=" + endpoint + " req=" + req +
+                    logger.log(Level.FINE, "dispatching endpoint = " + endpoint + " req = " + req +
                             " fragment=" + req.getURL().getFragment());
                     service.handle(req, resp);
                 })
                 .build();
         Domain domain = Domain.builder(httpAddress)
-                .addEndpointResolver(endpointResolver)
+                .addEndpointResolver(httpEndpointResolver)
                 .build();
         Server server = Server.builder(domain)
                 .build();
@@ -264,9 +264,9 @@ class EndpointTest {
 
     @Test
     void testMassiveEndpoints() throws IOException {
-        int max = 2; // more than 1024
+        int max = 1024;
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        EndpointResolver.Builder endpointResolverBuilder = EndpointResolver.builder()
+        HttpEndpointResolver.Builder endpointResolverBuilder = HttpEndpointResolver.builder()
                 .setPrefix("/static");
         for (int i = 0; i < max; i++) {
             endpointResolverBuilder.addEndpoint(HttpEndpoint.builder()

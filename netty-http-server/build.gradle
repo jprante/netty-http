@@ -1,14 +1,9 @@
 dependencies {
-    implementation project(":netty-http-common")
-    implementation "io.netty:netty-handler:${project.property('netty.version')}"
-    implementation "io.netty:netty-transport-native-epoll:${project.property('netty.version')}"
-    implementation "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
-    implementation "io.netty:netty-codec-http2:${project.property('netty.version')}"
-    implementation "org.xbib:net-url:${project.property('xbib-net-url.version')}"
-    implementation "org.bouncycastle:bcpkix-jdk15on:${project.property('bouncycastle.version')}"
-    implementation "org.reactivestreams:reactive-streams:${project.property('reactivestreams.version')}"
+    compile project(":netty-http-common")
+    compile "io.netty:netty-handler:${project.property('netty.version')}"
+    compile "io.netty:netty-transport-native-epoll:${project.property('netty.version')}"
+    compile "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
+    compile "io.netty:netty-codec-http2:${project.property('netty.version')}"
+    compile "org.bouncycastle:bcpkix-jdk15on:${project.property('bouncycastle.version')}"
     testImplementation project(":netty-http-client")
-    testImplementation("org.reactivestreams:reactive-streams-tck:${project.property('reactivestreams.version')}") {
-        exclude module: 'testng'
-    }
 }

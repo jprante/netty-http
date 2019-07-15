@@ -1,19 +1,23 @@
 package org.xbib.netty.http.server.transport;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufInputStream;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpUtil;
+import org.xbib.net.Pair;
 import org.xbib.net.QueryParameters;
 import org.xbib.net.URL;
 import org.xbib.netty.http.common.HttpParameters;
 import org.xbib.netty.http.server.ServerRequest;
-import org.xbib.netty.http.server.endpoint.EndpointInfo;
+import org.xbib.netty.http.server.endpoint.HttpEndpointDescriptor;
 
 import javax.net.ssl.SSLSession;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnmappableCharacterException;
@@ -40,7 +44,7 @@ public class HttpServerRequest implements ServerRequest {
 
     private FullHttpRequest httpRequest;
 
-    private EndpointInfo info;
+    private HttpEndpointDescriptor info;
 
     private HttpParameters parameters;
 
@@ -54,6 +58,26 @@ public class HttpServerRequest implements ServerRequest {
 
     private SSLSession sslSession;
 
+    public void handleParameters() throws IOException {
+        try {
+            HttpParameters httpParameters = new HttpParameters();
+            URL.Builder builder = URL.builder().path(getRequest().uri());
+            this.url = builder.build();
+            QueryParameters queryParameters = url.getQueryParams();
+            ByteBuf byteBuf = httpRequest.content();
+            if (APPLICATION_FORM_URL_ENCODED.equals(HttpUtil.getMimeType(httpRequest)) && byteBuf != null) {
+                String content = byteBuf.toString(HttpUtil.getCharset(httpRequest, StandardCharsets.ISO_8859_1));
+                queryParameters.addPercentEncodedBody(content);
+            }
+            for (Pair<String, String> pair : queryParameters) {
+                httpParameters.add(pair.getFirst(), pair.getSecond());
+            }
+            this.parameters = httpParameters;
+        } catch (MalformedInputException | UnmappableCharacterException e) {
+            throw new IOException(e);
+        }
+    }
+
     public void setChannelHandlerContext(ChannelHandlerContext ctx) {
         this.ctx = ctx;
     }
@@ -64,7 +88,7 @@ public class HttpServerRequest implements ServerRequest {
 
     public void setRequest(FullHttpRequest fullHttpRequest) {
         this.httpRequest = fullHttpRequest;
-        this.info = new EndpointInfo(this);
+        this.info = new HttpEndpointDescriptor(this);
     }
 
     public FullHttpRequest getRequest() {
@@ -77,7 +101,12 @@ public class HttpServerRequest implements ServerRequest {
     }
 
     @Override
-    public EndpointInfo getEndpointInfo() {
+    public Channel getChannel() {
+        return ctx.channel();
+    }
+
+    @Override
+    public HttpEndpointDescriptor getEndpointDescriptor() {
         return info;
     }
 
@@ -99,7 +128,7 @@ public class HttpServerRequest implements ServerRequest {
 
     @Override
     public String getEffectiveRequestPath() {
-        String path = getEndpointInfo().getPath();
+        String path = getEndpointDescriptor().getPath();
         String effective = contextPath != null && !PATH_SEPARATOR.equals(contextPath) && path.startsWith(contextPath) ?
                 path.substring(contextPath.length()) : path;
         return effective.isEmpty() ? PATH_SEPARATOR : effective;
@@ -127,27 +156,6 @@ public class HttpServerRequest implements ServerRequest {
     }
 
     @Override
-    public void createParameters() throws IOException {
-        try {
-            HttpParameters httpParameters = new HttpParameters();
-            URL.Builder builder = URL.builder().path(getRequest().uri());
-            this.url = builder.build();
-            QueryParameters queryParameters = url.getQueryParams();
-            ByteBuf byteBuf = httpRequest.content();
-            if (APPLICATION_FORM_URL_ENCODED.equals(HttpUtil.getMimeType(httpRequest)) && byteBuf != null) {
-                String content = byteBuf.toString(HttpUtil.getCharset(httpRequest, StandardCharsets.ISO_8859_1));
-                queryParameters.addPercentEncodedBody(content);
-            }
-            for (QueryParameters.Pair<String, String> pair : queryParameters) {
-                httpParameters.add(pair.getFirst(), pair.getSecond());
-            }
-            this.parameters = httpParameters;
-        } catch (MalformedInputException | UnmappableCharacterException e) {
-            throw new IOException(e);
-        }
-    }
-
-    @Override
     public HttpParameters getParameters() {
         return parameters;
     }
@@ -166,7 +174,7 @@ public class HttpServerRequest implements ServerRequest {
     }
 
     @Override
-    public Integer streamId() {
+    public Integer getStreamId() {
         return streamId;
     }
 
@@ -175,7 +183,7 @@ public class HttpServerRequest implements ServerRequest {
     }
 
     @Override
-    public Integer requestId() {
+    public Integer getRequestId() {
         return requestId;
     }
 
@@ -191,6 +199,11 @@ public class HttpServerRequest implements ServerRequest {
     @Override
     public ByteBuf getContent() {
         return httpRequest.content();
+    }
+
+    @Override
+    public ByteBufInputStream getInputStream() {
+        return new ByteBufInputStream(getContent(), true);
     }
 
     public String toString() {

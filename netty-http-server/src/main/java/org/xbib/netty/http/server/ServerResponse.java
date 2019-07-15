@@ -1,6 +1,7 @@
 package org.xbib.netty.http.server;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -30,9 +31,21 @@ public interface ServerResponse {
 
     ServerResponse withCookie(Cookie cookie);
 
+    ByteBufOutputStream getOutputStream();
+
+    void flush();
+
+    void write(byte[] bytes);
+
+    void write(ByteBufOutputStream byteBufOutputStream);
+
     void write(ByteBuf byteBuf);
 
     void write(ChunkedInput<ByteBuf> chunkedInput);
+
+    /**
+     * Convenience methods.
+     */
 
     static void write(ServerResponse serverResponse, int status) {
         write(serverResponse, HttpResponseStatus.valueOf(status));
