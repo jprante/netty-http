@@ -43,10 +43,6 @@ public interface ServerResponse {
 
     void write(ChunkedInput<ByteBuf> chunkedInput);
 
-    /**
-     * Convenience methods.
-     */
-
     static void write(ServerResponse serverResponse, int status) {
         write(serverResponse, HttpResponseStatus.valueOf(status));
     }

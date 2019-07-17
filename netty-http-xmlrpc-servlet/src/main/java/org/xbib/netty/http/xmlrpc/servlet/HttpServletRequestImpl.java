@@ -131,19 +131,18 @@ public class HttpServletRequestImpl implements HttpServletRequest {
     void readHttpHeaders() throws IOException {
         byte[] buffer = new byte[2048];
         String line = readLine(buffer);
-        StringTokenizer tokens =
-                line != null ? new StringTokenizer(line) : null;
+        StringTokenizer tokens = line != null ? new StringTokenizer(line) : null;
         if (tokens == null || !tokens.hasMoreTokens()) {
-            throw new ServletWebServer.Exception(400, "Bad Request", "Unable to parse requests first line (should" +
+            throw new ServletWebServer.ServletWebServerException(400, "Bad Request", "Unable to parse requests first line (should" +
                     " be 'METHOD uri HTTP/version', was empty.");
         }
         method = tokens.nextToken();
         if (!"POST".equalsIgnoreCase(method)) {
-            throw new ServletWebServer.Exception(400, "Bad Request", "Expected 'POST' method, got " +
+            throw new ServletWebServer.ServletWebServerException(400, "Bad Request", "Expected 'POST' method, got " +
                     method);
         }
         if (!tokens.hasMoreTokens()) {
-            throw new ServletWebServer.Exception(400, "Bad Request", "Unable to parse requests first line (should" +
+            throw new ServletWebServer.ServletWebServerException(400, "Bad Request", "Unable to parse requests first line (should" +
                     " be 'METHOD uri HTTP/version', was: " + line);
         }
         String u = tokens.nextToken();
@@ -155,26 +154,23 @@ public class HttpServletRequestImpl implements HttpServletRequest {
             uri = u;
             queryString = null;
         }
-        String httpVersion;
         if (tokens.hasMoreTokens()) {
             String v = tokens.nextToken().toUpperCase();
             if (tokens.hasMoreTokens()) {
-                throw new ServletWebServer.Exception(400, "Bad Request", "Unable to parse requests first line (should" +
-                        " be 'METHOD uri HTTP/version', was: " + line);
+                throw new ServletWebServer.ServletWebServerException(400, "Bad Request",
+                        "Unable to parse requests first line (should" + " be 'METHOD uri HTTP/version', was: " + line);
             } else {
                 int index = v.indexOf('/');
                 if (index == -1) {
-                    throw new ServletWebServer.Exception(400, "Bad Request", "Unable to parse requests first line (should" +
-                            " be 'METHOD uri HTTP/version', was: " + line);
+                    throw new ServletWebServer.ServletWebServerException(400, "Bad Request",
+                            "Unable to parse requests first line (should" + " be 'METHOD uri HTTP/version', was: " + line);
                 }
                 protocol = v.substring(0, index).toUpperCase();
-                httpVersion = v.substring(index + 1);
             }
         } else {
-            httpVersion = "1.0";
             protocol = "HTTP";
         }
-        for (;;) {
+        while (true) {
             line = HttpUtil.readLine(istream, buffer);
             if (line.length() == 0) {
                 break;
@@ -183,8 +179,8 @@ public class HttpServletRequestImpl implements HttpServletRequest {
             if (off > 0) {
                 addHeader(line.substring(0, off), line.substring(off + 1).trim());
             } else {
-                throw new ServletWebServer.Exception(400, "Bad Request", "Unable to parse header line: " +
-                        line);
+                throw new ServletWebServer.ServletWebServerException(400, "Bad Request",
+                        "Unable to parse header line: " + line);
             }
         }
         contentBytesRemaining = getIntHeader("content-length");
@@ -196,7 +192,7 @@ public class HttpServletRequestImpl implements HttpServletRequest {
             return null;
         }
         if (res == pBuffer.length && pBuffer[pBuffer.length - 1] != '\n') {
-            throw new ServletWebServer.Exception(400, "Bad Request",
+            throw new ServletWebServer.ServletWebServerException(400, "Bad Request",
                     "maximum header size of " + pBuffer.length + " characters exceeded");
         }
         return new String(pBuffer, 0, res, StandardCharsets.US_ASCII);
@@ -242,7 +238,7 @@ public class HttpServletRequestImpl implements HttpServletRequest {
     public String getHeader(String pHeader) {
         String key = pHeader.toLowerCase();
         String[] strings = headers.get(key);
-        return strings != null ? strings[0] : null;
+        return strings != null && strings.length > 0 ? strings[0] : null;
     }
 
     @Override
@@ -253,7 +249,9 @@ public class HttpServletRequestImpl implements HttpServletRequest {
     @Override
     public Enumeration<String> getHeaders(String pHeader) {
         String key = pHeader.toLowerCase();
-        return Collections.enumeration(Arrays.asList(headers.get(key)));
+        String[] values = headers.get(key);
+        return values != null && values.length > 0 ?
+                Collections.enumeration(Arrays.asList(values)) : Collections.emptyEnumeration();
     }
 
     @Override

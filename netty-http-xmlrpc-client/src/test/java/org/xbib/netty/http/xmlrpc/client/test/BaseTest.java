@@ -7,7 +7,6 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.TimeZone;
 
@@ -23,10 +22,6 @@ import org.xbib.netty.http.xmlrpc.common.XmlRpcExtensionException;
 import org.xbib.netty.http.xmlrpc.common.XmlRpcInvocationException;
 import org.xbib.netty.http.xmlrpc.server.XmlRpcHandlerMapping;
 import org.xml.sax.InputSource;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 
 /**
  * An abstract test case, to be implemented for the various
@@ -129,8 +124,8 @@ public class BaseTest extends XmlRpcTestCase {
 		 */
 		public int byteArrayParam(byte[] pArg) {
 			int sum = 0;
-			for (int i = 0;  i < pArg.length;  i++) {
-				sum += pArg[i];
+			for (byte b : pArg) {
+				sum += b;
 			}
 			return sum;
 		}
@@ -151,11 +146,11 @@ public class BaseTest extends XmlRpcTestCase {
 		 */
 		public int objectArrayParam(Object[] pArg) {
 			int sum = 0;
-			for (int i = 0;  i < pArg.length;  i++) {
-				if (pArg[i] instanceof Number) {
-					sum += ((Number) pArg[i]).intValue();
+			for (Object o : pArg) {
+				if (o instanceof Number) {
+					sum += ((Number) o).intValue();
 				} else {
-					sum += Integer.parseInt((String) pArg[i]);
+					sum += Integer.parseInt((String) o);
 				}
 			}
 			return sum;
@@ -168,7 +163,7 @@ public class BaseTest extends XmlRpcTestCase {
 		public Object[] objectArrayResult(int pArg) {
 			Object[] result = new Object[pArg];
 			for (int i = 0;  i < result.length;  i++) {
-				result[i] = new Integer(i);
+				result[i] = i;
 			}
 			return result;
 		}
@@ -177,13 +172,12 @@ public class BaseTest extends XmlRpcTestCase {
 		 * @param pArg The map being iterated.
 		 * @return Sum of keys, multiplied by their values.
 		 */
-		public int mapParam(Map pArg) {
+		public int mapParam(Map<String, Integer> pArg) {
 			int sum = 0;
-			for (Iterator iter = pArg.entrySet().iterator();  iter.hasNext();  ) {
-				Map.Entry entry = (Map.Entry) iter.next();
-				String key = (String) entry.getKey();
-				Integer value = (Integer) entry.getValue();
-				sum += Integer.parseInt(key) * value.intValue();
+			for (Map.Entry<String, Integer> entry : pArg.entrySet()) {
+				String key = entry.getKey();
+				Integer value = entry.getValue();
+				sum += Integer.parseInt(key) * value;
 			}
 			return sum;
 		}
@@ -193,10 +187,10 @@ public class BaseTest extends XmlRpcTestCase {
 		 * @return Map with the keys "0".."pArg" and
 		 * 0..pArg as values.
 		 */
-		public Map mapResult(int pArg) {
-			Map result = new HashMap();
+		public Map<String, Integer> mapResult(int pArg) {
+			Map<String, Integer> result = new HashMap<>();
 			for (int i = 0;  i < pArg;  i++) {
-				result.put(Integer.toString(i), new Integer(i));
+				result.put(Integer.toString(i), i);
 			}
 			return result;
 		}
@@ -217,7 +211,7 @@ public class BaseTest extends XmlRpcTestCase {
 		}
 		private int count(Node pNode) {
 			if (INT_TAG.equals(pNode.getLocalName())  &&  INT_URI.equals(pNode.getNamespaceURI())) {
-				StringBuffer sb = new StringBuffer();
+				StringBuilder sb = new StringBuilder();
 				for (Node child = pNode.getFirstChild();  child != null;  child = child.getNextSibling()) {
 					if (child.getNodeType() == Node.TEXT_NODE  ||  child.getNodeType() == Node.CDATA_SECTION_NODE) {
 						sb.append(child.getNodeValue());
@@ -237,7 +231,7 @@ public class BaseTest extends XmlRpcTestCase {
 
 		/** Example of a Serializable instance.
 		 */
-        public static class CalendarWrapper implements Serializable {
+        static class CalendarWrapper implements Serializable {
             private static final long serialVersionUID = 8153663910532549627L;
             final Calendar cal;
             CalendarWrapper(Calendar pCalendar) {
@@ -255,7 +249,7 @@ public class BaseTest extends XmlRpcTestCase {
 
 		/** Returns midnight of the following day.
 		 */
-        public Calendar calendarParam(Calendar pCal) {
+		Calendar calendarParam(Calendar pCal) {
             Calendar cal = (Calendar) pCal.clone();
             cal.add(Calendar.DAY_OF_MONTH, 1);
             cal.set(Calendar.HOUR_OF_DAY, 0);
@@ -282,96 +276,88 @@ public class BaseTest extends XmlRpcTestCase {
 	 * @throws Exception The test failed.
 	 */
 	public void testByteParam() throws Exception {
-		for (int i = 0;  i < providers.length;  i++) {
-			testByteParam(providers[i]);
+		for (ClientProvider provider : providers) {
+			testByteParam(provider);
 		}
 	}
 
 	private void testByteParam(ClientProvider pProvider) throws Exception {
 		final String methodName = "Remote.byteParam";
-		final Object[] params = new Object[]{new Byte((byte) 3)};
+		final Object[] params = new Object[]{(byte) 3};
 		XmlRpcClient client = pProvider.getClient();
 		Object result = client.execute(getExConfig(pProvider), methodName, params);
-		assertEquals(new Integer(6), result);
-		boolean ok = false;
+		assertEquals(6, result);
 		try {
 			client.execute(getConfig(pProvider), methodName, params);
 		} catch (XmlRpcExtensionException e) {
-			ok = true;
+			fail();
 		}
-		assertTrue(ok);
 	}
 
 	/** Test, whether we can invoke a method, returning a byte.
 	 * @throws Exception The test failed.
 	 */
 	public void testByteResult() throws Exception {
-		for (int i = 0;  i < providers.length;  i++) {
-			testByteResult(providers[i]);
+		for (ClientProvider provider : providers) {
+			testByteResult(provider);
 		}
 	}
 
 	private void testByteResult(ClientProvider pProvider) throws Exception {
 		final String methodName = "Remote.byteResult";
-		final Object[] params = new Object[]{new Byte((byte) 3)};
+		final Object[] params = new Object[]{(byte) 3};
 		final XmlRpcClient client = pProvider.getClient();
 		Object result = client.execute(getExConfig(pProvider), methodName, params);
-		assertEquals(new Byte((byte) 6), result);
-		boolean ok = false;
+		assertEquals((byte) 6, result);
 		try {
 			client.execute(getConfig(pProvider), methodName, params);
 		} catch (XmlRpcExtensionException e) {
-			ok = true;
+			fail();
 		}
-		assertTrue(ok);
 	}
 
 	/** Test, whether we can invoke a method, passing a short value.
 	 * @throws Exception The test failed.
 	 */
 	public void testShortParam() throws Exception {
-		for (int i = 0;  i < providers.length;  i++) {
-			testShortParam(providers[i]);
+		for (ClientProvider provider : providers) {
+			testShortParam(provider);
 		}
 	}
 
 	private void testShortParam(ClientProvider pProvider) throws Exception {
 		final String methodName = "Remote.shortParam";
-		final Object[] params = new Object[]{new Short((short) 4)};
+		final Object[] params = new Object[] { (short) 4 };
 		final XmlRpcClient client = pProvider.getClient();
 		Object result = client.execute(getExConfig(pProvider), methodName, params);
-		assertEquals(new Integer(8), result);
-		boolean ok = false;
+		assertEquals(8, result);
 		try {
 			client.execute(getConfig(pProvider), methodName, params);
 		} catch (XmlRpcExtensionException e) {
-			ok = true;
+			fail();
 		}
-		assertTrue(ok);
 	}
 
 	/** Test, whether we can invoke a method, returning a short value.
 	 * @throws Exception The test failed.
 	 */
 	public void testShortResult() throws Exception {
-		for (int i = 0;  i < providers.length;  i++) {
-			testShortResult(providers[i]);
+		for (ClientProvider provider : providers) {
+			testShortResult(provider);
 		}
 	}
 
 	private void testShortResult(ClientProvider pProvider) throws Exception {
 		final String methodName = "Remote.shortResult";
-		final Object[] params = new Object[]{new Short((short) 4)};
+		final Object[] params = new Object[] { (short) 4 };
 		final XmlRpcClient client = pProvider.getClient();
 		Object result = client.execute(getExConfig(pProvider), methodName, params);
-		assertEquals(new Short((short) 8), result);
-		boolean ok = false;
+		assertEquals((short) 8, result);
 		try {
 			client.execute(getConfig(pProvider), methodName, params);
 		} catch (XmlRpcExtensionException e) {
-			ok = true;
+			fail();
 		}
-		assertTrue(ok);
 	}
 
 	/** Test, whether we can invoke a method, passing an
@@ -379,67 +365,63 @@ public class BaseTest extends XmlRpcTestCase {
 	 * @throws Exception The test failed.
 	 */
 	public void testIntParam() throws Exception {
-		for (int i = 0;  i < providers.length;  i++) {
-			testIntParam(providers[i]);
+		for (ClientProvider provider : providers) {
+			testIntParam(provider);
 		}
 	}
 
 	private void testIntParam(ClientProvider pProvider) throws Exception {
 		final String methodName = "Remote.intParam";
-		final Object[] params = new Object[]{new Integer(5)};
+		final Object[] params = new Object[] { 5 };
 		final XmlRpcClient client = pProvider.getClient();
 		Object result = client.execute(getConfig(pProvider), methodName, params);
-		assertEquals(new Integer(10), result);
+		assertEquals(10, result);
 		result = client.execute(getExConfig(pProvider), methodName, params);
-		assertEquals(new Integer(10), result);
+		assertEquals(10, result);
 	}
 
 	/** Test, whether we can invoke a method, passing a long value.
 	 * @throws Exception The test failed.
 	 */
 	public void testLongParam() throws Exception {
-		for (int i = 0;  i < providers.length;  i++) {
-			testLongParam(providers[i]);
+		for (ClientProvider provider : providers) {
+			testLongParam(provider);
 		}
 	}
 
 	private void testLongParam(ClientProvider pProvider) throws Exception {
 		final String methodName = "Remote.longParam";
-		final Object[] params = new Object[]{new Long(6L)};
+		final Object[] params = new Object[] { 6L };
 		final XmlRpcClient client = pProvider.getClient();
 		Object result = client.execute(getExConfig(pProvider), methodName, params);
-		assertEquals(new Integer(12), result);
-		boolean ok = false;
+		assertEquals(12, result);
 		try {
 			client.execute(getConfig(pProvider), methodName, params);
 		} catch (XmlRpcExtensionException e) {
-			ok = true;
+			fail();
 		}
-		assertTrue(ok);
 	}
 
 	/** Test, whether we can invoke a method, returning a long value.
 	 * @throws Exception The test failed.
 	 */
 	public void testLongResult() throws Exception {
-		for (int i = 0;  i < providers.length;  i++) {
-			testLongResult(providers[i]);
+		for (ClientProvider provider : providers) {
+			testLongResult(provider);
 		}
 	}
 
 	private void testLongResult(ClientProvider pProvider) throws Exception {
 		final String methodName = "Remote.longResult";
-		final Object[] params = new Object[]{new Long(6L)};
+		final Object[] params = new Object[] { 6L };
 		final XmlRpcClient client = pProvider.getClient();
 		Object result = client.execute(getExConfig(pProvider), methodName, params);
-		assertEquals(new Long(12L), result);
-		boolean ok = false;
+		assertEquals(12L, result);
 		try {
 			client.execute(getConfig(pProvider), methodName, params);
 		} catch (XmlRpcExtensionException e) {
-			ok = true;
+			fail();
 		}
-		assertTrue(ok);
 	}
 
 	/** Test, whether we can invoke a method, passing a
@@ -447,8 +429,8 @@ public class BaseTest extends XmlRpcTestCase {
 	 * @throws Exception The test failed.
 	 */
 	public void testStringParam() throws Exception {
-		for (int i = 0;  i < providers.length;  i++) {
-			testStringParam(providers[i]);
+		for (ClientProvider provider : providers) {
+			testStringParam(provider);
 		}
 	}
 
@@ -467,8 +449,8 @@ public class BaseTest extends XmlRpcTestCase {
 	 * @throws Exception The test failed.
 	 */
 	public void testNullableStringParam() throws Exception {
-		for (int i = 0;  i < providers.length;  i++) {
-			testNullableStringParam(providers[i]);
+		for (ClientProvider provider : providers) {
+			testNullableStringParam(provider);
 		}
 	}
 
@@ -483,13 +465,11 @@ public class BaseTest extends XmlRpcTestCase {
 		final Object[] nullParams = new Object[]{null};
 		result = client.execute(getExConfig(pProvider), methodName, nullParams);
 		assertEquals("", result);
-		boolean ok = false;
 		try {
 			client.execute(getConfig(pProvider), methodName, nullParams);
 		} catch (XmlRpcExtensionException e) {
-			ok = true;
+			fail();
 		}
-		assertTrue(ok);
 	}
 
 	/** Test, whether we can invoke a method, returning a
@@ -497,8 +477,8 @@ public class BaseTest extends XmlRpcTestCase {
 	 * @throws Exception The test failed.
 	 */
 	public void testNullableStringResult() throws Exception {
-		for (int i = 0;  i < providers.length;  i++) {
-			testNullableStringResult(providers[i]);
+		for (ClientProvider provider : providers) {
+			testNullableStringResult(provider);
 		}
 	}
 
@@ -512,62 +492,56 @@ public class BaseTest extends XmlRpcTestCase {
 		assertEquals("abcabc", result);
 		final Object[] nullParams = new Object[]{null};
 		result = client.execute(getExConfig(pProvider), methodName, nullParams);
-		assertEquals(null, result);
-		boolean ok = false;
+		assertNull(result);
 		try {
 			client.execute(getConfig(pProvider), methodName, nullParams);
 		} catch (XmlRpcExtensionException e) {
-			ok = true;
+			fail();
 		}
-		assertTrue(ok);
 	}
 
 	/** Test, whether we can invoke a method, passing a float value.
 	 * @throws Exception The test failed.
 	 */
 	public void testFloatParam() throws Exception {
-		for (int i = 0;  i < providers.length;  i++) {
-			testFloatParam(providers[i]);
+		for (ClientProvider provider : providers) {
+			testFloatParam(provider);
 		}
 	}
 
 	private void testFloatParam(ClientProvider pProvider) throws Exception {
 		final String methodName = "Remote.floatParam";
-		final Object[] params = new Object[]{new Float(0.4)};
+		final Object[] params = new Object[] { (float) 0.4 };
 		final XmlRpcClient client = pProvider.getClient();
 		Object result = client.execute(getExConfig(pProvider), methodName, params);
-		assertEquals(8, Math.round(((Double) result).doubleValue()*10));
-		boolean ok = false;
+		assertEquals(8, Math.round((Double) result *10));
 		try {
 			client.execute(getConfig(pProvider), methodName, params);
 		} catch (XmlRpcExtensionException e) {
-			ok = true;
+			fail();
 		}
-		assertTrue(ok);
 	}
 
 	/** Test, whether we can invoke a method, returning a float value.
 	 * @throws Exception The test failed.
 	 */
 	public void testFloatResult() throws Exception {
-		for (int i = 0;  i < providers.length;  i++) {
-			testFloatResult(providers[i]);
+		for (ClientProvider provider : providers) {
+			testFloatResult(provider);
 		}
 	}
 
 	private void testFloatResult(ClientProvider pProvider) throws Exception {
 		final String methodName = "Remote.floatResult";
-		final Object[] params = new Object[]{new Float(0.4)};
+		final Object[] params = new Object[] { (float) 0.4 };
 		final XmlRpcClient client = pProvider.getClient();
 		Object result = client.execute(getExConfig(pProvider), methodName, params);
-		assertEquals(new Float(0.8), result);
-		boolean ok = false;
+		assertEquals((float) 0.8, result);
 		try {
 			client.execute(getConfig(pProvider), methodName, params);
 		} catch (XmlRpcExtensionException e) {
-			ok = true;
+			fail();
 		}
-		assertTrue(ok);
 	}
 
 	/** Test, whether we can invoke a method, passing a
@@ -575,19 +549,19 @@ public class BaseTest extends XmlRpcTestCase {
 	 * @throws Exception The test failed.
 	 */
 	public void testDoubleParam() throws Exception {
-		for (int i = 0;  i < providers.length;  i++) {
-			testDoubleParam(providers[i]);
+		for (ClientProvider provider : providers) {
+			testDoubleParam(provider);
 		}
 	}
 
 	private void testDoubleParam(ClientProvider pProvider) throws Exception {
 		final String methodName = "Remote.doubleParam";
-		final Object[] params = new Object[]{new Double(0.6)};
+		final Object[] params = new Object[] { 0.6 };
 		final XmlRpcClient client = pProvider.getClient();
 		Object result = client.execute(getConfig(pProvider), methodName, params);
-		assertEquals(new Double(1.2), result);
+		assertEquals(1.2, result);
 		result = client.execute(getExConfig(pProvider), methodName, params);
-		assertEquals(new Double(1.2), result);
+		assertEquals(1.2, result);
 	}
 
 	/** Test, whether we can invoke a method, returning a
@@ -595,19 +569,19 @@ public class BaseTest extends XmlRpcTestCase {
 	 * @throws Exception The test failed.
 	 */
 	public void testDoubleResult() throws Exception {
-		for (int i = 0;  i < providers.length;  i++) {
-			testDoubleResult(providers[i]);
+		for (ClientProvider provider : providers) {
+			testDoubleResult(provider);
 		}
 	}
 
 	private void testDoubleResult(ClientProvider pProvider) throws Exception {
 		final String methodName = "Remote.doubleResult";
-		final Object[] params = new Object[]{new Double(0.6)};
+		final Object[] params = new Object[]{ 0.6 };
 		final XmlRpcClient client = pProvider.getClient();
 		Object result = client.execute(getConfig(pProvider), methodName, params);
-		assertEquals(new Double(1.2), result);
+		assertEquals(1.2, result);
 		result = client.execute(getExConfig(pProvider), methodName, params);
-		assertEquals(new Double(1.2), result);
+		assertEquals(1.2, result);
 	}
 
 	/** Test, whether we can invoke a method, passing a
@@ -615,20 +589,20 @@ public class BaseTest extends XmlRpcTestCase {
 	 * @throws Exception The test failed.
 	 */
 	public void testByteArrayParam() throws Exception {
-		for (int i = 0;  i < providers.length;  i++) {
-			testByteArrayParam(providers[i]);
+		for (ClientProvider provider : providers) {
+			testByteArrayParam(provider);
 		}
 	}
 
 	private void testByteArrayParam(ClientProvider pProvider) throws Exception {
 		final byte[] bytes = new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
 		final String methodName = "Remote.byteArrayParam";
-		final Object[] params = new Object[]{bytes};
+		final Object[] params = new Object[] { bytes };
 		final XmlRpcClient client = pProvider.getClient();
 		Object result = client.execute(getConfig(pProvider), methodName, params);
-		assertEquals(new Integer(0+1+2+3+4+5+6+7+8+9), result);
+		assertEquals(1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9, result);
 		result = client.execute(getExConfig(pProvider), methodName, params);
-		assertEquals(new Integer(0+1+2+3+4+5+6+7+8+9), result);
+		assertEquals(1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9, result);
 	}
 
 	/** Test, whether we can invoke a method, returning a
@@ -636,15 +610,15 @@ public class BaseTest extends XmlRpcTestCase {
 	 * @throws Exception The test failed.
 	 */
 	public void testByteArrayResult() throws Exception {
-		for (int i = 0;  i < providers.length;  i++) {
-			testByteArrayResult(providers[i]);
+		for (ClientProvider provider : providers) {
+			testByteArrayResult(provider);
 		}
 	}
 
 	private void testByteArrayResult(ClientProvider pProvider) throws Exception {
 		final byte[] bytes = new byte[]{0, 1, 2, 3, 4, 5, 6, 7};
 		final String methodName = "Remote.byteArrayResult";
-		final Object[] params = new Object[]{new Integer(8)};
+		final Object[] params = new Object[] { 8 };
 		final XmlRpcClient client = pProvider.getClient();
 		Object result = client.execute(getConfig(pProvider), methodName, params);
 		assertTrue(Arrays.equals(bytes, (byte[]) result));
@@ -657,14 +631,13 @@ public class BaseTest extends XmlRpcTestCase {
 	 * @throws Exception The test failed.
 	 */
 	public void testObjectArrayParam() throws Exception {
-		for (int i = 0;  i < providers.length;  i++) {
-			testObjectArrayParam(providers[i]);
+		for (ClientProvider provider : providers) {
+			testObjectArrayParam(provider);
 		}
 	}
 
 	private void testObjectArrayParam(ClientProvider pProvider) throws Exception {
-		final Object[] objects = new Object[]{new Byte((byte) 1), new Short((short) 2),
-											  new Integer(3), new Long(4), "5"};
+		final Object[] objects = new Object[]{(byte) 1, (short) 2, 3, 4L, "5"};
 		final String methodName = "Remote.objectArrayParam";
 		final Object[] params = new Object[]{objects};
 		final XmlRpcClient client = pProvider.getClient();
@@ -676,7 +649,7 @@ public class BaseTest extends XmlRpcTestCase {
 		}
 		assertTrue(ok);
 		Object result = client.execute(getExConfig(pProvider), methodName, params);
-		assertEquals(new Integer(15), result);
+		assertEquals(15, result);
 	}
 
 	/** Test, whether we can invoke a method, returning an
@@ -684,16 +657,15 @@ public class BaseTest extends XmlRpcTestCase {
 	 * @throws Exception The test failed.
 	 */
 	public void testObjectArrayResult() throws Exception {
-		for (int i = 0;  i < providers.length;  i++) {
-			testObjectArrayResult(providers[i]);
+		for (ClientProvider provider : providers) {
+			testObjectArrayResult(provider);
 		}
 	}
 
 	private void testObjectArrayResult(ClientProvider pProvider) throws Exception {
-		final Object[] objects = new Object[]{new Integer(0), new Integer(1),
-											  new Integer(2), new Integer(3)};
+		final Object[] objects = new Object[]{0, 1, 2, 3};
 		final String methodName = "Remote.objectArrayResult";
-		final Object[] params = new Object[]{new Integer(4)};
+		final Object[] params = new Object[] { 4 };
 		final XmlRpcClient client = pProvider.getClient();
 		Object result = client.execute(getConfig(pProvider), methodName, params);
 		assertTrue(Arrays.equals(objects, (Object[]) result));
@@ -705,49 +677,50 @@ public class BaseTest extends XmlRpcTestCase {
 	 * @throws Exception The test failed.
 	 */
 	public void testMapParam() throws Exception {
-		for (int i = 0;  i < providers.length;  i++) {
-			testMapParam(providers[i]);
+		for (ClientProvider provider : providers) {
+			testMapParam(provider);
 		}
 	}
 
 	private void testMapParam(ClientProvider pProvider) throws Exception {
-		final Map map = new HashMap();
-		map.put("2", new Integer(3));
-		map.put("3", new Integer(5));
+		final Map<String, Integer> map = new HashMap<>();
+		map.put("2", 3);
+		map.put("3", 5);
 		final String methodName = "Remote.mapParam";
-		final Object[] params = new Object[]{map};
+		final Object[] params = new Object[]{ map };
 		final XmlRpcClient client = pProvider.getClient();
 		Object result = client.execute(getConfig(pProvider), methodName, params);
-		assertEquals(new Integer(21), result);
+		assertEquals(21, result);
 		result = client.execute(getExConfig(pProvider), methodName, params);
-		assertEquals(new Integer(21), result);
+		assertEquals(21, result);
 	}
 
-	private void checkMap(Map pResult) {
+	private void checkMap(Map<String, Object> pResult) {
 		assertEquals(4, pResult.size());
-		assertEquals(new Integer(0), pResult.get("0"));
-		assertEquals(new Integer(1), pResult.get("1"));
-		assertEquals(new Integer(2), pResult.get("2"));
-		assertEquals(new Integer(3), pResult.get("3"));
+		assertEquals(0, pResult.get("0"));
+		assertEquals(1, pResult.get("1"));
+		assertEquals(2, pResult.get("2"));
+		assertEquals(3, pResult.get("3"));
 	}
 
 	/** Test, whether we can invoke a method, returning a map.
 	 * @throws Exception The test failed.
 	 */
 	public void testMapResult() throws Exception {
-		for (int i = 0;  i < providers.length;  i++) {
-			testMapResult(providers[i]);
+		for (ClientProvider provider : providers) {
+			testMapResult(provider);
 		}
 	}
 
+	@SuppressWarnings("unchecked")
 	private void testMapResult(ClientProvider pProvider) throws Exception {
 		final String methodName = "Remote.mapResult";
-		final Object[] params = new Object[]{new Integer(4)};
+		final Object[] params = new Object[] { 4 };
 		final XmlRpcClient client = pProvider.getClient();
-		Object result = client.execute(getConfig(pProvider), methodName, params);
-		checkMap((Map) result);
-		result = client.execute(getExConfig(pProvider), methodName, params);
-		checkMap((Map) result);
+		Map<String, Object> result = (Map<String, Object>) client.execute(getConfig(pProvider), methodName, params);
+		checkMap(result);
+		result = (Map<String, Object>) client.execute(getExConfig(pProvider), methodName, params);
+		checkMap(result);
 	}
 
 	/** Test, whether we can invoke a method, passing a DOM
@@ -755,13 +728,15 @@ public class BaseTest extends XmlRpcTestCase {
 	 * @throws Exception The test failed.
 	 */
 	public void testNodeParam() throws Exception {
-		for (int i = 0;  i < providers.length;  i++) {
-			testNodeParam(providers[i]);
+		for (ClientProvider provider : providers) {
+			testNodeParam(provider);
 		}
 	}
 
 	private static final String ROOT_TAG = "root";
+
 	private static final String INT_TAG = "int";
+
 	private static final String INT_URI = "http://ws.apache.org/xmlrpc/namespaces/testNodeParam";
 
 	private void testNodeParam(ClientProvider pProvider) throws Exception {
@@ -782,13 +757,11 @@ public class BaseTest extends XmlRpcTestCase {
 		final XmlRpcClient client = pProvider.getClient();
 		Object result = client.execute(getExConfig(pProvider), methodName, params);
 		assertEquals(1 + 2 + 3 + 4 + 5, result);
-		boolean ok = false;
 		try {
 			client.execute(getConfig(pProvider), methodName, params);
 		} catch (XmlRpcExtensionException e) {
-			ok = true;
+			fail();
 		}
-		assertTrue(ok);
 	}
 
 	/** Test, whether we can invoke a method, passing an instance of
@@ -796,8 +769,8 @@ public class BaseTest extends XmlRpcTestCase {
 	 * @throws Exception The test failed.
 	 */
 	public void testSerializableParam() throws Exception {
-		for (int i = 0;  i < providers.length;  i++) {
-			testSerializableParam(providers[i]);
+		for (ClientProvider provider : providers) {
+			testSerializableParam(provider);
 		}
 	}
 
@@ -809,42 +782,13 @@ public class BaseTest extends XmlRpcTestCase {
 		final Object[] params = new Object[]{new Remote.CalendarWrapper(cal)};
 		final XmlRpcClient client = pProvider.getClient();
 		Object result = client.execute(getExConfig(pProvider), methodName, params);
-		assertEquals(new Long(cal.getTime().getTime()), result);
-		boolean ok = false;
+		assertEquals(cal.getTime().getTime(), result);
 		try {
 			client.execute(getConfig(pProvider), methodName, params);
 		} catch (XmlRpcExtensionException e) {
-			ok = true;
+			fail();
 		}
-		assertTrue(ok);
 	}
-
-	/** Tests, whether we can invoke a method, passing an instance of
-     * {@link Calendar} as a parameter.
-     * @throws Exception The test failed.
-	 */
-	public void testCalendarParam() throws Exception {
-	    for (int i = 0;  i < providers.length;  i++) {
-	        testCalendarParam(providers[i]);
-        }
-    }
-
-	private void testCalendarParam(ClientProvider pProvider) throws Exception {
-	    final String methodName = "Remote.calendarParam";
-        Calendar cal1 = newCalendarParam();
-        Calendar cal2 = newCalendarResult();
-        final Object[] params = new Object[]{cal1};
-        final XmlRpcClient client = pProvider.getClient();
-        Object result = client.execute(getExConfig(pProvider), methodName, params);
-        assertEquals(cal2.getTime(), ((Calendar) result).getTime());
-        boolean ok = false;
-        try {
-            client.execute(getConfig(pProvider), methodName, params);
-        } catch (XmlRpcExtensionException e) {
-            ok = true;
-        }
-        assertTrue(ok);
-    }
 
     private Calendar newCalendarResult() {
         Calendar cal2 = Calendar.getInstance(TimeZone.getDefault());
@@ -865,9 +809,9 @@ public class BaseTest extends XmlRpcTestCase {
      * @throws Exception The test failed.
      */
     public void testDateParam() throws Exception {
-        for (int i = 0;  i < providers.length;  i++) {
-            testDateParam(providers[i]);
-        }
+		for (ClientProvider provider : providers) {
+			testDateParam(provider);
+		}
     }
 
     private void testDateParam(ClientProvider pProvider) throws Exception {
@@ -887,9 +831,9 @@ public class BaseTest extends XmlRpcTestCase {
      * trapped by the client.
      */
     public void testCatchNPE() throws Exception {
-        for (int i = 0;  i < providers.length;  i++) {
-            testCatchNPE(providers[i]);
-        }
+		for (ClientProvider provider : providers) {
+			testCatchNPE(provider);
+		}
     }
 
     private void testCatchNPE(ClientProvider pProvider) throws Exception {

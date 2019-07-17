@@ -1,6 +1,7 @@
 package org.xbib.netty.http.xmlrpc.client.test;
 
 import org.xbib.netty.http.xmlrpc.client.XmlRpcClient;
+import org.xbib.netty.http.xmlrpc.client.XmlRpcSunHttpTransport;
 import org.xbib.netty.http.xmlrpc.client.XmlRpcSunHttpTransportFactory;
 import org.xbib.netty.http.xmlrpc.client.XmlRpcTransportFactory;
 import org.xbib.netty.http.xmlrpc.server.XmlRpcHandlerMapping;

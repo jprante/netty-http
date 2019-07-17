@@ -5,8 +5,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -33,8 +31,6 @@ import org.xml.sax.XMLReader;
  */
 public abstract class XmlRpcStreamServer extends XmlRpcServer
         implements XmlRpcStreamRequestProcessor {
-
-    private static final Logger log = Logger.getLogger(XmlRpcStreamServer.class.getName());
 
     private XmlWriterFactory writerFactory = new DefaultXMLWriterFactory();
 
@@ -173,17 +169,16 @@ public abstract class XmlRpcStreamServer extends XmlRpcServer
         return false;
     }
 
-    /** Returns, whether the
-     /** Processes a "connection". The "connection" is an opaque object, which is
+    /**
+     * Processes a "connection". The "connection" is an opaque object, which is
      * being handled by the subclasses.
      * @param pConfig The request configuration.
      * @param pConnection The "connection" being processed.
      * @throws XmlRpcException Processing the request failed.
      */
-    public void execute(XmlRpcStreamRequestConfig pConfig,
-                        ServerStreamConnection pConnection)
+    @Override
+    public void execute(XmlRpcStreamRequestConfig pConfig, ServerStreamConnection pConnection)
             throws XmlRpcException {
-        log.log(Level.FINE, "execute: ->");
         try {
             Object result;
             Throwable error;
@@ -195,13 +190,18 @@ public abstract class XmlRpcStreamServer extends XmlRpcServer
                 istream.close();
                 istream = null;
                 error = null;
-                log.log(Level.FINE, "execute: Request performed successfully");
             } catch (Throwable t) {
                 logError(t);
                 result = null;
                 error = t;
             } finally {
-                if (istream != null) { try { istream.close(); } catch (Throwable ignore) {} }
+                if (istream != null) {
+                    try {
+                        istream.close();
+                    } catch (Throwable ignore) {
+                        //
+                    }
+                }
             }
             boolean contentLengthRequired = isContentLengthRequired(pConfig);
             ByteArrayOutputStream baos;
@@ -223,7 +223,13 @@ public abstract class XmlRpcStreamServer extends XmlRpcServer
                 ostream.close();
                 ostream = null;
             } finally {
-                if (ostream != null) { try { ostream.close(); } catch (Throwable ignore) {} }
+                if (ostream != null) {
+                    try {
+                        ostream.close();
+                    } catch (Throwable ignore) {
+
+                    }
+                }
             }
             if (baos != null) {
                 OutputStream dest = getOutputStream(pConfig, pConnection, baos.size());
@@ -232,18 +238,27 @@ public abstract class XmlRpcStreamServer extends XmlRpcServer
                     dest.close();
                     dest = null;
                 } finally {
-                    if (dest != null) { try { dest.close(); } catch (Throwable ignore) {} }
+                    if (dest != null) {
+                        try {
+                            dest.close();
+                        } catch (Throwable ignore) {
+
+                        }
+                    }
                 }
             }
             pConnection.close();
             pConnection = null;
         } catch (IOException e) {
-            throw new XmlRpcException("I/O error while processing request: "
-                    + e.getMessage(), e);
+            throw new XmlRpcException("I/O error while processing request: " + e.getMessage(), e);
         } finally {
-            if (pConnection != null) { try { pConnection.close(); } catch (Throwable ignore) {} }
+            if (pConnection != null) {
+                try {
+                    pConnection.close(); } catch (Throwable ignore) {
+
+                }
+            }
         }
-        log.log(Level.FINE, "execute: <-");
     }
 
     protected void logError(Throwable t) {

@@ -5,27 +5,31 @@ import java.net.Socket;
 
 import javax.servlet.http.HttpServlet;
 
-/** {@link ServletWebServer ServletWebServer's}
- * {@link ThreadPool.Task} for handling a single
+/** {@link ServletWebServer ServletWebServer's} {@link Runnable} for handling a single
  * servlet connection.
  */
 public class ServletConnection implements ThreadPool.InterruptableTask {
+
 	private final HttpServlet servlet;
+
 	private final Socket socket;
+
 	private final HttpServletRequestImpl request;
+
 	private final HttpServletResponseImpl response;
-    private boolean shuttingDown;
+
+	private boolean shuttingDown;
 
 	/** Creates a new instance.
 	 * @param pServlet The servlet, which ought to handle the request.
 	 * @param pSocket The socket, to which the client is connected.
 	 * @throws IOException
 	 */
-	public ServletConnection(HttpServlet pServlet, Socket pSocket) throws IOException {
+	ServletConnection(HttpServlet pServlet, Socket pSocket) throws IOException {
 		servlet = pServlet;
 		socket = pSocket;
-		request = new HttpServletRequestImpl(socket);
-		response = new HttpServletResponseImpl(socket);
+		request = new HttpServletRequestImpl(pSocket);
+		response = new HttpServletResponseImpl(pSocket);
 	}
 
 	@Override
@@ -40,6 +44,7 @@ public class ServletConnection implements ThreadPool.InterruptableTask {
         }
 	}
 
+	@Override
     public void shutdown() throws Throwable {
         shuttingDown = true;
         socket.close();

@@ -3,6 +3,7 @@ package org.xbib.netty.http.xmlrpc.client.test;
 import java.io.StringReader;
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
@@ -26,104 +27,100 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.XMLReader;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
-
 /** A test case for the various serializers.
  */
 public class SerializerTest extends TestCase {
-	private final XmlRpcClient client;
+    private final XmlRpcClient client;
 
-	/** Creates a new instance.
-	 */
-	public SerializerTest() {
-		client = new XmlRpcClient();
-		client.setTransportFactory(new XmlRpcSunHttpTransportFactory(client));
-	}
+    /** Creates a new instance.
+     */
+    public SerializerTest() {
+        client = new XmlRpcClient();
+        client.setTransportFactory(new XmlRpcSunHttpTransportFactory(client));
+    }
 
-	protected XmlRpcClientConfigImpl getConfig() {
-		XmlRpcClientConfigImpl config = new XmlRpcClientConfigImpl();
-		return config;
-	}
+    protected XmlRpcClientConfigImpl getConfig() {
+        XmlRpcClientConfigImpl config = new XmlRpcClientConfigImpl();
+        return config;
+    }
 
-	protected XmlRpcStreamRequestConfig getExConfig() {
-		XmlRpcClientConfigImpl config = getConfig();
-		config.setEnabledForExtensions(true);
-		return config;
-	}
+    protected XmlRpcStreamRequestConfig getExConfig() {
+        XmlRpcClientConfigImpl config = getConfig();
+        config.setEnabledForExtensions(true);
+        return config;
+    }
 
-	protected String writeRequest(XmlRpcStreamRequestConfig pConfig, XmlRpcRequest pRequest)
-			throws SAXException {
+    protected String writeRequest(XmlRpcStreamRequestConfig pConfig, XmlRpcRequest pRequest)
+            throws SAXException {
         client.setConfig((XmlRpcClientConfig) pConfig);
         return XmlRpcTestCase.writeRequest(client, pRequest);
-	}
+    }
 
-	/** Test serialization of a byte parameter.
-	 * @throws Exception The test failed.
-	 */
-	public void testByteParam() throws Exception {
-		XmlRpcStreamRequestConfig config = getExConfig();
-		XmlRpcRequest request = new XmlRpcClientRequestImpl(config, "byteParam", new Object[]{new Byte((byte)3)});
-		String got = writeRequest(config, request);
-		String expect =
-			"<?xml version=\"1.0\" encoding=\"US-ASCII\"?>"
-			+ "<methodCall xmlns:ex=\"http://ws.apache.org/xmlrpc/namespaces/extensions\">"
-			+ "<methodName>byteParam</methodName><params><param><value><ex:i1>3</ex:i1></value></param></params></methodCall>";
-		assertEquals(expect, got);
-	}
+    /** Test serialization of a byte parameter.
+     * @throws Exception The test failed.
+     */
+    public void testByteParam() throws Exception {
+        XmlRpcStreamRequestConfig config = getExConfig();
+        XmlRpcRequest request = new XmlRpcClientRequestImpl(config, "byteParam", new Object[] { (byte) 3} );
+        String got = writeRequest(config, request);
+        String expect =
+                "<?xml version=\"1.0\" encoding=\"US-ASCII\"?>"
+                        + "<methodCall xmlns:ex=\"http://ws.apache.org/xmlrpc/namespaces/extensions\">"
+                        + "<methodName>byteParam</methodName><params><param><value><ex:i1>3</ex:i1></value></param></params></methodCall>";
+        assertEquals(expect, got);
+    }
 
-	/** Test serialization of an integer parameter.
-	 * @throws Exception The test failed.
-	 */
-	public void testIntParam() throws Exception {
-		XmlRpcStreamRequestConfig config = getConfig();
-		XmlRpcRequest request = new XmlRpcClientRequestImpl(config, "intParam", new Object[]{new Integer(3)});
-		String got = writeRequest(config, request);
-		String expect =
-			"<?xml version=\"1.0\" encoding=\"US-ASCII\"?>"
-			+ "<methodCall>"
-			+ "<methodName>intParam</methodName><params><param><value><i4>3</i4></value></param></params></methodCall>";
-		assertEquals(expect, got);
-	}
+    /** Test serialization of an integer parameter.
+     * @throws Exception The test failed.
+     */
+    public void testIntParam() throws Exception {
+        XmlRpcStreamRequestConfig config = getConfig();
+        XmlRpcRequest request = new XmlRpcClientRequestImpl(config, "intParam", new Object[] { 3 } );
+        String got = writeRequest(config, request);
+        String expect =
+                "<?xml version=\"1.0\" encoding=\"US-ASCII\"?>"
+                        + "<methodCall>"
+                        + "<methodName>intParam</methodName><params><param><value><i4>3</i4></value></param></params></methodCall>";
+        assertEquals(expect, got);
+    }
 
-	/** Test serialization of a byte array.
-	 * @throws Exception The test failed.
-	 */
-	public void testByteArrayParam() throws Exception {
-		byte[] bytes = new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-		XmlRpcStreamRequestConfig config = getConfig();
-		XmlRpcRequest request = new XmlRpcClientRequestImpl(config, "byteArrayParam", new Object[]{bytes});
-		String got = writeRequest(config, request);
-		String expect =
-			"<?xml version=\"1.0\" encoding=\"US-ASCII\"?>"
-			+ "<methodCall>"
-			+ "<methodName>byteArrayParam</methodName><params><param><value><base64>AAECAwQFBgcICQ==</base64></value></param></params></methodCall>";
-		assertEquals(expect, got);
-	}
+    /** Test serialization of a byte array.
+     * @throws Exception The test failed.
+     */
+    public void testByteArrayParam() throws Exception {
+        byte[] bytes = new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+        XmlRpcStreamRequestConfig config = getConfig();
+        XmlRpcRequest request = new XmlRpcClientRequestImpl(config, "byteArrayParam", new Object[]{ bytes });
+        String got = writeRequest(config, request);
+        String expect =
+                "<?xml version=\"1.0\" encoding=\"US-ASCII\"?>"
+                        + "<methodCall>"
+                        + "<methodName>byteArrayParam</methodName><params><param><value><base64>AAECAwQFBgcICQ==</base64></value></param></params></methodCall>";
+        assertEquals(expect, got);
+    }
 
-	/** Test serialization of a map.
-	 * @throws Exception The test failed.
-	 */
-	public void testMapParam() throws Exception {
-		final Map map = new HashMap();
-		map.put("2", new Integer(3));
-		map.put("3", new Integer(5));
-		final Object[] params = new Object[]{map};
-		XmlRpcStreamRequestConfig config = getConfig();
-		XmlRpcRequest request = new XmlRpcClientRequestImpl(config, "mapParam", params);
-		String got = writeRequest(config, request);
-		String expect =
-			"<?xml version=\"1.0\" encoding=\"US-ASCII\"?>"
-			+ "<methodCall><methodName>mapParam</methodName>"
-			+ "<params><param><value><struct>"
-			+ "<member><name>3</name><value><i4>5</i4></value></member>"
-			+ "<member><name>2</name><value><i4>3</i4></value></member>"
-			+ "</struct></value></param></params></methodCall>";
-		assertEquals(expect, got);
-	}
+    /** Test serialization of a map.
+     * @throws Exception The test failed.
+     */
+    public void testMapParam() throws Exception {
+        final Map<String, Integer> map = new LinkedHashMap<>();
+        map.put("2", 3);
+        map.put("3", 5);
+        final Object[] params = new Object[]{map};
+        XmlRpcStreamRequestConfig config = getConfig();
+        XmlRpcRequest request = new XmlRpcClientRequestImpl(config, "mapParam", params);
+        String got = writeRequest(config, request);
+        String expect = "<?xml version=\"1.0\" encoding=\"US-ASCII\"?>"
+                + "<methodCall><methodName>mapParam</methodName>"
+                + "<params><param><value><struct>"
+                + "<member><name>2</name><value><i4>3</i4></value></member>"
+                + "<member><name>3</name><value><i4>5</i4></value></member>"
+                + "</struct></value></param></params></methodCall>";
+        assertEquals(expect, got);
+    }
 
-	/** Tests serialization of a calendar instance.
-	 */
+    /** Tests serialization of a calendar instance.
+     */
     public void testCalendarParam() throws Exception {
         TimeZone tz = TimeZone.getTimeZone("GMT");
         Calendar cal1 = Calendar.getInstance(tz);
@@ -136,12 +133,12 @@ public class SerializerTest extends TestCase {
         XmlRpcRequest request = new XmlRpcClientRequestImpl(config, "dateParam", new Object[]{cal1, cal2.getTime()});
         String got = writeRequest(config, request);
         String expect =
-            "<?xml version=\"1.0\" encoding=\"US-ASCII\"?>"
-            + "<methodCall xmlns:ex=\"http://ws.apache.org/xmlrpc/namespaces/extensions\">"
-            + "<methodName>dateParam</methodName><params>"
-            + "<param><value><ex:dateTime>1933-06-12T11:07:21.311Z</ex:dateTime></value></param>"
-            + "<param><value><dateTime.iso8601>19330612T11:07:21</dateTime.iso8601></value></param>"
-            + "</params></methodCall>";
+                "<?xml version=\"1.0\" encoding=\"US-ASCII\"?>"
+                        + "<methodCall xmlns:ex=\"http://ws.apache.org/xmlrpc/namespaces/extensions\">"
+                        + "<methodName>dateParam</methodName><params>"
+                        + "<param><value><ex:dateTime>1933-06-12T11:07:21.311Z</ex:dateTime></value></param>"
+                        + "<param><value><dateTime.iso8601>19330612T11:07:21</dateTime.iso8601></value></param>"
+                        + "</params></methodCall>";
         assertEquals(expect, got);
     }
 
@@ -149,23 +146,23 @@ public class SerializerTest extends TestCase {
      * Test for XMLRPC-127: Is it possible to transmit a
      * map with integers as the keys?
      */
+    @SuppressWarnings("unchecked")
     public void testIntegerKeyMap() throws Exception {
-        Map map = new HashMap();
-        map.put(new Integer(1), "one");
+        Map<Integer, String> map = new HashMap<>();
+        map.put(1, "one");
         XmlRpcStreamRequestConfig config = getExConfig();
         XmlRpcRequest request = new XmlRpcClientRequestImpl(config, "integerKeyMap", new Object[]{map});
         String got = writeRequest(config, request);
         String expect =
-            "<?xml version=\"1.0\" encoding=\"US-ASCII\"?>"
-            + "<methodCall xmlns:ex=\"http://ws.apache.org/xmlrpc/namespaces/extensions\">"
-            + "<methodName>integerKeyMap</methodName><params>"
-            + "<param><value><struct><member>"
-            +   "<name><value><i4>1</i4></value></name>"
-            +   "<value>one</value></member>"
-            + "</struct></value></param>"
-            + "</params></methodCall>";
+                "<?xml version=\"1.0\" encoding=\"US-ASCII\"?>"
+                        + "<methodCall xmlns:ex=\"http://ws.apache.org/xmlrpc/namespaces/extensions\">"
+                        + "<methodName>integerKeyMap</methodName><params>"
+                        + "<param><value><struct><member>"
+                        +   "<name><value><i4>1</i4></value></name>"
+                        +   "<value>one</value></member>"
+                        + "</struct></value></param>"
+                        + "</params></methodCall>";
         assertEquals(expect, got);
-
         XmlRpcServer server = new XmlRpcServer();
         XmlRpcServerConfigImpl serverConfig = new XmlRpcServerConfigImpl();
         serverConfig.setEnabledForExtensions(true);
@@ -178,10 +175,10 @@ public class SerializerTest extends TestCase {
         xr.setContentHandler(parser);
         xr.parse(new InputSource(new StringReader(expect)));
         assertEquals("integerKeyMap", parser.getMethodName());
-        List params = parser.getParams();
+        List<Object> params = parser.getParams();
         assertEquals(1, params.size());
-        Map paramMap = (Map) params.get(0);
+        Map<Object, Object> paramMap = (Map) params.get(0);
         assertEquals(1, paramMap.size());
-        assertEquals("one", paramMap.get(new Integer(1)));
+        assertEquals("one", paramMap.get(1));
     }
 }

@@ -18,10 +18,14 @@ import java.net.URL;
  * A provider class for testing the {@link ServletWebServer}.
  */
 public class ServletWebServerProvider extends ClientProviderImpl {
+
 	protected final ServletWebServer webServer;
-    protected final XmlRpcServlet servlet;
+
+	protected final XmlRpcServlet servlet;
+
 	private final boolean contentLength;
-	private final int port;
+
+	private int port;
 
 	/**
 	 * Creates a new instance of {@link XmlRpcServlet}.
@@ -40,18 +44,22 @@ public class ServletWebServerProvider extends ClientProviderImpl {
 		contentLength = pContentLength;
 		servlet = newXmlRpcServlet();
 		webServer = new ServletWebServer(servlet, 0);
-		XmlRpcServer server = servlet.getXmlRpcServletServer();
-		server.setHandlerMapping(mapping);
-		XmlRpcServerConfigImpl serverConfig = (XmlRpcServerConfigImpl) server.getConfig();
-		serverConfig.setEnabledForExtensions(true);
-		serverConfig.setContentLengthOptional(!contentLength);
-        serverConfig.setEnabledForExceptions(true);
-		webServer.start();
-		port = webServer.getPort();
+		try {
+			XmlRpcServer server = servlet.getXmlRpcServletServer();
+			server.setHandlerMapping(mapping);
+			XmlRpcServerConfigImpl serverConfig = (XmlRpcServerConfigImpl) server.getConfig();
+			serverConfig.setEnabledForExtensions(true);
+			serverConfig.setContentLengthOptional(!contentLength);
+			serverConfig.setEnabledForExceptions(true);
+			webServer.start();
+			port = webServer.getPort();
+		} catch (Exception e) {
+			webServer.shutdown();
+		}
 	 }
 
 	public final XmlRpcClientConfigImpl getConfig() throws Exception {
-		return getConfig(new URL("http://127.0.0.1:" + port + "/"));
+		return getConfig(new URL("http://localhost:" + port + "/"));
 	}
 
 	protected XmlRpcClientConfigImpl getConfig(URL pServerURL) throws Exception {
@@ -69,7 +77,7 @@ public class ServletWebServerProvider extends ClientProviderImpl {
         return servlet.getXmlRpcServletServer();
     }
 
-    public void shutdown() {
+    public void shutdown() throws IOException {
         webServer.shutdown();
     }
 }

@@ -1,37 +1,17 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.    
- */
 package org.xbib.netty.http.xmlrpc.client.test;
+
+import org.xbib.netty.http.xmlrpc.client.XmlRpcClient;
+import org.xbib.netty.http.xmlrpc.common.XmlRpcException;
+import org.xbib.netty.http.xmlrpc.common.XmlRpcHandler;
+import org.xbib.netty.http.xmlrpc.server.XmlRpcHandlerMapping;
+import org.xbib.netty.http.xmlrpc.server.XmlRpcNoSuchHandlerException;
+import org.xbib.netty.http.xmlrpc.servlet.XmlRpcServlet;
 
 import java.io.IOException;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-import org.apache.xmlrpc.XmlRpcException;
-import org.apache.xmlrpc.XmlRpcHandler;
-import org.apache.xmlrpc.XmlRpcRequest;
-import org.apache.xmlrpc.client.XmlRpcClient;
-import org.apache.xmlrpc.server.XmlRpcHandlerMapping;
-import org.apache.xmlrpc.server.XmlRpcNoSuchHandlerException;
-import org.apache.xmlrpc.webserver.XmlRpcServlet;
-
 
 /**
  * Test case for reading the clients IP address.
@@ -65,14 +45,16 @@ public class ClientIpTest extends XmlRpcTestCase {
      * object.
      */
     public static class ClientInfoServlet extends XmlRpcServlet {
+
         private static final long serialVersionUID = 8210342625908021538L;
-        private static ThreadLocal clientInfo = new ThreadLocal();
+
+        private static final ThreadLocal<ClientInfo> clientInfo = new ThreadLocal<>();
 
         /**
          * Returns the current threads. client info object.
          */
-        public static ClientInfo getClientInfo() {
-            return (ClientInfo) clientInfo.get();
+        static ClientInfo getClientInfo() {
+            return clientInfo.get();
         }
 
         public void doPost(HttpServletRequest pRequest,
@@ -102,20 +84,17 @@ public class ClientIpTest extends XmlRpcTestCase {
         };
     }
 
-    protected XmlRpcHandlerMapping getHandlerMapping() throws IOException,
-            XmlRpcException {
-        final XmlRpcHandler handler = new XmlRpcHandler(){
-            public Object execute(XmlRpcRequest pRequest) throws XmlRpcException {
-                final ClientInfo clientInfo = ClientInfoServlet.getClientInfo();
-                if (clientInfo == null) {
-                    return "";
-                }
-                final String ip = clientInfo.getIpAddress();
-                if (ip == null) {
-                    return "";
-                }
-                return ip;
+    protected XmlRpcHandlerMapping getHandlerMapping() {
+        final XmlRpcHandler handler = pRequest -> {
+            final ClientInfo clientInfo = ClientInfoServlet.getClientInfo();
+            if (clientInfo == null) {
+                return "";
             }
+            final String ip = clientInfo.getIpAddress();
+            if (ip == null) {
+                return "";
+            }
+            return ip;
         };
         return new XmlRpcHandlerMapping(){
             public XmlRpcHandler getHandler(String pHandlerName)

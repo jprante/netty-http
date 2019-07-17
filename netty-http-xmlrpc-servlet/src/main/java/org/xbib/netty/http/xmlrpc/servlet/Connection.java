@@ -14,30 +14,40 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
 import java.net.Socket;
 import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.StringTokenizer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
-
-/** Handler for a single clients connection. This implementation
+/**
+ * Handler for a single clients connection. This implementation
  * is able to do HTTP keepalive. In other words, it can serve
  * multiple requests via a single, physical connection.
  */
 public class Connection implements ThreadPool.InterruptableTask, ServerStreamConnection {
-    private static final String US_ASCII = "US-ASCII";
+
+    private static final Logger logger = Logger.getLogger(Connection.class.getName());
+
     private static final byte[] ctype = toHTTPBytes("Content-Type: text/xml\r\n");
+
     private static final byte[] clength = toHTTPBytes("Content-Length: ");
+
     private static final byte[] newline = toHTTPBytes("\r\n");
+
     private static final byte[] doubleNewline = toHTTPBytes("\r\n\r\n");
+
     private static final byte[] conkeep = toHTTPBytes("Connection: Keep-Alive\r\n");
+
     private static final byte[] conclose = toHTTPBytes("Connection: close\r\n");
+
     private static final byte[] ok = toHTTPBytes(" 200 OK\r\n");
+
     private static final byte[] serverName = toHTTPBytes("Server: Apache XML-RPC 1.0\r\n");
+
     private static final byte[] wwwAuthenticate = toHTTPBytes("WWW-Authenticate: Basic realm=XML-RPC\r\n");
 
     private static abstract class RequestException extends IOException {
@@ -48,6 +58,7 @@ public class Connection implements ThreadPool.InterruptableTask, ServerStreamCon
             super(pMessage);
             requestData = pData;
         }
+
         RequestData getRequestData() { return requestData; }
     }
 
@@ -109,10 +120,12 @@ public class Connection implements ThreadPool.InterruptableTask, ServerStreamCon
              * Closing the input stream must not occur, because
              * that would close the whole socket. So we suppress it.
              */
-            public void close() throws IOException {
+            @Override
+            public void close() {
             }
         };
         output = new BufferedOutputStream(socket.getOutputStream());
+        headers = new LinkedHashMap<>();
     }
 
     /** Returns the connections request configuration by
@@ -122,41 +135,36 @@ public class Connection implements ThreadPool.InterruptableTask, ServerStreamCon
      */
     private RequestData getRequestConfig() throws IOException {
         requestData = new RequestData(this);
-        if (headers != null) {
-            headers.clear();
-        }
+        headers.clear();
         firstByte = true;
         XmlRpcHttpServerConfig serverConfig = (XmlRpcHttpServerConfig) server.getConfig();
         requestData.setBasicEncoding(serverConfig.getBasicEncoding());
         requestData.setContentLengthOptional(serverConfig.isContentLengthOptional());
         requestData.setEnabledForExtensions(serverConfig.isEnabledForExtensions());
         requestData.setEnabledForExceptions(serverConfig.isEnabledForExceptions());
-
-        // reset user authentication
         String line = readLine();
         if (line == null  &&  firstByte) {
             return null;
         }
-        // Netscape sends an extra \n\r after bodypart, swallow it
         if (line != null && line.length() == 0) {
             line = readLine();
             if (line == null  ||  line.length() == 0) {
                 return null;
             }
         }
-
-        // tokenize first line of HTTP request
-        StringTokenizer tokens = new StringTokenizer(line);
-        String method = tokens.nextToken();
-        if (!"POST".equalsIgnoreCase(method)) {
-            throw new BadRequestException(requestData, method);
+        if (line != null) {
+            StringTokenizer tokens = new StringTokenizer(line);
+            String method = tokens.nextToken();
+            if (!"POST".equalsIgnoreCase(method)) {
+                throw new BadRequestException(requestData, method);
+            }
+            requestData.setMethod(method);
+            tokens.nextToken(); // Skip URI
+            String httpVersion = tokens.nextToken();
+            requestData.setHttpVersion(httpVersion);
+            requestData.setKeepAlive(serverConfig.isKeepAliveEnabled()
+                    && WebServer.HTTP_11.equals(httpVersion));
         }
-        requestData.setMethod(method);
-        tokens.nextToken(); // Skip URI
-        String httpVersion = tokens.nextToken();
-        requestData.setHttpVersion(httpVersion);
-        requestData.setKeepAlive(serverConfig.isKeepAliveEnabled()
-                && WebServer.HTTP_11.equals(httpVersion));
         do {
             line = readLine();
             if (line != null) {
@@ -166,7 +174,7 @@ public class Connection implements ThreadPool.InterruptableTask, ServerStreamCon
                     requestData.setContentLength(Integer.parseInt(cLength.trim()));
                 } else if (lineLower.startsWith("connection:")) {
                     requestData.setKeepAlive(serverConfig.isKeepAliveEnabled()
-                            &&  lineLower.indexOf("keep-alive") > -1);
+                            && lineLower.contains("keep-alive"));
                 } else if (lineLower.startsWith("authorization:")) {
                     String credentials = line.substring("authorization:".length());
                     HttpUtil.parseAuthorization(requestData, credentials);
@@ -180,13 +188,13 @@ public class Connection implements ThreadPool.InterruptableTask, ServerStreamCon
             }
         }
         while (line != null && line.length() != 0);
-
         return requestData;
     }
 
+    @Override
     public void run() {
         try {
-            for (int i = 0;  ;  i++) {
+            while (true) {
                 RequestData data = getRequestConfig();
                 if (data == null) {
                     break;
@@ -203,16 +211,28 @@ public class Connection implements ThreadPool.InterruptableTask, ServerStreamCon
                 writeErrorHeader(e.requestData, e, -1);
                 output.flush();
             } catch (IOException e1) {
-                /* Ignore me */
+                logger.log(Level.WARNING, e1.getMessage(), e1);
             }
         } catch (Throwable t) {
             if (!shuttingDown) {
                 webServer.log(t);
             }
         } finally {
-            try { output.close(); } catch (Throwable ignore) {}
-            try { input.close(); } catch (Throwable ignore) {}
-            try { socket.close(); } catch (Throwable ignore) {}
+            try {
+                output.close();
+            } catch (Throwable ignore) {
+                //
+            }
+            try {
+                input.close();
+            } catch (Throwable ignore) {
+                //
+            }
+            try {
+                socket.close();
+            } catch (Throwable ignore) {
+                //
+            }
         }
     }
 
@@ -243,7 +263,7 @@ public class Connection implements ThreadPool.InterruptableTask, ServerStreamCon
                 throw new IOException("HTTP Header too long");
             }
         }
-        return new String(buffer, 0, count, US_ASCII);
+        return new String(buffer, 0, count, StandardCharsets.US_ASCII);
     }
 
     /** Writes the response header and the response to the
@@ -365,12 +385,11 @@ public class Connection implements ThreadPool.InterruptableTask, ServerStreamCon
      * Sets a response header value.
      */
     public void setResponseHeader(String pHeader, String[] pValue) {
-        if (headers != null) {
-            headers.put(pHeader, pValue);
-        }
+        headers.put(pHeader, pValue);
     }
 
-    public OutputStream newOutputStream() throws IOException {
+    @Override
+    public OutputStream newOutputStream() {
         boolean useContentLength;
         useContentLength = !requestData.isEnabledForExtensions()
             ||  !((XmlRpcHttpRequestConfig) requestData).isContentLengthOptional();
@@ -381,7 +400,8 @@ public class Connection implements ThreadPool.InterruptableTask, ServerStreamCon
         }
     }
 
-    public InputStream newInputStream() throws IOException {
+    @Override
+    public InputStream newInputStream() {
         int contentLength = requestData.getContentLength();
         if (contentLength == -1) {
             return input;
@@ -390,9 +410,11 @@ public class Connection implements ThreadPool.InterruptableTask, ServerStreamCon
         }
     }
 
-    public void close() throws IOException {
+    @Override
+    public void close() {
     }
 
+    @Override
     public void shutdown() throws Throwable {
         shuttingDown = true;
         socket.close();

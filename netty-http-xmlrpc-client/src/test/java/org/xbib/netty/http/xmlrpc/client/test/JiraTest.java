@@ -1,21 +1,3 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.    
- */
 package org.xbib.netty.http.xmlrpc.client.test;
 
 import java.io.IOException;
@@ -26,22 +8,22 @@ import java.io.Writer;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Hashtable;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Vector;
 
-import org.apache.xmlrpc.XmlRpcException;
-import org.apache.xmlrpc.client.TimingOutCallback;
-import org.apache.xmlrpc.client.XmlRpcClient;
-import org.apache.xmlrpc.client.XmlRpcHttpClientConfig;
-import org.apache.xmlrpc.client.util.ClientFactory;
-import org.apache.xmlrpc.common.XmlRpcStreamRequestConfig;
-import org.apache.xmlrpc.parser.XmlRpcResponseParser;
-import org.apache.xmlrpc.server.XmlRpcHandlerMapping;
-import org.apache.xmlrpc.util.SAXParsers;
+import org.xbib.netty.http.xmlrpc.client.ClientFactory;
+import org.xbib.netty.http.xmlrpc.client.TimingOutCallback;
+import org.xbib.netty.http.xmlrpc.client.XmlRpcClient;
+import org.xbib.netty.http.xmlrpc.client.XmlRpcHttpClientConfig;
+import org.xbib.netty.http.xmlrpc.common.XmlRpcException;
+import org.xbib.netty.http.xmlrpc.common.XmlRpcStreamRequestConfig;
+import org.xbib.netty.http.xmlrpc.common.parser.XmlRpcResponseParser;
+import org.xbib.netty.http.xmlrpc.common.util.SAXParsers;
+import org.xbib.netty.http.xmlrpc.server.XmlRpcHandlerMapping;
 import org.xml.sax.InputSource;
 import org.xml.sax.XMLReader;
 
@@ -56,12 +38,12 @@ public class JiraTest extends XmlRpcTestCase {
         /**
          * Returns the reversed vector.
          */
-        Vector reverse(Vector pVector);
+        Vector<Object> reverse(Vector<Object> pVector);
         /**
          * Returns the same hashtable, but doubles the
          * values.
          */
-        Hashtable doubledValues(Hashtable pMap);
+        Hashtable<Object, Object> doubledValues(Hashtable<Object, Object> pMap);
         /**
          * Returns the same properties, but doubles the
          * values.
@@ -73,22 +55,21 @@ public class JiraTest extends XmlRpcTestCase {
      * Handler for {@link JiraTest#testXMLRPC89()}
      */ 
     public static class XMLRPC89HandlerImpl implements XMLRPC89Handler {
-        public Vector reverse(Vector pVector) {
-            Vector result = new Vector(pVector.size());
+        public Vector<Object> reverse(Vector<Object> pVector) {
+            Vector<Object> result = new Vector<>(pVector.size());
             result.addAll(pVector);
             Collections.reverse(result);
             return result;
         }
-        public Hashtable doubledValues(Hashtable pMap) {
-            final Hashtable result;
+        public Hashtable<Object, Object> doubledValues(Hashtable<Object, Object> pMap) {
+            final Hashtable<Object, Object> result;
             if (pMap instanceof Properties) {
                 result = new Properties();
             } else {
-                result = new Hashtable();
+                result = new Hashtable<>();
             }
             result.putAll(pMap);
-            for (Iterator iter = result.entrySet().iterator();  iter.hasNext();  ) {
-                Map.Entry entry = (Map.Entry) iter.next();
+            for (Map.Entry<Object, Object> entry : result.entrySet()) {
                 Object value = entry.getValue();
                 final Integer i;
                 if (pMap instanceof Properties) {
@@ -96,7 +77,7 @@ public class JiraTest extends XmlRpcTestCase {
                 } else {
                     i = (Integer) value;
                 }
-                Integer iDoubled = new Integer(i.intValue()*2);
+                Integer iDoubled = i * 2;
                 if (pMap instanceof Properties) {
                     entry.setValue(iDoubled.toString());
                 } else {
@@ -120,19 +101,19 @@ public class JiraTest extends XmlRpcTestCase {
      * XMLRPC-89</a>
      */
     public void testXMLRPC89() throws Exception {
-        for (int i = 0;  i < providers.length;  i++) {
-            testXMLRPC89Vector(providers[i]);
-            testXMLRPC89Hashtable(providers[i]);
-            testXMLRPC89Properties(providers[i]);
+        for (ClientProvider provider : providers) {
+            testXMLRPC89Vector(provider);
+            testXMLRPC89Hashtable(provider);
+            testXMLRPC89Properties(provider);
         }
     }
 
     private void testXMLRPC89Vector(ClientProvider pProvider) throws Exception {
-        Vector values = new Vector();
+        Vector<Object> values = new Vector<>();
         for (int i = 0;  i < 3;  i++) {
-            values.add(new Integer(i));
+            values.add(i);
         }
-        Vector params = new Vector();
+        Vector<Object> params = new Vector<>();
         params.add(values);
         XmlRpcClient client = pProvider.getClient();
         client.setConfig(getConfig(pProvider));
@@ -141,20 +122,20 @@ public class JiraTest extends XmlRpcTestCase {
         assertNotNull(result);
         assertEquals(3, result.length);
         for (int i = 0;  i < 3;  i++) {
-            assertEquals(new Integer(2-i), result[i]);
+            assertEquals(2 - i, result[i]);
         }
 
         ClientFactory factory = new ClientFactory(client);
         XMLRPC89Handler handler = (XMLRPC89Handler) factory.newInstance(XMLRPC89Handler.class);
-        Vector resultVector = handler.reverse(values);
+        Vector<Object> resultVector = handler.reverse(values);
         assertNotNull(resultVector);
         assertEquals(3, resultVector.size());
         for (int i = 0;  i < 3;  i++) {
-            assertEquals(new Integer(2-i), resultVector.get(i));
+            assertEquals(2 - i, resultVector.get(i));
         }
     }
 
-    private void verifyXMLRPC89Hashtable(Map pMap) {
+    private void verifyXMLRPC89Hashtable(Map<Object, Object> pMap) {
         assertNotNull(pMap);
         assertEquals(3, pMap.size());
         for (int i = 0;  i < 3;  i++) {
@@ -163,23 +144,24 @@ public class JiraTest extends XmlRpcTestCase {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private void testXMLRPC89Hashtable(ClientProvider pProvider) throws Exception {
-        Hashtable values = new Hashtable();
+        Hashtable<Object, Object> values = new Hashtable<>();
         for (int i = 0;  i < 3;  i++) {
-            values.put(String.valueOf(i), new Integer(i));
+            values.put(String.valueOf(i), i);
         }
         XmlRpcClient client = pProvider.getClient();
         client.setConfig(getConfig(pProvider));
-        Object res = client.execute(XMLRPC89Handler.class.getName() + ".doubledValues", new Object[]{values});
-        verifyXMLRPC89Hashtable((Map) res);
+        Map<Object, Object> res = (Map<Object, Object>) client.execute(XMLRPC89Handler.class.getName() + ".doubledValues", new Object[]{values});
+        verifyXMLRPC89Hashtable(res);
 
         ClientFactory factory = new ClientFactory(client);
         XMLRPC89Handler handler = (XMLRPC89Handler) factory.newInstance(XMLRPC89Handler.class);
-        Hashtable result = handler.doubledValues(values);
+        Hashtable<Object, Object> result = handler.doubledValues(values);
         verifyXMLRPC89Hashtable(result);
     }
 
-    private void verifyXMLRPC89Properties(Map pMap) {
+    private void verifyXMLRPC89Properties(Map<Object, Object> pMap) {
         assertNotNull(pMap);
         assertEquals(3, pMap.size());
         for (int i = 0;  i < 3;  i++) {
@@ -188,6 +170,7 @@ public class JiraTest extends XmlRpcTestCase {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private void testXMLRPC89Properties(ClientProvider pProvider) throws Exception {
         Properties values = new Properties();
         for (int i = 0;  i < 3;  i++) {
@@ -195,19 +178,20 @@ public class JiraTest extends XmlRpcTestCase {
         }
         XmlRpcClient client = pProvider.getClient();
         client.setConfig(getConfig(pProvider));
-        Object res = client.execute(XMLRPC89Handler.class.getName() + ".doubledPropertyValues", new Object[]{values});
-        verifyXMLRPC89Properties((Map) res);
-
+        Map<Object, Object> res = (Map<Object, Object>) client.execute(XMLRPC89Handler.class.getName() + ".doubledPropertyValues", new Object[]{values});
+        verifyXMLRPC89Properties(res);
         ClientFactory factory = new ClientFactory(client);
         XMLRPC89Handler handler = (XMLRPC89Handler) factory.newInstance(XMLRPC89Handler.class);
         Properties result = handler.doubledPropertyValues(values);
         verifyXMLRPC89Properties(result);
     }
 
-    /** Handler for XMLRPC-96
+    /**
+     * Handler for XMLRPC-96
      */
     public static class XMLRPC96Handler {
-        /** Returns the "Hello, world!" string.
+        /**
+         * Returns the "Hello, world!" string.
          */
         public String getHelloWorld() {
             return "Hello, world!";
@@ -219,8 +203,8 @@ public class JiraTest extends XmlRpcTestCase {
      * XMLRPC-96</a>
      */
     public void testXMLRPC96() throws Exception {
-        for (int i = 0;  i < providers.length;  i++) {
-            testXMLRPC96(providers[i]);
+        for (ClientProvider provider : providers) {
+            testXMLRPC96(provider);
         }
     }
 
@@ -238,8 +222,8 @@ public class JiraTest extends XmlRpcTestCase {
      * XMLRPC-112</a>
      */
     public void testXMLRPC112() throws Exception {
-        for (int i = 0;  i < providers.length;  i++) {
-            testXMLRPC112(providers[i]);
+        for (ClientProvider provider : providers) {
+            testXMLRPC112(provider);
         }
     }
 
@@ -248,8 +232,8 @@ public class JiraTest extends XmlRpcTestCase {
      * XMLRPC-113</a>
      */
     public void testXMLRPC113() throws Exception {
-        for (int i = 0;  i < providers.length;  i++) {
-            testXMLRPC113(providers[i]);
+        for (ClientProvider provider : providers) {
+            testXMLRPC113(provider);
         }
     }
 
@@ -306,7 +290,7 @@ public class JiraTest extends XmlRpcTestCase {
         XMLRPC113Handler handler = (XMLRPC113Handler) new ClientFactory(client).newInstance(XMLRPC113Handler.class);
         for (int i = 0;  i < 5;  i++) {
             try {
-                client.execute(XMLRPC113Handler.class.getName() + ".throwCode", new Object[]{new Integer(i)});
+                client.execute(XMLRPC113Handler.class.getName() + ".throwCode", new Object[] { i });
                 fail("Excpected exception");
             } catch (XmlRpcException e) {
                 assertEquals(i, e.code);
@@ -336,8 +320,8 @@ public class JiraTest extends XmlRpcTestCase {
      * XMLRPC-115</a>
      */
     public void testXMLRPC115() throws Exception {
-        for (int i = 0;  i < providers.length;  i++) {
-            testXMLRPC115(providers[i]);
+        for (ClientProvider provider : providers) {
+            testXMLRPC115(provider);
         }
     }
 
@@ -352,7 +336,7 @@ public class JiraTest extends XmlRpcTestCase {
             conn.setRequestMethod("POST");
             conn.setRequestProperty("content-type", "text/xml");
             OutputStream ostream = conn.getOutputStream();
-            Writer w = new OutputStreamWriter(ostream, "UTF-8");
+            Writer w = new OutputStreamWriter(ostream, StandardCharsets.UTF_8);
             w.write("<methodCall><methodName>" + XMLRPC115Handler.class.getName() + ".ping"
                     + "</methodName></methodCall>");
             w.close();
@@ -372,8 +356,8 @@ public class JiraTest extends XmlRpcTestCase {
      * XMLRPC-119</a>
      */
     public void testXMLRPC119() throws Exception {
-        for (int i = 0;  i < providers.length;  i++) {
-            testXMLRPC119(providers[i]);
+        for (ClientProvider provider : providers) {
+            testXMLRPC119(provider);
         }
     }
 
@@ -383,7 +367,7 @@ public class JiraTest extends XmlRpcTestCase {
         /** Returns a string with a length of "num" Kilobytes.
          */
         public String getString(int pSize) {
-            StringBuffer sb = new StringBuffer(pSize*1024);
+            StringBuilder sb = new StringBuilder(pSize*1024);
             for (int i = 0;  i < pSize*1024;  i++) {
                 sb.append('&');
             }
@@ -395,7 +379,8 @@ public class JiraTest extends XmlRpcTestCase {
         XmlRpcClient client = pProvider.getClient();
         client.setConfig(getConfig(pProvider));
         for (int i = 0;  i < 100;  i+= 10) {
-            String s = (String) client.execute(XMLRPC119Handler.class.getName() + ".getString", new Object[]{new Integer(i)});
+            String s = (String) client.execute(XMLRPC119Handler.class.getName() + ".getString",
+                    new Object[] { i });
             assertEquals(i*1024, s.length());
         }
     }

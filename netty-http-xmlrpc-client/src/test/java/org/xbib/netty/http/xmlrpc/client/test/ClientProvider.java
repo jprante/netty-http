@@ -4,6 +4,8 @@ import org.xbib.netty.http.xmlrpc.client.XmlRpcClient;
 import org.xbib.netty.http.xmlrpc.client.XmlRpcClientConfigImpl;
 import org.xbib.netty.http.xmlrpc.server.XmlRpcServer;
 
+import java.io.IOException;
+
 /** This interface allows to perform a unit test with various
  * transports. Basically, the implementation creates the client,
  * including the transport, and the server, if required.
@@ -27,5 +29,5 @@ public interface ClientProvider {
 
     /** Performs a shutdown of the server.
      */
-    void shutdown();
+    void shutdown() throws IOException;
 }

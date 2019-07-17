@@ -17,7 +17,9 @@ import org.xml.sax.SAXException;
  * {@link HttpURLConnection} class.
  */
 public class XmlRpcSunHttpTransport extends XmlRpcHttpTransport {
+
 	private static final String userAgent = USER_AGENT + " (Sun HTTP Transport)";
+
 	private URLConnection conn;
 
 	/** Creates a new instance.
@@ -55,7 +57,7 @@ public class XmlRpcSunHttpTransport extends XmlRpcHttpTransport {
 	    getURLConnection().setRequestProperty(pHeader, pValue);
 	}
 
-	protected void close() throws XmlRpcClientException {
+	protected void close() {
 	    final URLConnection c = getURLConnection();
 		if (c instanceof HttpURLConnection) {
 			((HttpURLConnection) c).disconnect();
@@ -69,7 +71,7 @@ public class XmlRpcSunHttpTransport extends XmlRpcHttpTransport {
 	protected InputStream getInputStream() throws XmlRpcException {
 		try {
 		    URLConnection connection = getURLConnection();
-		    if ( connection instanceof HttpURLConnection ) {
+		    if (connection instanceof HttpURLConnection ) {
 		        HttpURLConnection httpConnection = (HttpURLConnection) connection;
 		        int responseCode = httpConnection.getResponseCode();
 		        if (responseCode < 200  ||  responseCode > 299) {

@@ -1,45 +1,31 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.    
- */
 package org.xbib.netty.http.xmlrpc.client.test;
 
+import java.io.IOException;
 import java.net.URL;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 
-import org.apache.xmlrpc.XmlRpcException;
-import org.apache.xmlrpc.client.XmlRpcClient;
-import org.apache.xmlrpc.client.XmlRpcClientConfigImpl;
-import org.apache.xmlrpc.server.PropertyHandlerMapping;
-import org.apache.xmlrpc.server.XmlRpcHandlerMapping;
-import org.apache.xmlrpc.util.ThreadPool;
-import org.apache.xmlrpc.webserver.ServletWebServer;
-import org.apache.xmlrpc.webserver.WebServer;
-import org.apache.xmlrpc.webserver.XmlRpcServlet;
-
 import junit.framework.TestCase;
-
+import org.xbib.netty.http.xmlrpc.client.XmlRpcClient;
+import org.xbib.netty.http.xmlrpc.client.XmlRpcClientConfigImpl;
+import org.xbib.netty.http.xmlrpc.common.XmlRpcException;
+import org.xbib.netty.http.xmlrpc.server.PropertyHandlerMapping;
+import org.xbib.netty.http.xmlrpc.server.XmlRpcHandlerMapping;
+import org.xbib.netty.http.xmlrpc.servlet.ServletWebServer;
+import org.xbib.netty.http.xmlrpc.servlet.ThreadPool;
+import org.xbib.netty.http.xmlrpc.servlet.WebServer;
+import org.xbib.netty.http.xmlrpc.servlet.XmlRpcServlet;
 
 /**
  * Tests the frameworks scalability.
  */
 public class ScalabilityTest extends TestCase {
+
+    private static final Logger logger = Logger.getLogger(ScalabilityTest.class.getName());
+
     /**
      * Primitive handler class
      */
@@ -52,43 +38,18 @@ public class ScalabilityTest extends TestCase {
         }
     }
 
-    private class MyServletWebServer extends ServletWebServer {
-        protected ThreadPool pool;
-        MyServletWebServer(HttpServlet pServlet, int pPort)
-                throws ServletException {
-            super(pServlet, pPort);
-        }
-        public ThreadPool newThreadPool(){
-            pool = new ThreadPool(getXmlRpcServer().getMaxThreads(), "XML-RPC"){
-            };
-            return pool;
-        }
-        int getNumThreads() {
-            return pool.getNumThreads();
-        }
-    }
-
-    private class MyWebServer extends WebServer {
-        protected ThreadPool pool;
-        MyWebServer(int pPort) {
-            super(pPort);
-        }
-        public ThreadPool newThreadPool(){
-            pool = new ThreadPool(getXmlRpcServer().getMaxThreads(), "XML-RPC"){
-            };
-            return pool;
-        }
-        int getNumThreads() {
-            return pool.getNumThreads();
-        }
-    }
-    
     private static final int BASE = 1;
-    private static final Integer THREE = new Integer(3);
-    private static final Integer FIVE = new Integer(5);
-    private static final Integer EIGHT = new Integer(8);
+
+    private static final Integer THREE = 3;
+
+    private static final Integer FIVE = 5;
+
+    private static final Integer EIGHT = 8;
+
     private XmlRpcServlet servlet;
+
     private MyServletWebServer server;
+
     private MyWebServer webServer;
 
     private XmlRpcHandlerMapping newXmlRpcHandlerMapping() throws XmlRpcException {
@@ -98,50 +59,48 @@ public class ScalabilityTest extends TestCase {
     }
 
     private void initServletWebServer() throws Exception {
-        servlet = new XmlRpcServlet(){
-            private static final long serialVersionUID = -2040521497373327817L;
-            protected XmlRpcHandlerMapping newXmlRpcHandlerMapping()
-                    throws XmlRpcException {
-                return ScalabilityTest.this.newXmlRpcHandlerMapping();
+        servlet = new XmlRpcServlet() {
 
+            private static final long serialVersionUID = -2040521497373327817L;
+
+            @Override
+            protected XmlRpcHandlerMapping newXmlRpcHandlerMapping() throws XmlRpcException {
+                return ScalabilityTest.this.newXmlRpcHandlerMapping();
             }
-            
         };
-        server = new MyServletWebServer(servlet, 0);
+        server = new MyServletWebServer(servlet, 8080);
         server.getXmlRpcServer().setMaxThreads(25);
         server.start();
     }
 
-    private void shutdownServletWebServer() {
+    private void shutdownServletWebServer() throws IOException {
         server.shutdown();
     }
 
     private void initWebServer() throws Exception {
-        webServer = new MyWebServer(0);
+        webServer = new MyWebServer(8080);
         webServer.getXmlRpcServer().setHandlerMapping(newXmlRpcHandlerMapping());
         webServer.getXmlRpcServer().setMaxThreads(25);
         webServer.start();
     }
 
-    private void shutdownWebServer() {
+    private void shutdownWebServer() throws IOException {
         webServer.shutdown();
     }
 
     /**
-     * Runs the test with a single client.
+     * Runs the servlet test with a single client.
      */
-    public void testSingleClient() throws Exception {
+    public void testSingleServletClient() throws Exception {
         initServletWebServer();
-        boolean ok = false;
         try {
             long now = System.currentTimeMillis();
             servlet.getXmlRpcServletServer().setMaxThreads(1);
-            new Client(100*BASE, server.getPort()).run();
-            System.out.println("Single client: " + (System.currentTimeMillis()-now) + ", " + server.getNumThreads());
-            shutdownServletWebServer();
-            ok = true;
+            new MyClient(100 * BASE, server.getPort()).run();
+            logger.log(Level.INFO,
+                    "Single servlet client: " + (System.currentTimeMillis() - now) + ", " + server.getNumThreads());
         } finally {
-            if (!ok) { try { shutdownServletWebServer(); } catch (Throwable t) {} }
+            shutdownServletWebServer();
         }
     }
 
@@ -150,38 +109,14 @@ public class ScalabilityTest extends TestCase {
      */
     public void testSingleWebServerClient() throws Exception {
         initWebServer();
-        boolean ok = false;
         try {
             long now = System.currentTimeMillis();
             webServer.getXmlRpcServer().setMaxThreads(1);
-            new Client(100*BASE, webServer.getPort()).run();
-            System.out.println("Single client: " + (System.currentTimeMillis()-now) + ", " + webServer.getNumThreads());
-            shutdownWebServer();
-            ok = true;
+            new MyClient(100 * BASE, webServer.getPort()).run();
+            logger.log(Level.INFO,
+                    "Single web server client: " + (System.currentTimeMillis( ) -now) + ", " + webServer.getNumThreads());
         } finally {
-            if (!ok) { try { shutdownWebServer(); } catch (Throwable t) {} }
-        }
-    }
-
-    private static class Client implements Runnable {
-        private final int iterations;
-        private final int port;
-        Client(int pIterations, int pPort) {
-            iterations = pIterations;
-            port = pPort;
-        }
-        public void run() {
-            try {
-                XmlRpcClient client = new XmlRpcClient();
-                XmlRpcClientConfigImpl config = new XmlRpcClientConfigImpl();
-                config.setServerURL(new URL("http://127.0.0.1:" + port + "/"));
-                client.setConfig(config);
-                for (int i = 0;  i < iterations;  i++) {
-                    assertEquals(EIGHT, client.execute("Adder.add", new Object[]{THREE, FIVE}));
-                }
-            } catch (Throwable t) {
-                t.printStackTrace();
-            }
+            shutdownWebServer();
         }
     }
 
@@ -190,23 +125,90 @@ public class ScalabilityTest extends TestCase {
      */
     public void testTenClient() throws Exception {
         initServletWebServer();
-        boolean ok = false;
         try {
             final Thread[] threads = new Thread[10];
             servlet.getXmlRpcServletServer().setMaxThreads(10);
             long now = System.currentTimeMillis();
             for (int i = 0;  i < threads.length;  i++) {
-                threads[i] = new Thread(new Client(10*BASE, server.getPort()));
+                threads[i] = new Thread(new MyClient(10 * BASE, server.getPort()));
                 threads[i].start();
             }
-            for (int i = 0;  i < threads.length;  i++) {
-                threads[i].join();
+            for (Thread thread : threads) {
+                thread.join();
             }
-            System.out.println("Ten clients: " + (System.currentTimeMillis() - now) + ", " + server.getNumThreads());
+            logger.log(Level.INFO, "Ten clients: " + (System.currentTimeMillis() - now) + ", " + server.getNumThreads());
             shutdownServletWebServer();
-            ok = false;
         } finally {
-            if (!ok) { try { shutdownServletWebServer(); } catch (Throwable t) {} }
+            shutdownServletWebServer();
         }
     }
+
+    private static class MyClient implements Runnable {
+
+        private final int iterations;
+
+        private final int port;
+
+        MyClient(int pIterations, int pPort) {
+            iterations = pIterations;
+            port = pPort;
+        }
+
+        @Override
+        public void run() {
+            int i = 0;
+            try {
+                XmlRpcClient client = new XmlRpcClient();
+                XmlRpcClientConfigImpl config = new XmlRpcClientConfigImpl();
+                config.setServerURL(new URL("http://localhost:" + port + "/"));
+                client.setConfig(config);
+                for (i = 0;  i < iterations;  i++) {
+                    assertEquals(EIGHT, client.execute("Adder.add", new Object[] {
+                            THREE, FIVE
+                    }));
+                }
+            } catch (Throwable t) {
+                throw new RuntimeException("i=" + i, t);
+            }
+        }
+    }
+
+    private class MyServletWebServer extends ServletWebServer {
+
+        ThreadPool pool;
+
+        MyServletWebServer(HttpServlet pServlet, int pPort) throws ServletException {
+            super(pServlet, pPort);
+        }
+
+        @Override
+        public ThreadPool newThreadPool(){
+            pool = new ThreadPool(getXmlRpcServer().getMaxThreads(), "XML-RPC");
+            return pool;
+        }
+
+        int getNumThreads() {
+            return pool.getNumThreads();
+        }
+    }
+
+    private class MyWebServer extends WebServer {
+
+        ThreadPool pool;
+
+        MyWebServer(int pPort) {
+            super(pPort);
+        }
+
+        @Override
+        public ThreadPool newThreadPool(){
+            pool = new ThreadPool(getXmlRpcServer().getMaxThreads(), "XML-RPC");
+            return pool;
+        }
+
+        int getNumThreads() {
+            return pool.getNumThreads();
+        }
+    }
+
 }

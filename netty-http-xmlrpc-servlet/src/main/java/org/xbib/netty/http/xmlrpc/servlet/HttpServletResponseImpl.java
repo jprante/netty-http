@@ -28,8 +28,6 @@ public class HttpServletResponseImpl implements HttpServletResponse {
 
     static final int BUFFER_SIZE = 8192;
 
-    private final Socket socket;
-
     private final OutputStream ostream;
 
     private final Map<String, String[]> headers = new HashMap<>();
@@ -50,9 +48,8 @@ public class HttpServletResponseImpl implements HttpServletResponse {
      * @param pSocket The clients socket.
      * @throws IOException Accessing the sockets output stream failed.
      */
-    public HttpServletResponseImpl(Socket pSocket) throws IOException {
-        socket = pSocket;
-        ostream = socket.getOutputStream();
+    HttpServletResponseImpl(Socket pSocket) throws IOException {
+        ostream = pSocket.getOutputStream();
     }
 
     @Override
@@ -79,7 +76,7 @@ public class HttpServletResponseImpl implements HttpServletResponse {
     public String getHeader(String pHeader) {
         String key = pHeader.toLowerCase();
         String[] strings = headers.get(key);
-        return strings != null ? strings[0] : null;
+        return strings != null && strings.length > 0 ? strings[0] : null;
     }
 
     @Override
@@ -125,8 +122,7 @@ public class HttpServletResponseImpl implements HttpServletResponse {
         sendError(pStatusCode, pMessage, null);
     }
 
-    protected void sendError(int pStatusCode, String pMessage, String pDescription)
-            throws IOException {
+    protected void sendError(int pStatusCode, String pMessage, String pDescription) throws IOException {
         if (isCommitted()) {
             throw new IllegalStateException("Can't send an error message, if the response has already been committed.");
         }

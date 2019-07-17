@@ -8,19 +8,20 @@ import java.util.logging.Logger;
  * error logging.
  */
 public class XmlRpcErrorLogger {
+
     private static final Logger log = Logger.getLogger(XmlRpcErrorLogger.class.getName());
 
     /**
      * Called to log the given error.
      */
     public void log(String pMessage, Throwable pThrowable) {
-        log.log(Level.SEVERE, pMessage, pThrowable);
+        log.log(Level.INFO, pMessage, pThrowable);
     }
 
     /**
      * Called to log the given error message.
      */
     public void log(String pMessage) {
-        log.log(Level.SEVERE, pMessage);
+        log.log(Level.INFO, pMessage);
     }
 }

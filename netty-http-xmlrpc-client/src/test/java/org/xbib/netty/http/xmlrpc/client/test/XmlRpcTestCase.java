@@ -3,6 +3,7 @@ package org.xbib.netty.http.xmlrpc.client.test;
 import java.io.IOException;
 import java.io.StringWriter;
 
+import junit.framework.TestCase;
 import org.xbib.netty.http.xmlrpc.client.XmlRpcClient;
 import org.xbib.netty.http.xmlrpc.client.XmlRpcClientConfig;
 import org.xbib.netty.http.xmlrpc.client.XmlRpcClientConfigImpl;
@@ -18,6 +19,8 @@ import org.xbib.netty.http.xmlrpc.server.PropertyHandlerMapping;
 import org.xbib.netty.http.xmlrpc.server.XmlRpcHandlerMapping;
 import org.xml.sax.SAXException;
 
+import javax.servlet.ServletException;
+
 /**
  * Abstract base class for deriving test cases.
  */
@@ -31,14 +34,14 @@ public abstract class XmlRpcTestCase extends TestCase {
         return pProvider.getConfig();
     }
 
-    protected XmlRpcClientConfig getExConfig(ClientProvider pProvider) throws Exception {
+    XmlRpcClientConfig getExConfig(ClientProvider pProvider) throws Exception {
         XmlRpcClientConfigImpl config = getConfig(pProvider);
         config.setEnabledForExtensions(true);
         config.setEnabledForExceptions(true);
         return config;
     }
 
-    protected XmlRpcHandlerMapping getHandlerMapping(String pResource) throws IOException, XmlRpcException {
+    XmlRpcHandlerMapping getHandlerMapping(String pResource) throws IOException, XmlRpcException {
         PropertyHandlerMapping mapping = new PropertyHandlerMapping();
         mapping.setVoidMethodEnabled(true);
         mapping.load(getClass().getClassLoader(), getClass().getResource(pResource));
@@ -49,27 +52,29 @@ public abstract class XmlRpcTestCase extends TestCase {
     protected ClientProvider[] initProviders(XmlRpcHandlerMapping pMapping) throws ServletException, IOException {
         return new ClientProvider[]{
                 new LocalTransportProvider(pMapping),
-                new LocalStreamTransportProvider(pMapping),
-                new LiteTransportProvider(pMapping, true),
-                // new LiteTransportProvider(mapping, false), Doesn't support HTTP/1.1
-                new SunHttpTransportProvider(pMapping, true),
-                new SunHttpTransportProvider(pMapping, false),
-                new CommonsProvider(pMapping),
-                new ServletWebServerProvider(pMapping, true),
-                new ServletWebServerProvider(pMapping, false)
+                //new LocalStreamTransportProvider(pMapping),
+                //new LiteTransportProvider(pMapping, true),
+                //// new LiteTransportProvider(mapping, false), Doesn't support HTTP/1.1
+                //new SunHttpTransportProvider(pMapping, true),
+                //new SunHttpTransportProvider(pMapping, false),
+                //new CommonsProvider(pMapping),
+                //new ServletWebServerProvider(pMapping, true),
+                //new ServletWebServerProvider(pMapping, false)
             };
     }
 
+    @Override
     public void setUp() throws Exception {
         if (providers == null) {
             providers = initProviders(getHandlerMapping());
         }
     }
 
-    public void tearDown() throws Exception {
+    @Override
+    public void tearDown() throws IOException {
         if (providers != null) {
-            for (int i = 0;  i < providers.length;  i++) {
-                providers[i].shutdown();
+            for (ClientProvider provider : providers) {
+                provider.shutdown();
             }
         }
     }

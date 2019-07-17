@@ -1,6 +1,5 @@
 package org.xbib.netty.http.xmlrpc.client.test;
 
-
 import org.xbib.netty.http.xmlrpc.client.XmlRpcClient;
 import org.xbib.netty.http.xmlrpc.client.XmlRpcClientConfigImpl;
 import org.xbib.netty.http.xmlrpc.client.XmlRpcTransportFactory;
@@ -10,7 +9,10 @@ import org.xbib.netty.http.xmlrpc.server.XmlRpcServer;
 /** Abstract base implementation of {@link ClientProvider}.
  */
 public abstract class ClientProviderImpl implements ClientProvider {
+
 	protected final XmlRpcHandlerMapping mapping;
+
+	protected XmlRpcClientConfigImpl clientConfig;
 
 	protected abstract XmlRpcTransportFactory getTransportFactory(XmlRpcClient pClient);
 
@@ -21,15 +23,17 @@ public abstract class ClientProviderImpl implements ClientProvider {
 		mapping = pMapping;
 	}
 
-	protected XmlRpcServer getXmlRpcServer() throws Exception {
+	protected XmlRpcServer getXmlRpcServer() {
 		XmlRpcServer server = new XmlRpcServer();
 		server.setHandlerMapping(mapping);
 		return server;
 	}
 
 	public XmlRpcClientConfigImpl getConfig() throws Exception {
-		XmlRpcClientConfigImpl config = new XmlRpcClientConfigImpl();
-		return config;
+		if (clientConfig == null) {
+			clientConfig =  new XmlRpcClientConfigImpl();
+		}
+		return clientConfig;
 	}
 
 	public XmlRpcClient getClient() {

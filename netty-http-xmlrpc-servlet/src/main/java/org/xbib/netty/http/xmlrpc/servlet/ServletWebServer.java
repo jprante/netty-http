@@ -29,46 +29,12 @@ import javax.servlet.http.HttpServlet;
  * <code>org/apache/xmlrpc/server/webserver/XmlRpcServlet.properties</code>.</p>
  * <pre>
  *   final int port = 8088;
- *
  *   XmlRpcServlet servlet = new XmlRpcServlet();
  *   ServletWebServer webServer = new ServletWebServer(servlet, port);
  *   webServer.start();
  * </pre>
  */
 public class ServletWebServer extends WebServer {
-    /** This exception is thrown by the request handling classes,
-     * advising the server, that it should return an error response.
-     */
-    public static class Exception extends IOException {
-        private static final long serialVersionUID = 49879832748972394L;
-        private final int statusCode;
-        private final String description;
-
-        /** Creates a new instance.
-         * @param pStatusCode The HTTP status code being sent to the client.
-         * @param pMessage The HTTP status message being sent to the client.
-         * @param pDescription The error description being sent to the client
-         * in the response body.
-         */
-        public Exception(int pStatusCode, String pMessage, String pDescription) {
-            super(pMessage);
-            statusCode = pStatusCode;
-            description = pDescription;
-        }
-
-        public String getMessage() { return statusCode + " " + super.getMessage(); }
-
-        /** Returns the error description. The server will send the description
-         * as plain text in the response body.
-         * @return The error description.
-         */
-        public String getDescription() { return description; }
-
-        /** Returns the HTTP status code.
-         * @return The status code.
-         */
-        public int getStatusCode() { return statusCode; }
-    }
 
     private final HttpServlet servlet;
 
@@ -91,22 +57,34 @@ public class ServletWebServer extends WebServer {
      * @param pAddr The servers IP address.
      * @throws ServletException Initializing the servlet failed.
      */
-    public ServletWebServer(HttpServlet pServlet, int pPort, InetAddress pAddr)
-            throws ServletException {
+    public ServletWebServer(HttpServlet pServlet, int pPort, InetAddress pAddr) throws ServletException {
         super(pPort, pAddr);
         servlet = pServlet;
-        servlet.init(new ServletConfig(){
+        servlet.init(new ServletConfig() {
+
+            @Override
             public String getServletName() { return servlet.getClass().getName(); }
+
+            @Override
             public ServletContext getServletContext() {
                 throw new IllegalStateException("Context not available");
             }
+
+            @Override
             public String getInitParameter(String pArg0) {
                 return null;
             }
 
+            @Override
             public Enumeration<String> getInitParameterNames() {
                 return new Enumeration<String>(){
-                    public boolean hasMoreElements() { return false; }
+
+                    @Override
+                    public boolean hasMoreElements() {
+                        return false;
+                    }
+
+                    @Override
                     public String nextElement() {
                         throw new NoSuchElementException();
                     }
@@ -122,4 +100,42 @@ public class ServletWebServer extends WebServer {
                                Socket pSocket) throws IOException {
         return new ServletConnection(servlet, pSocket);
     }
+
+    /** This exception is thrown by the request handling classes,
+     * advising the server, that it should return an error response.
+     */
+    public static class ServletWebServerException extends IOException {
+
+        private static final long serialVersionUID = 49879832748972394L;
+
+        private final int statusCode;
+
+        private final String description;
+
+        /** Creates a new instance.
+         * @param pStatusCode The HTTP status code being sent to the client.
+         * @param pMessage The HTTP status message being sent to the client.
+         * @param pDescription The error description being sent to the client
+         * in the response body.
+         */
+        ServletWebServerException(int pStatusCode, String pMessage, String pDescription) {
+            super(pMessage);
+            statusCode = pStatusCode;
+            description = pDescription;
+        }
+
+        public String getMessage() { return statusCode + " " + super.getMessage(); }
+
+        /** Returns the error description. The server will send the description
+         * as plain text in the response body.
+         * @return The error description.
+         */
+        public String getDescription() { return description; }
+
+        /** Returns the HTTP status code.
+         * @return The status code.
+         */
+        public int getStatusCode() { return statusCode; }
+    }
+
 }
