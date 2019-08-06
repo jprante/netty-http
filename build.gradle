@@ -55,7 +55,7 @@ subprojects {
         systemProperty 'java.util.logging.config.file', 'src/test/resources/logging.properties'
         failFast = false
         testLogging {
-            events 'PASSED', 'FAILED', 'SKIPPED'
+            events 'STARTED', 'PASSED', 'FAILED', 'SKIPPED'
         }
         afterSuite { desc, result ->
             if (!desc.parent) {
