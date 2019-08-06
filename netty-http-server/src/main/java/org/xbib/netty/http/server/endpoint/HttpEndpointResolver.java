@@ -11,7 +11,6 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
@@ -44,7 +43,8 @@ public class HttpEndpointResolver {
         HttpEndpointDescriptor httpEndpointDescriptor = serverRequest.getEndpointDescriptor();
         endpointDescriptors.putIfAbsent(httpEndpointDescriptor, endpoints.stream()
                 .filter(endpoint -> endpoint.matches(httpEndpointDescriptor))
-                .sorted(new HttpEndpoint.EndpointPathComparator(httpEndpointDescriptor.getPath())).collect(Collectors.toList()));
+                .sorted(new HttpEndpoint.EndpointPathComparator(httpEndpointDescriptor.getPath()))
+                .collect(Collectors.toList()));
         List<HttpEndpoint> matchingEndpoints = endpointDescriptors.get(httpEndpointDescriptor);
         if (logger.isLoggable(Level.FINE)) {
             logger.log(Level.FINE, () -> "endpoint = " + httpEndpointDescriptor +
@@ -83,7 +83,7 @@ public class HttpEndpointResolver {
         return endpointDescriptors;
     }
 
-    protected HttpEndpoint createDefaultEndpoint() {
+    private HttpEndpoint createDefaultEndpoint() {
         return HttpEndpoint.builder()
                 .setPath("/**")
                 .addMethod("GET")
@@ -92,27 +92,6 @@ public class HttpEndpointResolver {
                     ServerResponse.write(resp, HttpResponseStatus.NOT_FOUND,
                             "application/octet-stream","no endpoint configured");
                 }).build();
-    }
-
-    /**
-     * A simple LRU cache, based on a {@link LinkedHashMap}.
-     *
-     * @param <K> the key type parameter
-     * @param <V> the vale type parameter
-     */
-    @SuppressWarnings("serial")
-    private static class LRUCache<K, V> extends LinkedHashMap<K, V> {
-
-        private final int cacheSize;
-
-        LRUCache(int cacheSize) {
-            super(16, 0.75f, true);
-            this.cacheSize = cacheSize;
-        }
-
-        protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
-            return size() > cacheSize;
-        }
     }
 
     public static Builder builder() {

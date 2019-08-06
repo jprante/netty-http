@@ -34,7 +34,7 @@ import org.xbib.netty.http.client.transport.HttpTransport;
 import org.xbib.netty.http.client.transport.Transport;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.NetworkUtils;
-import org.xbib.netty.http.common.SecurityUtil;
+import org.xbib.netty.http.common.security.SecurityUtil;
 
 import javax.net.ssl.SNIHostName;
 import javax.net.ssl.SNIServerName;

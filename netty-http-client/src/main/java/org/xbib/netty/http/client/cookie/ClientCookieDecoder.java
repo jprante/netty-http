@@ -4,7 +4,8 @@ import org.xbib.netty.http.common.cookie.Cookie;
 import org.xbib.netty.http.common.cookie.CookieDecoder;
 import org.xbib.netty.http.common.cookie.CookieHeaderNames;
 import org.xbib.netty.http.common.cookie.DefaultCookie;
-import org.xbib.netty.http.common.util.DateTimeUtils;
+import org.xbib.netty.http.common.cookie.SameSite;
+import org.xbib.netty.http.common.util.DateTimeUtil;
 
 import java.time.Instant;
 import java.util.Locale;
@@ -42,7 +43,7 @@ public final class ClientCookieDecoder extends CookieDecoder {
     public Cookie decode(String header) {
         final int headerLen = Objects.requireNonNull(header, "header").length();
         if (headerLen == 0) {
-            return null;
+            throw new IllegalArgumentException("header length is 0");
         }
         CookieBuilder cookieBuilder = null;
         int i = 0;
@@ -116,7 +117,10 @@ public final class ClientCookieDecoder extends CookieDecoder {
                 }
             }
         }
-        return cookieBuilder != null ? cookieBuilder.cookie() : null;
+        if (cookieBuilder == null) {
+            throw new IllegalArgumentException("no cookie found");
+        }
+        return cookieBuilder.cookie();
     }
 
     private static class CookieBuilder {
@@ -139,7 +143,7 @@ public final class ClientCookieDecoder extends CookieDecoder {
 
         private boolean httpOnly;
 
-        private Cookie.SameSite sameSite = Cookie.SameSite.STRICT;
+        private SameSite sameSite = SameSite.STRICT;
 
         CookieBuilder(DefaultCookie cookie, String header) {
             this.cookie = cookie;
@@ -208,7 +212,7 @@ public final class ClientCookieDecoder extends CookieDecoder {
             if (maxAge != Long.MIN_VALUE) {
                 return maxAge;
             } else if (isValueDefined(expiresStart, expiresEnd)) {
-                Instant expiresDate = DateTimeUtils.parseDate(header, expiresStart, expiresEnd);
+                Instant expiresDate = DateTimeUtil.parseDate(header, expiresStart, expiresEnd);
                 if (expiresDate != null) {
                     Instant now = Instant.now();
                     long maxAgeMillis = expiresDate.toEpochMilli() - now.toEpochMilli();
@@ -233,7 +237,7 @@ public final class ClientCookieDecoder extends CookieDecoder {
             } else if (header.regionMatches(true, nameStart, CookieHeaderNames.SAMESITE, 0, 8)) {
                 String string = computeValue(valueStart, valueEnd);
                 if (string != null) {
-                    setSameSite(Cookie.SameSite.valueOf(string.toUpperCase(Locale.ROOT)));
+                    setSameSite(SameSite.valueOf(string.toUpperCase(Locale.ROOT)));
                 }
             }
         }
@@ -246,7 +250,7 @@ public final class ClientCookieDecoder extends CookieDecoder {
             return isValueDefined(valueStart, valueEnd) ? header.substring(valueStart, valueEnd) : null;
         }
 
-        private void setSameSite(Cookie.SameSite value) {
+        private void setSameSite(SameSite value) {
             sameSite = value;
         }
     }

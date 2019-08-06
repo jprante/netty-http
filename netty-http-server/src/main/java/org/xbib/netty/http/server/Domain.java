@@ -8,7 +8,7 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
 import org.xbib.netty.http.common.HttpAddress;
-import org.xbib.netty.http.common.SecurityUtil;
+import org.xbib.netty.http.common.security.SecurityUtil;
 import org.xbib.netty.http.server.endpoint.HttpEndpoint;
 import org.xbib.netty.http.server.endpoint.HttpEndpointResolver;
 import org.xbib.netty.http.server.endpoint.service.Service;
@@ -147,7 +147,7 @@ public class Domain {
             this.serverName = serverName;
             this.aliases = new LinkedHashSet<>();
             this.httpEndpointResolvers = new ArrayList<>();
-            this.trustManagerFactory = SecurityUtil.Defaults.DEFAULT_TRUST_MANAGER_FACTORY; // InsecureTrustManagerFactory.INSTANCE;
+            this.trustManagerFactory = SecurityUtil.Defaults.DEFAULT_TRUST_MANAGER_FACTORY;
             this.sslProvider = SecurityUtil.Defaults.DEFAULT_SSL_PROVIDER;
             this.ciphers = SecurityUtil.Defaults.DEFAULT_CIPHERS;
             this.cipherSuiteFilter = SecurityUtil.Defaults.DEFAULT_CIPHER_SUITE_FILTER;

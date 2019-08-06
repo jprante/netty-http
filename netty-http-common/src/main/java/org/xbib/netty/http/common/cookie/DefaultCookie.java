@@ -25,6 +25,10 @@ public class DefaultCookie implements Cookie {
 
     private SameSite sameSite;
 
+    public DefaultCookie(String name, CookieSigner cookieSigner) {
+        this(name, cookieSigner.getCookieValue());
+    }
+
     /**
      * Creates a new cookie with the specified name and value.
      * @param name name
@@ -36,10 +40,6 @@ public class DefaultCookie implements Cookie {
             throw new IllegalArgumentException("empty name");
         }
         setValue(value);
-    }
-
-    public DefaultCookie(String name, Payload payload) {
-        this(name, payload.toString());
     }
 
     @Override

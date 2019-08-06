@@ -5,7 +5,7 @@ import org.xbib.netty.http.common.cookie.CookieEncoder;
 import org.xbib.netty.http.common.cookie.CookieHeaderNames;
 import org.xbib.netty.http.common.cookie.CookieUtil;
 import org.xbib.netty.http.common.cookie.DefaultCookie;
-import org.xbib.netty.http.common.util.DateTimeUtils;
+import org.xbib.netty.http.common.util.DateTimeUtil;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -86,7 +86,7 @@ public final class ServerCookieEncoder extends CookieEncoder {
             Instant expires = Instant.ofEpochMilli(cookie.maxAge() * 1000 + System.currentTimeMillis());
             buf.append(CookieHeaderNames.EXPIRES);
             buf.append(CookieUtil.EQUALS);
-            buf.append(DateTimeUtils.formatMillis(expires.toEpochMilli()));
+            buf.append(DateTimeUtil.formatMillis(expires.toEpochMilli()));
             buf.append(CookieUtil.SEMICOLON);
             buf.append(CookieUtil.SP);
         }
@@ -108,28 +108,6 @@ public final class ServerCookieEncoder extends CookieEncoder {
                     s.substring(0, 1).toUpperCase(Locale.ROOT) + s.substring(1).toLowerCase(Locale.ROOT));
         }
         return CookieUtil.stripTrailingSeparator(buf);
-    }
-
-    /**
-     * Deduplicate a list of encoded cookies by keeping only the last instance with a given name.
-     *
-     * @param encoded The list of encoded cookies.
-     * @param nameToLastIndex A map from cookie name to index of last cookie instance.
-     * @return The encoded list with all but the last instance of a named cookie.
-     */
-    private static List<String> dedup(List<String> encoded, Map<String, Integer> nameToLastIndex) {
-        boolean[] isLastInstance = new boolean[encoded.size()];
-        for (int idx : nameToLastIndex.values()) {
-            isLastInstance[idx] = true;
-        }
-        List<String> dedupd = new ArrayList<>(nameToLastIndex.size());
-        int n = encoded.size();
-        for (int i = 0; i < n; i++) {
-            if (isLastInstance[i]) {
-                dedupd.add(encoded.get(i));
-            }
-        }
-        return dedupd;
     }
 
     /**
@@ -203,5 +181,27 @@ public final class ServerCookieEncoder extends CookieEncoder {
             }
         }
         return hasDupdName ? dedup(encoded, nameToIndex) : encoded;
+    }
+
+    /**
+     * Deduplicate a list of encoded cookies by keeping only the last instance with a given name.
+     *
+     * @param encoded The list of encoded cookies.
+     * @param nameToLastIndex A map from cookie name to index of last cookie instance.
+     * @return The encoded list with all but the last instance of a named cookie.
+     */
+    private static List<String> dedup(List<String> encoded, Map<String, Integer> nameToLastIndex) {
+        boolean[] isLastInstance = new boolean[encoded.size()];
+        for (int idx : nameToLastIndex.values()) {
+            isLastInstance[idx] = true;
+        }
+        List<String> dedupd = new ArrayList<>(nameToLastIndex.size());
+        int n = encoded.size();
+        for (int i = 0; i < n; i++) {
+            if (isLastInstance[i]) {
+                dedupd.add(encoded.get(i));
+            }
+        }
+        return dedupd;
     }
 }

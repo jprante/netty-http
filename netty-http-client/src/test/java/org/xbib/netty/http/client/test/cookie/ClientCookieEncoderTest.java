@@ -38,8 +38,7 @@ class ClientCookieEncoderTest {
 
     @Test
     void testRejectCookieValueWithSemicolon() {
-        assertThrows(IllegalArgumentException.class, () -> {
-            ClientCookieEncoder.STRICT.encode(new DefaultCookie("myCookie", "foo;bar"));
-        });
+        assertThrows(IllegalArgumentException.class, () ->
+                ClientCookieEncoder.STRICT.encode(new DefaultCookie("myCookie", "foo;bar")));
     }
 }

@@ -8,7 +8,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Locale;
 
-public class DateTimeUtils {
+public class DateTimeUtil {
 
     private static final ZoneId ZONE_UTC = ZoneId.of("UTC");
 
@@ -17,6 +17,9 @@ public class DateTimeUtils {
     private static final String RFC1036_PATTERN = "EEE, dd-MMM-yyyy HH:mm:ss zzz";
 
     private static final String ASCIITIME_PATTERN = "EEE MMM d HH:mm:ss yyyyy";
+
+    private DateTimeUtil() {
+    }
 
     public static String formatInstant(Instant instant) {
         return DateTimeFormatter.RFC_1123_DATE_TIME.format(ZonedDateTime.ofInstant(instant, ZoneOffset.UTC));

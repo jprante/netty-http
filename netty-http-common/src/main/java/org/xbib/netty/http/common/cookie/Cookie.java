@@ -147,6 +147,4 @@ public interface Cookie extends Comparable<Cookie> {
      * @param sameSite the same site value
      */
     void setSameSite(SameSite sameSite);
-
-    enum SameSite { STRICT, LAX }
 }

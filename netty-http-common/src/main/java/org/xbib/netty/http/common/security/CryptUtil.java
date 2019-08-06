@@ -1,7 +1,8 @@
-package org.xbib.netty.http.common.util;
+package org.xbib.netty.http.common.security;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
@@ -15,9 +16,12 @@ import java.util.Base64;
  * A utility class for invoking encryption methods and returning password strings,
  * using {@link java.security.MessageDigest} and {@link javax.crypto.Mac}.
  */
-public class CryptUtils {
+public class CryptUtil {
 
     private static final Random random = new SecureRandom();
+
+    private CryptUtil() {
+    }
 
     public static String randomHex(int length) {
         byte[] b = new byte[length];
@@ -53,32 +57,32 @@ public class CryptUtils {
         return digest(Codec.BASE64, plainText.getBytes(StandardCharsets.UTF_8), salt, Algo.SSHA512.algo, Algo.SSHA512.prefix);
     }
 
-    public static String hmacSHA1(String plainText, String secret) throws NoSuchAlgorithmException, InvalidKeyException {
-        return hmac(Codec.BASE64, plainText.getBytes(StandardCharsets.UTF_8), secret.getBytes(StandardCharsets.UTF_8), HMac.HMAC_SHA1);
+    public static String hmacSHA1(Charset charset, String plainText, String secret) throws NoSuchAlgorithmException, InvalidKeyException {
+        return hmac(HMac.HMAC_SHA1, Codec.BASE64, plainText.getBytes(charset), secret.getBytes(charset));
     }
 
-    public static String hmacSHA1(byte[] plainText, String secret) throws InvalidKeyException, NoSuchAlgorithmException {
-        return hmac(Codec.BASE64, plainText, secret.getBytes(StandardCharsets.UTF_8), HMac.HMAC_SHA1);
+    public static String hmacSHA1(Charset charset, byte[] plainText, String secret) throws InvalidKeyException, NoSuchAlgorithmException {
+        return hmac(HMac.HMAC_SHA1, Codec.BASE64, plainText, secret.getBytes(charset));
     }
 
     public static String hmacSHA1(byte[] plainText, byte[] secret) throws InvalidKeyException, NoSuchAlgorithmException {
-        return hmac(Codec.BASE64, plainText, secret, HMac.HMAC_SHA1);
+        return hmac(HMac.HMAC_SHA1, Codec.BASE64, plainText, secret);
     }
 
-    public static String hmacSHA256(String plainText, String secret) throws NoSuchAlgorithmException, InvalidKeyException {
-        return hmac(Codec.BASE64, plainText.getBytes(StandardCharsets.UTF_8), secret.getBytes(StandardCharsets.UTF_8), HMac.HMAC_SHA256);
+    public static String hmacSHA256(Charset charset, String plainText, String secret) throws NoSuchAlgorithmException, InvalidKeyException {
+        return hmac(HMac.HMAC_SHA256, Codec.BASE64, plainText.getBytes(charset), secret.getBytes(charset));
     }
 
-    public static String hmacSHA256(byte[] plainText, String secret) throws InvalidKeyException, NoSuchAlgorithmException {
-        return hmac(Codec.BASE64, plainText, secret.getBytes(StandardCharsets.UTF_8), HMac.HMAC_SHA256);
+    public static String hmacSHA256(Charset charset, byte[] plainText, String secret) throws InvalidKeyException, NoSuchAlgorithmException {
+        return hmac(HMac.HMAC_SHA256, Codec.BASE64, plainText, secret.getBytes(charset));
     }
 
     public static String hmacSHA256(byte[] plainText, byte[] secret) throws InvalidKeyException, NoSuchAlgorithmException {
-        return hmac(Codec.BASE64, plainText, secret, HMac.HMAC_SHA256);
+        return hmac(HMac.HMAC_SHA256, Codec.BASE64, plainText, secret);
     }
 
-    public static String hmac(Codec codec, String plainText, String secret, HMac hmac) throws InvalidKeyException, NoSuchAlgorithmException {
-        return hmac(codec, plainText.getBytes(StandardCharsets.UTF_8), secret.getBytes(StandardCharsets.UTF_8), hmac);
+    public static String hmac(Charset charset, HMac hmac, Codec codec, String plainText, String secret) throws InvalidKeyException, NoSuchAlgorithmException {
+        return hmac(hmac, codec, plainText.getBytes(charset), secret.getBytes(charset));
     }
 
     public static String digest(Codec codec, byte[] plainText, byte[] salt, String algo, String prefix) throws NoSuchAlgorithmException {
@@ -98,11 +102,11 @@ public class CryptUtils {
                         codec == Codec.HEX ? encodeHex(bytes) : null);
     }
 
-    public static String hmac(Codec codec, byte[] plainText, byte[] secret, HMac hmac) throws NoSuchAlgorithmException, InvalidKeyException {
+    public static String hmac(HMac hmac, Codec codec, byte[] plainText, byte[] secret) throws NoSuchAlgorithmException, InvalidKeyException {
         Objects.requireNonNull(plainText);
         Objects.requireNonNull(secret);
-        Mac mac = Mac.getInstance(hmac.algo);
-        SecretKeySpec secretKeySpec = new SecretKeySpec(secret, hmac.algo);
+        Mac mac = Mac.getInstance(hmac.getAlgo());
+        SecretKeySpec secretKeySpec = new SecretKeySpec(secret, hmac.getAlgo());
         mac.init(secretKeySpec);
         return codec == Codec.BASE64 ? Base64.getEncoder().encodeToString(mac.doFinal(plainText)) :
                 codec == Codec.HEX ? encodeHex(mac.doFinal(plainText)) : null;

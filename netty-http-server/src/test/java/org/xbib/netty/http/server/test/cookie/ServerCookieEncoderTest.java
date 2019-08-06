@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.xbib.netty.http.client.cookie.ClientCookieEncoder;
 import org.xbib.netty.http.common.cookie.Cookie;
 import org.xbib.netty.http.common.cookie.DefaultCookie;
-import org.xbib.netty.http.common.util.DateTimeUtils;
+import org.xbib.netty.http.common.util.DateTimeUtil;
 import org.xbib.netty.http.server.cookie.ServerCookieEncoder;
 
 import java.time.Instant;
@@ -35,7 +35,7 @@ class ServerCookieEncoderTest {
         String encodedCookie = ServerCookieEncoder.STRICT.encode(cookie);
         Matcher matcher = Pattern.compile(result).matcher(encodedCookie);
         assertTrue(matcher.find());
-        Instant expire = DateTimeUtils.parseDate(matcher.group(1));
+        Instant expire = DateTimeUtil.parseDate(matcher.group(1));
         long diff = (expire.toEpochMilli() - System.currentTimeMillis()) / 1000;
         assertTrue(Math.abs(diff - maxAge) <= 2);
     }

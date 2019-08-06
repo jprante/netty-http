@@ -1,4 +1,4 @@
-package org.xbib.netty.http.common;
+package org.xbib.netty.http.common.security;
 
 import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.ssl.CipherSuiteFilter;
@@ -21,6 +21,9 @@ public class SecurityUtil {
         } catch (Exception e) {
             TRUST_MANAGER_FACTORY = null;
         }
+    }
+
+    private SecurityUtil() {
     }
 
     public interface Defaults {

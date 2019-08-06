@@ -22,7 +22,7 @@ import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.NetworkUtils;
 import org.xbib.netty.http.server.handler.http.HttpChannelInitializer;
 import org.xbib.netty.http.server.handler.http2.Http2ChannelInitializer;
-import org.xbib.netty.http.common.SecurityUtil;
+import org.xbib.netty.http.common.security.SecurityUtil;
 import org.xbib.netty.http.server.transport.HttpTransport;
 import org.xbib.netty.http.server.transport.Http2Transport;
 import org.xbib.netty.http.server.transport.Transport;
@@ -83,8 +83,7 @@ public final class Server {
                   Class<? extends ServerSocketChannel> socketChannelClass) {
         Objects.requireNonNull(serverConfig);
         this.serverConfig = serverConfig;
-        this.byteBufAllocator = byteBufAllocator != null ?
-                byteBufAllocator : ByteBufAllocator.DEFAULT;
+        this.byteBufAllocator = byteBufAllocator != null ? byteBufAllocator : ByteBufAllocator.DEFAULT;
         this.parentEventLoopGroup = createParentEventLoopGroup(serverConfig, parentEventLoopGroup);
         this.childEventLoopGroup = createChildEventLoopGroup(serverConfig, childEventLoopGroup);
         this.socketChannelClass = createSocketChannelClass(serverConfig, socketChannelClass);
@@ -191,6 +190,7 @@ public final class Server {
         parentEventLoopGroup.shutdownGracefully();
         try {
             if (channelFuture != null) {
+                // close channel and wait
                 channelFuture.channel().closeFuture().sync();
             }
         } catch (InterruptedException e) {

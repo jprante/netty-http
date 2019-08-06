@@ -1,4 +1,4 @@
-package org.xbib.netty.http.common.util;
+package org.xbib.netty.http.common.security;
 
 public enum Algo {
     MD5("MD5", "md5"),

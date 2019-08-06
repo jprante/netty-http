@@ -3,7 +3,8 @@ package org.xbib.netty.http.client.test.cookie;
 import org.junit.jupiter.api.Test;
 import org.xbib.netty.http.client.cookie.ClientCookieDecoder;
 import org.xbib.netty.http.common.cookie.Cookie;
-import org.xbib.netty.http.common.util.DateTimeUtils;
+import org.xbib.netty.http.common.cookie.SameSite;
+import org.xbib.netty.http.common.util.DateTimeUtil;
 
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -24,7 +25,7 @@ class ClientCookieDecoderTest {
     void testDecodingSingleCookieV0() {
         long millis = System.currentTimeMillis() + 50000;
         String cookieString = "myCookie=myValue;expires=" +
-                DateTimeUtils.formatMillis(millis) +
+                DateTimeUtil.formatMillis(millis) +
                 ";path=/apathsomewhere;domain=.adomainsomewhere;secure;";
         Cookie cookie = ClientCookieDecoder.STRICT.decode(cookieString);
         assertNotNull(cookie);
@@ -55,8 +56,8 @@ class ClientCookieDecoderTest {
         String cookieString = "myCookie=myValue;max-age=50;path=/apathsomewhere;domain=.adomainsomewhere" +
                 ";secure;comment=this is a comment;version=1;";
         Cookie cookie = ClientCookieDecoder.STRICT.decode(cookieString);
-        assertEquals("myValue", cookie.value());
         assertNotNull(cookie);
+        assertEquals("myValue", cookie.value());
         assertEquals(".adomainsomewhere", cookie.domain());
         assertEquals(50, cookie.maxAge());
         assertEquals("/apathsomewhere", cookie.path());
@@ -134,6 +135,7 @@ class ClientCookieDecoderTest {
                 "__utmz=48461872.1258140131.1.1.utmcsr=overstock.com|utmccn=(referral)|" +
                 "utmcmd=referral|utmcct=/Home-Garden/Furniture/Clearance,/clearance,/32/dept.html";
         Cookie cookie = ClientCookieDecoder.STRICT.decode(source);
+        assertNotNull(cookie);
         assertEquals("ARPT", cookie.name());
         assertEquals("LWUKQPSWRTUN04CKKJI", cookie.value());
     }
@@ -144,6 +146,7 @@ class ClientCookieDecoderTest {
         long expectedMaxAge = ((zonedDateTime.toEpochSecond() * 1000L) - System.currentTimeMillis()) / 1000;
         String source = "Format=EU; expires=Fri, 31-Dec-2100 23:59:59 GMT; path=/";
         Cookie cookie = ClientCookieDecoder.STRICT.decode(source);
+        assertNotNull(cookie);
         assertTrue(Math.abs(expectedMaxAge - cookie.maxAge()) < 2);
     }
 
@@ -159,6 +162,7 @@ class ClientCookieDecoderTest {
     void testDecodingWeirdNames1() {
         String src = "path=; expires=Mon, 01-Jan-1990 00:00:00 GMT; path=/; domain=.www.google.com";
         Cookie cookie = ClientCookieDecoder.STRICT.decode(src);
+        assertNotNull(cookie);
         assertEquals("path", cookie.name());
         assertEquals("", cookie.value());
         assertEquals("/", cookie.path());
@@ -168,15 +172,14 @@ class ClientCookieDecoderTest {
     void testDecodingWeirdNames2() {
         String src = "HTTPOnly=";
         Cookie cookie = ClientCookieDecoder.STRICT.decode(src);
+        assertNotNull(cookie);
         assertEquals("HTTPOnly", cookie.name());
         assertEquals("", cookie.value());
     }
 
     @Test
     void testDecodingValuesWithCommasAndEqualsFails() {
-        String src = "A=v=1&lg=en-US,it-IT,it&intl=it&np=1;T=z=E";
-        Cookie cookie = ClientCookieDecoder.STRICT.decode(src);
-        assertNull(cookie);
+            assertNull(ClientCookieDecoder.STRICT.decode( "A=v=1&lg=en-US,it-IT,it&intl=it&np=1;T=z=E"));
     }
 
     @Test
@@ -226,6 +229,7 @@ class ClientCookieDecoderTest {
                 "%=KqtH_$?mi____'=KqtH_$?mx____'=KqtH_$D7]____#=J_#p_$D@T____#=J_#p_$V<g____" +
                 "'=KqtH";
         Cookie cookie = ClientCookieDecoder.STRICT.decode("bh=\"" + longValue + "\";");
+        assertNotNull(cookie);
         assertEquals("bh", cookie.name());
         assertEquals(longValue, cookie.value());
     }
@@ -234,6 +238,7 @@ class ClientCookieDecoderTest {
     void testIgnoreEmptyDomain() {
         String emptyDomain = "sessionid=OTY4ZDllNTgtYjU3OC00MWRjLTkzMWMtNGUwNzk4MTY0MTUw;Domain=;Path=/";
         Cookie cookie = ClientCookieDecoder.STRICT.decode(emptyDomain);
+        assertNotNull(cookie);
         assertNull(cookie.domain());
     }
 
@@ -241,6 +246,7 @@ class ClientCookieDecoderTest {
     void testIgnoreEmptyPath() {
         String emptyPath = "sessionid=OTY4ZDllNTgtYjU3OC00MWRjLTkzMWMtNGUwNzk4MTY0MTUw;Domain=;Path=";
         Cookie cookie = ClientCookieDecoder.STRICT.decode(emptyPath);
+        assertNotNull(cookie);
         assertNull(cookie.path());
     }
 
@@ -248,20 +254,23 @@ class ClientCookieDecoderTest {
     void testSameSiteStrict() {
         String sameSite = "sessionid=OTY4ZDllNTgtYjU3OC00MWRjLTkzMWMtNGUwNzk4MTY0MTUw;SameSite=Strict";
         Cookie cookie = ClientCookieDecoder.STRICT.decode(sameSite);
-        assertEquals(Cookie.SameSite.STRICT, cookie.sameSite());
+        assertNotNull(cookie);
+        assertEquals(SameSite.STRICT, cookie.sameSite());
     }
 
     @Test
     void testSameSiteLax() {
         String sameSite = "sessionid=OTY4ZDllNTgtYjU3OC00MWRjLTkzMWMtNGUwNzk4MTY0MTUw;SameSite=Lax";
         Cookie cookie = ClientCookieDecoder.STRICT.decode(sameSite);
-        assertEquals(Cookie.SameSite.LAX, cookie.sameSite());
+        assertNotNull(cookie);
+        assertEquals(SameSite.LAX, cookie.sameSite());
     }
 
     @Test
     void testEmptySameSite() {
         String sameSite = "sessionid=OTY4ZDllNTgtYjU3OC00MWRjLTkzMWMtNGUwNzk4MTY0MTUw;SameSite=";
         Cookie cookie = ClientCookieDecoder.STRICT.decode(sameSite);
-        assertEquals(Cookie.SameSite.STRICT, cookie.sameSite());
+        assertNotNull(cookie);
+        assertEquals(SameSite.STRICT, cookie.sameSite());
     }
 }

@@ -6,7 +6,7 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.stream.ChunkedNioStream;
-import org.xbib.netty.http.common.util.DateTimeUtils;
+import org.xbib.netty.http.common.util.DateTimeUtil;
 import org.xbib.netty.http.server.ServerRequest;
 import org.xbib.netty.http.server.ServerResponse;
 import org.xbib.netty.http.server.util.MimeTypeUtils;
@@ -55,14 +55,14 @@ public abstract class ResourceService implements Service {
         long maxAgeSeconds = 24 * 3600;
         long expirationMillis = System.currentTimeMillis() + 1000 * maxAgeSeconds;
         if (isCacheResponseEnabled()) {
-            serverResponse.withHeader(HttpHeaderNames.EXPIRES, DateTimeUtils.formatMillis(expirationMillis))
+            serverResponse.withHeader(HttpHeaderNames.EXPIRES, DateTimeUtil.formatMillis(expirationMillis))
                     .withHeader(HttpHeaderNames.CACHE_CONTROL, "public, max-age=" + maxAgeSeconds);
         }
         boolean sent = false;
         if (isETagResponseEnabled()) {
             Instant lastModifiedInstant = resource.getLastModified();
             String eTag = resource.getResourcePath().hashCode() + "/" + lastModifiedInstant.toEpochMilli() + "/" + resource.getLength();
-            Instant ifUnmodifiedSinceInstant = DateTimeUtils.parseDate(headers.get(HttpHeaderNames.IF_UNMODIFIED_SINCE));
+            Instant ifUnmodifiedSinceInstant = DateTimeUtil.parseDate(headers.get(HttpHeaderNames.IF_UNMODIFIED_SINCE));
             if (ifUnmodifiedSinceInstant != null &&
                     ifUnmodifiedSinceInstant.plusMillis(1000L).isAfter(lastModifiedInstant)) {
                 ServerResponse.write(serverResponse, HttpResponseStatus.PRECONDITION_FAILED);
@@ -76,20 +76,20 @@ public abstract class ResourceService implements Service {
             String ifNoneMatch = headers.get(HttpHeaderNames.IF_NONE_MATCH);
             if (ifNoneMatch != null && matches(ifNoneMatch, eTag)) {
                 serverResponse.withHeader(HttpHeaderNames.ETAG, eTag)
-                        .withHeader(HttpHeaderNames.EXPIRES, DateTimeUtils.formatMillis(expirationMillis));
+                        .withHeader(HttpHeaderNames.EXPIRES, DateTimeUtil.formatMillis(expirationMillis));
                 ServerResponse.write(serverResponse, HttpResponseStatus.NOT_MODIFIED);
                 return;
             }
-            Instant ifModifiedSinceInstant = DateTimeUtils.parseDate(headers.get(HttpHeaderNames.IF_MODIFIED_SINCE));
+            Instant ifModifiedSinceInstant = DateTimeUtil.parseDate(headers.get(HttpHeaderNames.IF_MODIFIED_SINCE));
             if (ifModifiedSinceInstant != null &&
                     ifModifiedSinceInstant.plusMillis(1000L).isAfter(lastModifiedInstant)) {
                 serverResponse.withHeader(HttpHeaderNames.ETAG, eTag)
-                        .withHeader(HttpHeaderNames.EXPIRES, DateTimeUtils.formatMillis(expirationMillis));
+                        .withHeader(HttpHeaderNames.EXPIRES, DateTimeUtil.formatMillis(expirationMillis));
                 ServerResponse.write(serverResponse, HttpResponseStatus.NOT_MODIFIED);
                 return;
             }
             serverResponse.withHeader(HttpHeaderNames.ETAG, eTag)
-                    .withHeader(HttpHeaderNames.LAST_MODIFIED, DateTimeUtils.formatInstant(lastModifiedInstant));
+                    .withHeader(HttpHeaderNames.LAST_MODIFIED, DateTimeUtil.formatInstant(lastModifiedInstant));
             if (isRangeResponseEnabled()) {
                 performRangeResponse(serverRequest, serverResponse, resource, contentType, eTag, headers);
                 sent = true;
@@ -119,7 +119,7 @@ public abstract class ResourceService implements Service {
             String ifRange = headers.get(HttpHeaderNames.IF_RANGE);
             if (ifRange != null && !ifRange.equals(eTag)) {
                 try {
-                    Instant ifRangeTime = DateTimeUtils.parseDate(ifRange);
+                    Instant ifRangeTime = DateTimeUtil.parseDate(ifRange);
                     if (ifRangeTime != null && ifRangeTime.plusMillis(1000).isBefore(resource.getLastModified())) {
                         ranges.add(full);
                     }

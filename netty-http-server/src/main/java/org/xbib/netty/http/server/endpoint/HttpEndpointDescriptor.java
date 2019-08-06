@@ -32,7 +32,7 @@ public class HttpEndpointDescriptor implements EndpointDescriptor, Comparable<Ht
 
     @Override
     public String toString() {
-        return "[EndpointInfo:path=" + path + ",method=" + method + ",contentType=" + contentType + "]";
+        return "[HttpEndpointDescriptor:path=" + path + ",method=" + method + ",contentType=" + contentType + "]";
     }
 
     @Override

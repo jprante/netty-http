@@ -10,7 +10,7 @@ import io.netty.handler.ssl.CipherSuiteFilter;
 import io.netty.handler.ssl.SslProvider;
 import org.xbib.netty.http.client.retry.BackOff;
 import org.xbib.netty.http.common.HttpAddress;
-import org.xbib.netty.http.common.SecurityUtil;
+import org.xbib.netty.http.common.security.SecurityUtil;
 
 import javax.net.ssl.TrustManagerFactory;
 import java.io.InputStream;
