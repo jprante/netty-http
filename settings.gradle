@@ -1,5 +1,6 @@
 include 'netty-http-common'
 include 'netty-http-client'
+include 'netty-http-client-rest'
 include 'netty-http-server'
 include 'netty-http-server-reactive'
 include 'netty-http-server-rest'

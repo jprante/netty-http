@@ -1,10 +1,10 @@
 package org.xbib.netty.http.client.test;
 
-import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.proxy.HttpProxyHandler;
 import org.junit.jupiter.api.Test;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.Request;
+import org.xbib.netty.http.common.HttpResponse;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -24,9 +24,9 @@ class XbibTest {
         try {
             Request request = Request.get().url("http://xbib.org")
                     .build()
-                    .setResponseListener(fullHttpResponse -> {
-                        String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-                        logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
+                    .setResponseListener(resp -> {
+                        logger.log(Level.INFO, "status = " + resp.getStatus() +
+                                " response = " + resp.getBodyAsString(StandardCharsets.UTF_8));
                     });
             client.execute(request);
         } finally {
@@ -40,18 +40,18 @@ class XbibTest {
                 .setTcpNodelay(true)
                 .build();
         try {
-            final Function<FullHttpResponse, String> httpResponseStringFunction =
-                    response -> response.content().toString(StandardCharsets.UTF_8);
+            final Function<HttpResponse, String> stringFunction =
+                    response -> response.getBodyAsString(StandardCharsets.UTF_8);
             Request request = Request.get().url("http://xbib.org")
                     .build();
-            final CompletableFuture<String> completableFuture = httpClient.execute(request, httpResponseStringFunction)
+            final CompletableFuture<String> completableFuture = httpClient.execute(request, stringFunction)
                     .exceptionally(Throwable::getMessage)
                     .thenCompose(content -> {
                         try {
                             return httpClient.execute(Request.post()
                                     .url("http://google.de")
                                     .addParameter("query", content.substring(0, 15))
-                                    .build(), httpResponseStringFunction);
+                                    .build(), stringFunction);
                         } catch (IOException e) {
                             logger.log(Level.WARNING, e.getMessage(), e);
                             return null;
@@ -75,10 +75,8 @@ class XbibTest {
             httpClient.execute(Request.get()
                     .url("http://xbib.org")
                     .build()
-                    .setResponseListener(fullHttpResponse -> {
-                        String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-                        logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
-                    }))
+                    .setResponseListener(resp -> logger.log(Level.INFO, "status = " + resp.getStatus() +
+                            " response body = " + resp.getBodyAsString(StandardCharsets.UTF_8))))
                     .get();
         } finally {
             httpClient.shutdownGracefully();
@@ -94,10 +92,10 @@ class XbibTest {
                     .url("http://xbib.org")
                     .setTimeoutInMillis(10)
                     .build()
-                    .setResponseListener(fullHttpResponse -> {
-                        String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-                        logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
-                    }))
+                    .setResponseListener(resp ->
+                        logger.log(Level.INFO, "status = " + resp.getStatus() +
+                                " response body = " + resp.getBodyAsString(StandardCharsets.UTF_8))
+                    ))
                     .get();
         } finally {
             httpClient.shutdownGracefully();
@@ -112,9 +110,9 @@ class XbibTest {
                     .setVersion("HTTP/1.1")
                     .url("http://xbib.org")
                     .build()
-                    .setResponseListener(fullHttpResponse -> {
-                        String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-                        logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
+                    .setResponseListener(resp -> {
+                        logger.log(Level.INFO, "status = " + resp.getStatus() +
+                                " response body = " + resp.getBodyAsString(StandardCharsets.UTF_8));
                     }))
                     .get();
 
@@ -122,9 +120,9 @@ class XbibTest {
                     .setVersion("HTTP/1.1")
                     .url("http://xbib.org")
                     .build()
-                    .setResponseListener(fullHttpResponse -> {
-                        String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-                        logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
+                    .setResponseListener(resp -> {
+                        logger.log(Level.INFO, "status = " + resp.getStatus() +
+                                " response body = " + resp.getBodyAsString(StandardCharsets.UTF_8));
                     }))
                     .get();
         } finally {

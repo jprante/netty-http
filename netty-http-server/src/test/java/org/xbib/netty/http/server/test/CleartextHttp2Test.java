@@ -8,6 +8,7 @@ import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.client.listener.ResponseListener;
 import org.xbib.netty.http.client.transport.Transport;
 import org.xbib.netty.http.common.HttpAddress;
+import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.ServerResponse;
 import org.xbib.netty.http.server.Domain;
@@ -43,10 +44,9 @@ class CleartextHttp2Test {
                 .build();
         AtomicInteger counter = new AtomicInteger();
         // a single instance of HTTP/2 response listener, always receives responses out-of-order
-        ResponseListener responseListener = fullHttpResponse -> {
-            String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-            logger.log(Level.INFO, "response listener: headers = " + fullHttpResponse.headers().entries() +
-                    " response body = " + response);
+        ResponseListener<HttpResponse> responseListener = resp -> {
+            logger.log(Level.INFO, "response listener: headers = " + resp.getHeaders() +
+                    " response body = " + resp.getBodyAsString(StandardCharsets.UTF_8));
             counter.incrementAndGet();
         };
         try {
@@ -87,17 +87,12 @@ class CleartextHttp2Test {
                 .build();
         AtomicInteger counter = new AtomicInteger();
         // a single instance of HTTP/2 response listener, always receives responses out-of-order
-        final ResponseListener responseListener = fullHttpResponse -> {
-            String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-            //logger.log(Level.INFO, "response listener: headers = " + fullHttpResponse.headers().entries() +
-            //        " response body = " + response);
-            counter.incrementAndGet();
-        };
+        final ResponseListener<HttpResponse> responseListener = resp -> counter.incrementAndGet();
         try {
             // single transport, single thread
             Transport transport = client.newTransport();
             for (int i = 0; i < loop; i++) {
-                String payload = Integer.toString(0) + "/" + Integer.toString(i);
+                String payload = 0 + "/" + i;
                 Request request = Request.get().setVersion("HTTP/2.0")
                         .url(server.getServerConfig().getAddress().base())
                         .content(payload, "text/plain")
@@ -136,12 +131,7 @@ class CleartextHttp2Test {
                 .build();
         AtomicInteger counter = new AtomicInteger();
         // a HTTP/2 listener always receives responses out-of-order
-        final ResponseListener responseListener = fullHttpResponse -> {
-            String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-            //logger.log(Level.INFO, "response listener: headers = " + fullHttpResponse.headers().entries() +
-            //        " response body = " + response);
-            counter.incrementAndGet();
-        };
+        final ResponseListener<HttpResponse> responseListener = resp -> counter.incrementAndGet();
         try {
             // note: for HTTP/2 only, we can use a single shared transport
             final Transport transport = client.newTransport();
@@ -214,12 +204,7 @@ class CleartextHttp2Test {
                 .build();
         AtomicInteger counter = new AtomicInteger();
         // a single instance of HTTP/2 response listener, always receives responses out-of-order
-        final ResponseListener responseListener = fullHttpResponse -> {
-            String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-            //logger.log(Level.INFO, "response listener: headers = " + fullHttpResponse.headers().entries() +
-            //        " response body = " + response);
-            counter.incrementAndGet();
-        };
+        final ResponseListener<HttpResponse> responseListener = resp -> counter.incrementAndGet();
         try {
             // note: for HTTP/2 only, we can use a single shared transport
             final Transport transport = client.newTransport();

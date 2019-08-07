@@ -1,12 +1,10 @@
 
 dependencies {
-    implementation project(":netty-http-common")
-    implementation "io.netty:netty-handler-proxy:${project.property('netty.version')}"
-    implementation "io.netty:netty-transport-native-epoll:${project.property('netty.version')}"
-    implementation "io.netty:netty-codec-http2:${project.property('netty.version')}"
-    implementation "org.xbib:net-url:${project.property('xbib-net-url.version')}"
-    testImplementation "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
-    testImplementation "org.bouncycastle:bcpkix-jdk15on:${project.property('bouncycastle.version')}"
-    testImplementation "org.conscrypt:conscrypt-openjdk-uber:${project.property('conscrypt.version')}"
-    testImplementation "com.fasterxml.jackson.core:jackson-databind:${project.property('jackson.version')}"
+    compile project(":netty-http-common")
+    compile "io.netty:netty-handler-proxy:${project.property('netty.version')}"
+    compile "io.netty:netty-transport-native-epoll:${project.property('netty.version')}"
+    testCompile "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
+    testCompile "org.bouncycastle:bcpkix-jdk15on:${project.property('bouncycastle.version')}"
+    testCompile "org.conscrypt:conscrypt-openjdk-uber:${project.property('conscrypt.version')}"
+    testCompile "com.fasterxml.jackson.core:jackson-databind:${project.property('jackson.version')}"
 }

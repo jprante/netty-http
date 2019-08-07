@@ -3,7 +3,6 @@ package org.xbib.netty.http.client.transport;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
-import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http2.DefaultHttp2DataFrame;
@@ -26,6 +25,7 @@ import org.xbib.netty.http.client.listener.StatusListener;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.client.listener.ResponseListener;
+import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.common.cookie.Cookie;
 
 import java.io.IOException;
@@ -134,13 +134,13 @@ public class Http2Transport extends BaseTransport {
     }
 
     @Override
-    public void responseReceived(Channel channel, Integer streamId, FullHttpResponse fullHttpResponse) {
+    public void responseReceived(Channel channel, Integer streamId, HttpResponse httpResponse) {
         if (throwable != null) {
-            logger.log(Level.WARNING, "throwable not null for response " + fullHttpResponse, throwable);
+            logger.log(Level.WARNING, "throwable not null for response " + httpResponse, throwable);
             return;
         }
         if (streamId == null) {
-            logger.log(Level.WARNING, "stream ID is null for response " + fullHttpResponse);
+            logger.log(Level.WARNING, "stream ID is null for response " + httpResponse);
             return;
         }
         // format of childchan channel ID is <parent channel ID> "/" <substream ID>
@@ -160,9 +160,9 @@ public class Http2Transport extends BaseTransport {
             } else {
                 StatusListener statusListener = request.getStatusListener();
                 if (statusListener != null) {
-                    statusListener.onStatus(fullHttpResponse.status());
+                    statusListener.onStatus(httpResponse.getStatus());
                 }
-                for (String cookieString : fullHttpResponse.headers().getAll(HttpHeaderNames.SET_COOKIE)) {
+                for (String cookieString : httpResponse.getHeaders().getAllHeaders(HttpHeaderNames.SET_COOKIE)) {
                     Cookie cookie = ClientCookieDecoder.STRICT.decode(cookieString);
                     addCookie(cookie);
                     CookieListener cookieListener = request.getCookieListener();
@@ -170,17 +170,17 @@ public class Http2Transport extends BaseTransport {
                         cookieListener.onCookie(cookie);
                     }
                 }
-                ResponseListener responseListener = request.getResponseListener();
+                ResponseListener<HttpResponse> responseListener = request.getResponseListener();
                 if (responseListener != null) {
-                    responseListener.onResponse(fullHttpResponse);
+                    responseListener.onResponse(httpResponse);
                 }
                 try {
-                    Request retryRequest = retry(request, fullHttpResponse);
+                    Request retryRequest = retry(request, httpResponse);
                     if (retryRequest != null) {
                         // retry transport, wait for completion
                         client.retry(this, retryRequest);
                     } else {
-                        Request continueRequest = continuation(request, fullHttpResponse);
+                        Request continueRequest = continuation(request, httpResponse);
                         if (continueRequest != null) {
                             // continue with new transport, synchronous call here, wait for completion
                             client.continuation(this, continueRequest);

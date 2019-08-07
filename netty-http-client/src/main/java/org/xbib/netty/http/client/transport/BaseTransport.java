@@ -1,7 +1,6 @@
 package org.xbib.netty.http.client.transport;
 
 import io.netty.channel.Channel;
-import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.ssl.SslHandler;
@@ -12,6 +11,7 @@ import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.client.retry.BackOff;
+import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.common.cookie.Cookie;
 import org.xbib.netty.http.common.cookie.CookieBox;
 
@@ -65,6 +65,11 @@ abstract class BaseTransport implements Transport {
         this.requests = new ConcurrentSkipListMap<>();
     }
 
+    @Override
+    public HttpAddress getHttpAddress() {
+        return httpAddress;
+    }
+
     /**
      * Experimental method for executing in a wrapping completable future.
      * @param request request
@@ -74,7 +79,7 @@ abstract class BaseTransport implements Transport {
      */
     @Override
     public <T> CompletableFuture<T> execute(Request request,
-                                            Function<FullHttpResponse, T> supplier) throws IOException {
+                                            Function<HttpResponse, T> supplier) throws IOException {
         Objects.requireNonNull(supplier);
         final CompletableFuture<T> completableFuture = new CompletableFuture<>();
         request.setResponseListener(response -> {
@@ -237,7 +242,7 @@ abstract class BaseTransport implements Transport {
         return channel;
     }
 
-    protected Request continuation(Request request, FullHttpResponse httpResponse) throws URLSyntaxException {
+    protected Request continuation(Request request, HttpResponse httpResponse) throws URLSyntaxException {
         if (httpResponse == null) {
             return null;
         }
@@ -247,7 +252,7 @@ abstract class BaseTransport implements Transport {
         }
         try {
             if (request.canRedirect()) {
-                int status = httpResponse.status().code();
+                int status = httpResponse.getStatus().getCode();
                 switch (status) {
                     case 300:
                     case 301:
@@ -256,12 +261,12 @@ abstract class BaseTransport implements Transport {
                     case 305:
                     case 307:
                     case 308:
-                        String location = httpResponse.headers().get(HttpHeaderNames.LOCATION);
+                        String location = httpResponse.getHeaders().getHeader(HttpHeaderNames.LOCATION);
                         location = new PercentDecoder(StandardCharsets.UTF_8.newDecoder()).decode(location);
                         if (location != null) {
                             logger.log(Level.FINE, "found redirect location: " + location);
                             URL redirUrl = URL.base(request.url()).resolve(location);
-                            HttpMethod method = httpResponse.status().code() == 303 ? HttpMethod.GET : request.httpMethod();
+                            HttpMethod method = httpResponse.getStatus().getCode() == 303 ? HttpMethod.GET : request.httpMethod();
                             Request.Builder newHttpRequestBuilder = Request.builder(method)
                                     .url(redirUrl)
                                     .setVersion(request.httpVersion())
@@ -297,7 +302,7 @@ abstract class BaseTransport implements Transport {
         return null;
     }
 
-    protected Request retry(Request request, FullHttpResponse httpResponse) {
+    protected Request retry(Request request, HttpResponse httpResponse) {
         if (httpResponse == null) {
             return null;
         }
@@ -308,7 +313,7 @@ abstract class BaseTransport implements Transport {
         if (request.isBackOff()) {
             BackOff backOff = request.getBackOff() != null ? request.getBackOff() :
                     client.getClientConfig().getBackOff();
-            int status = httpResponse.status().code();
+            int status = httpResponse.getStatus ().getCode();
             switch (status) {
                 case 403:
                 case 404:

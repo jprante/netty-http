@@ -26,10 +26,8 @@ class Http2PushTest {
             Request request = Request.builder(HttpMethod.GET)
                     .url(url).setVersion("HTTP/2.0")
                     .build()
-                    .setResponseListener(msg -> logger.log(Level.INFO, "got response: " +
-                            msg.headers().entries() +
-                            //msg.content().toString(StandardCharsets.UTF_8) +
-                            " status=" + msg.status().code()));
+                    .setResponseListener(resp -> logger.log(Level.INFO,
+                            "got response: " + resp.getHeaders() + " status=" + resp.getStatus()));
             client.execute(request).get();
 
         } finally {

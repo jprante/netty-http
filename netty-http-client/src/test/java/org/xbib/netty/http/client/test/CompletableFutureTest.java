@@ -1,9 +1,9 @@
 package org.xbib.netty.http.client.test;
 
-import io.netty.handler.codec.http.FullHttpResponse;
 import org.junit.jupiter.api.Test;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.Request;
+import org.xbib.netty.http.common.HttpResponse;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -23,12 +23,12 @@ class CompletableFutureTest {
     void testComposeCompletableFutures() throws IOException {
         Client client = Client.builder().build();
         try {
-            final Function<FullHttpResponse, String> httpResponseStringFunction = response ->
-                    response.content().toString(StandardCharsets.UTF_8);
+            final Function<HttpResponse, String> stringFunction = response ->
+                    response.getBodyAsString(StandardCharsets.UTF_8);
             Request request = Request.get()
                     .url("http://repo.maven.apache.org/maven2/org/xbib/netty-http-client/maven-metadata.xml.sha1")
                     .build();
-            CompletableFuture<String> completableFuture = client.execute(request, httpResponseStringFunction)
+            CompletableFuture<String> completableFuture = client.execute(request, stringFunction)
                     .exceptionally(Throwable::getMessage)
                     .thenCompose(content -> {
                         logger.log(Level.INFO, content);
@@ -37,7 +37,7 @@ class CompletableFutureTest {
                             return client.execute(Request.post()
                                     .url("http://google.com/")
                                     .addParameter("query", content)
-                                    .build(), httpResponseStringFunction);
+                                    .build(), stringFunction);
                         } catch (IOException e) {
                             logger.log(Level.WARNING, e.getMessage(), e);
                             return null;

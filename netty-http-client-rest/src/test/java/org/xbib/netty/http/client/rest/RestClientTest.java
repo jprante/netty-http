@@ -1,7 +1,6 @@
-package org.xbib.netty.http.client.test.rest;
+package org.xbib.netty.http.client.rest;
 
 import org.junit.jupiter.api.Test;
-import org.xbib.netty.http.client.rest.RestClient;
 
 import java.io.IOException;
 import java.util.logging.Logger;

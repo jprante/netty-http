@@ -9,11 +9,11 @@ import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.client.listener.ResponseListener;
 import org.xbib.netty.http.client.transport.Transport;
 import org.xbib.netty.http.common.HttpAddress;
+import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.Domain;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -43,11 +43,7 @@ class SecureHttp1Test {
                 .trustInsecure()
                 .build();
         AtomicInteger counter = new AtomicInteger();
-        final ResponseListener responseListener = fullHttpResponse -> {
-            String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-            //logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
-            counter.getAndIncrement();
-        };
+        final ResponseListener<HttpResponse> responseListener = resp -> counter.getAndIncrement();
         try {
             server.accept();
             Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
@@ -81,11 +77,7 @@ class SecureHttp1Test {
                 .setPoolNodeConnectionLimit(2)
                 .build();
         AtomicInteger counter = new AtomicInteger();
-        final ResponseListener responseListener = fullHttpResponse -> {
-            String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-            //logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
-            counter.incrementAndGet();
-        };
+        final ResponseListener<HttpResponse> responseListener = resp -> counter.incrementAndGet();
         try {
             for (int i = 0; i < loop; i++) {
                 Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
@@ -129,12 +121,7 @@ class SecureHttp1Test {
                 .setPoolNodeConnectionLimit(threads)
                 .build();
         AtomicInteger counter = new AtomicInteger();
-        final ResponseListener responseListener = fullHttpResponse -> {
-            String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-            //logger.log(Level.INFO, "response listener: headers = " + fullHttpResponse.headers().entries() +
-            //        " response body = " + response);
-            counter.incrementAndGet();
-        };
+        final ResponseListener<HttpResponse> responseListener = resp -> counter.incrementAndGet();
         try {
             ExecutorService executorService = Executors.newFixedThreadPool(threads);
             for (int n = 0; n < threads; n++) {

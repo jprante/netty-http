@@ -25,6 +25,7 @@ import org.xbib.netty.http.client.listener.StatusListener;
 import org.xbib.netty.http.client.retry.BackOff;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.HttpParameters;
+import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.common.cookie.Cookie;
 
 import java.nio.charset.MalformedInputException;
@@ -73,7 +74,7 @@ public class Request {
 
     private CompletableFuture<?> completableFuture;
 
-    private ResponseListener responseListener;
+    private ResponseListener<HttpResponse> responseListener;
 
     private CookieListener cookieListener;
 
@@ -208,12 +209,12 @@ public class Request {
         return statusListener;
     }
 
-    public Request setResponseListener(ResponseListener responseListener) {
+    public Request setResponseListener(ResponseListener<HttpResponse> responseListener) {
         this.responseListener = responseListener;
         return this;
     }
 
-    public ResponseListener getResponseListener() {
+    public ResponseListener<HttpResponse> getResponseListener() {
         return responseListener;
     }
 

@@ -1,12 +1,12 @@
 package org.xbib.netty.http.client.rest;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpMethod;
 import org.xbib.net.URL;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.Request;
+import org.xbib.netty.http.common.HttpResponse;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -16,16 +16,16 @@ public class RestClient {
 
     private static final Client client = new Client();
 
-    private FullHttpResponse response;
+    private HttpResponse response;
 
     private RestClient() {
     }
 
-    public void setResponse(FullHttpResponse response) {
-        this.response = response.copy();
+    public void setResponse(HttpResponse response) {
+        this.response = response;
     }
 
-    public FullHttpResponse getResponse() {
+    public HttpResponse getResponse() {
         return response;
     }
 
@@ -34,14 +34,8 @@ public class RestClient {
     }
 
     public String asString(Charset charset) {
-        ByteBuf byteBuf = response != null ? response.content() : null;
-        try {
-            return byteBuf != null && byteBuf.isReadable() ? response.content().toString(charset) : null;
-        } finally {
-            if (byteBuf != null) {
-                byteBuf.release();
-            }
-        }
+        ByteBuf byteBuf = response != null ? response.getBody() : null;
+        return byteBuf != null && byteBuf.isReadable() ? byteBuf.toString(charset) : null;
     }
 
     public void close() throws IOException {

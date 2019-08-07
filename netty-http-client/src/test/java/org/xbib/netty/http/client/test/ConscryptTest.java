@@ -28,10 +28,9 @@ class ConscryptTest {
                     .url("https://google.com")
                     .setVersion("HTTP/1.1")
                     .build()
-                    .setResponseListener(fullHttpResponse -> {
-                        String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-                        logger.log(Level.INFO, "status = " + fullHttpResponse.status()
-                                + " response body = " + response);
+                    .setResponseListener(resp -> {
+                        logger.log(Level.INFO, "status = " + resp.getStatus()
+                                + " response body = " + resp.getBodyAsString(StandardCharsets.UTF_8));
                     });
             client.execute(request).get();
         } finally {

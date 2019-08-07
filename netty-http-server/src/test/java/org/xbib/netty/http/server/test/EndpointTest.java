@@ -59,8 +59,8 @@ class EndpointTest {
             Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base().resolve("/test.txt"))
                     .build()
-                    .setResponseListener(r -> {
-                        assertEquals("Hello Jörg", r.content().toString(StandardCharsets.UTF_8));
+                    .setResponseListener(resp -> {
+                        assertEquals("Hello Jörg", resp.getBodyAsString(StandardCharsets.UTF_8));
                         success.set(true);
                     });
             client.execute(request).get();
@@ -99,8 +99,8 @@ class EndpointTest {
             Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base().resolve("/test.txt"))
                     .build()
-                    .setResponseListener(r -> {
-                        assertEquals("Hello Jörg", r.content().toString(StandardCharsets.UTF_8));
+                    .setResponseListener(resp -> {
+                        assertEquals("Hello Jörg", resp.getBodyAsString(StandardCharsets.UTF_8));
                         success.set(true);
                     });
             client.execute(request).get();
@@ -146,24 +146,24 @@ class EndpointTest {
             Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base().resolve("/static/test.txt"))
                     .build()
-                    .setResponseListener(r -> {
-                        assertEquals("Hello Jörg", r.content().toString(StandardCharsets.UTF_8));
+                    .setResponseListener(resp -> {
+                        assertEquals("Hello Jörg", resp.getBodyAsString(StandardCharsets.UTF_8));
                         success.set(true);
                     });
             client.execute(request).get();
             Request request1 = Request.get().setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base().resolve("/static1/test1.txt"))
                     .build()
-                    .setResponseListener(r -> {
-                        assertEquals("Hello Jörg 1", r.content().toString(StandardCharsets.UTF_8));
+                    .setResponseListener(resp -> {
+                        assertEquals("Hello Jörg 1",resp.getBodyAsString(StandardCharsets.UTF_8));
                         success1.set(true);
                     });
             client.execute(request1).get();
             Request request2 = Request.get().setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base().resolve("/static2/test2.txt"))
                     .build()
-                    .setResponseListener(r -> {
-                        assertEquals("Hello Jörg 2", r.content().toString(StandardCharsets.UTF_8));
+                    .setResponseListener(resp -> {
+                        assertEquals("Hello Jörg 2", resp.getBodyAsString(StandardCharsets.UTF_8));
                         success2.set(true);
                     });
             client.execute(request2).get();
@@ -214,12 +214,12 @@ class EndpointTest {
                     .url(server.getServerConfig().getAddress().base().resolve("/static/test.txt"))
                     .addParameter("a", "b")
                     .build()
-                    .setResponseListener(r -> {
-                        if (r.status().equals(HttpResponseStatus.OK)) {
-                            assertEquals("Hello Jörg", r.content().toString(StandardCharsets.UTF_8));
+                    .setResponseListener(resp -> {
+                        if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
+                            assertEquals("Hello Jörg", resp.getBodyAsString(StandardCharsets.UTF_8));
                             success.set(true);
                         } else {
-                            logger.log(Level.WARNING, r.toString());
+                            logger.log(Level.WARNING, resp.getStatus().getReasonPhrase());
                         }
                     });
             client.execute(request).get();
@@ -227,12 +227,12 @@ class EndpointTest {
                     .url(server.getServerConfig().getAddress().base()
                             .resolve("/static1/test1.txt").newBuilder().fragment("frag").build())
                     .build()
-                    .setResponseListener(r -> {
-                        if (r.status().equals(HttpResponseStatus.OK)) {
-                            assertEquals("Hello Jörg 1", r.content().toString(StandardCharsets.UTF_8));
+                    .setResponseListener(resp -> {
+                        if (resp.getStatus().getCode() ==  HttpResponseStatus.OK.code()) {
+                            assertEquals("Hello Jörg 1", resp.getBodyAsString(StandardCharsets.UTF_8));
                             success1.set(true);
                         } else {
-                            logger.log(Level.WARNING, r.toString());
+                            logger.log(Level.WARNING, resp.getStatus().getReasonPhrase());
                         }
                     });
             client.execute(request1).get();
@@ -240,12 +240,12 @@ class EndpointTest {
                     .url(server.getServerConfig().getAddress().base().resolve("/static2/test2.txt"))
                     .content("{\"a\":\"b\"}","application/json")
                     .build()
-                    .setResponseListener(r -> {
-                        if (r.status().equals(HttpResponseStatus.OK)) {
-                            assertEquals("Hello Jörg 2", r.content().toString(StandardCharsets.UTF_8));
+                    .setResponseListener(resp -> {
+                        if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
+                            assertEquals("Hello Jörg 2",resp.getBodyAsString(StandardCharsets.UTF_8));
                             success2.set(true);
                         } else {
-                            logger.log(Level.WARNING, r.toString());
+                            logger.log(Level.WARNING, resp.getStatus().getReasonPhrase());
                         }
                     });
             client.execute(request2).get();
@@ -288,11 +288,11 @@ class EndpointTest {
                 Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
                         .url(server.getServerConfig().getAddress().base().resolve("/static/" + i + "/test.txt"))
                         .build()
-                        .setResponseListener(r -> {
-                            if (r.status().equals(HttpResponseStatus.OK)) {
+                        .setResponseListener(resp -> {
+                            if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
                                 count.incrementAndGet();
                             } else {
-                                logger.log(Level.WARNING, r.status().reasonPhrase());
+                                logger.log(Level.WARNING, resp.getStatus().getReasonPhrase());
                             }
                         });
                 client.execute(request).get();

@@ -1,9 +1,9 @@
 package org.xbib.netty.http.client.listener;
 
-import io.netty.handler.codec.http.FullHttpResponse;
+import org.xbib.netty.http.common.HttpResponse;
 
 @FunctionalInterface
-public interface ResponseListener {
+public interface ResponseListener<R extends HttpResponse> {
 
-    void onResponse(FullHttpResponse fullHttpResponse);
+    void onResponse(R response);
 }

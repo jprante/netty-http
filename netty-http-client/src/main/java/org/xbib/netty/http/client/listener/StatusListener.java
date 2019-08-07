@@ -1,9 +1,10 @@
 package org.xbib.netty.http.client.listener;
 
-import io.netty.handler.codec.http.HttpResponseStatus;
+
+import org.xbib.netty.http.common.HttpStatus;
 
 @FunctionalInterface
 public interface StatusListener {
 
-    void onStatus(HttpResponseStatus httpResponseStatus);
+    void onStatus(HttpStatus httpStatus);
 }

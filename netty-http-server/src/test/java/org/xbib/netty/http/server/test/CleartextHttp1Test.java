@@ -9,10 +9,10 @@ import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.client.listener.ResponseListener;
 import org.xbib.netty.http.client.transport.Transport;
 import org.xbib.netty.http.common.HttpAddress;
+import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.Domain;
 
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -41,10 +41,8 @@ class CleartextHttp1Test {
         Client client = Client.builder()
                 .build();
         AtomicInteger counter = new AtomicInteger();
-        final ResponseListener responseListener = fullHttpResponse -> {
-            if (fullHttpResponse.status().equals(HttpResponseStatus.OK)) {
-                String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-                //logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
+        final ResponseListener<HttpResponse> responseListener = resp -> {
+            if (resp.getStatus().getCode() ==  HttpResponseStatus.OK.code()) {
                 counter.incrementAndGet();
             }
         };
@@ -79,10 +77,8 @@ class CleartextHttp1Test {
                 .setPoolNodeConnectionLimit(2)
                 .build();
         AtomicInteger counter = new AtomicInteger();
-        final ResponseListener responseListener = fullHttpResponse -> {
-            if (fullHttpResponse.status().equals(HttpResponseStatus.OK)) {
-                String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-                //logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
+        final ResponseListener<HttpResponse> responseListener = resp -> {
+            if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
                 counter.incrementAndGet();
             }
         };
@@ -126,11 +122,8 @@ class CleartextHttp1Test {
                 .setPoolNodeConnectionLimit(threads)
                 .build();
         AtomicInteger counter = new AtomicInteger();
-        final ResponseListener responseListener = fullHttpResponse -> {
-            if (fullHttpResponse.status().equals(HttpResponseStatus.OK)) {
-                String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-                //logger.log(Level.INFO, "status = " + fullHttpResponse.status() +
-                //        " response=" + response + " payload=" + payload);
+        final ResponseListener<HttpResponse> responseListener = resp -> {
+            if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
                 counter.incrementAndGet();
             }
         };

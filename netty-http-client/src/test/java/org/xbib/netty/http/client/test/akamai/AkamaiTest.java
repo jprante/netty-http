@@ -39,10 +39,9 @@ public class AkamaiTest {
                     //.url("https://http2.akamai.com/")
                     .setVersion("HTTP/2.0")
                     .build()
-                    .setResponseListener(msg -> {
-                        String response = msg.content().toString(StandardCharsets.UTF_8);
-                        logger.log(Level.INFO, "status = " + msg.status() +
-                                msg.headers().entries() + " " + response);
+                    .setResponseListener(resp -> {
+                        logger.log(Level.INFO, "status = " + resp.getStatus().getCode() +
+                                resp.getHeaders() + " " + resp.getBodyAsString(StandardCharsets.UTF_8));
                     });
             client.execute(request).get();
         } finally {

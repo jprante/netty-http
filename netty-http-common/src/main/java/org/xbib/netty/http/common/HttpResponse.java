@@ -1,13 +1,21 @@
 package org.xbib.netty.http.common;
 
-import java.io.IOException;
+import io.netty.buffer.ByteBuf;
+
 import java.io.InputStream;
+import java.nio.charset.Charset;
 
 public interface HttpResponse {
 
-    int getStatusCode() throws IOException;
+    HttpAddress getAddress();
 
-    String getReason() throws Exception;
+    HttpStatus getStatus();
 
-    InputStream getContent() throws IOException;
+    HttpHeaders getHeaders();
+
+    ByteBuf getBody();
+
+    InputStream getBodyAsStream();
+
+    String getBodyAsString(Charset charset);
 }

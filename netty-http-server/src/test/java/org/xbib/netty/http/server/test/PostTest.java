@@ -45,8 +45,8 @@ class PostTest {
                     .addParameter("a", "b")
                     .addFormParameter("name", "Jörg")
                     .build()
-                    .setResponseListener(r -> {
-                        if (r.status().equals(HttpResponseStatus.OK)) {
+                    .setResponseListener(resp -> {
+                        if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
                             success.set(true);
                         }
                     });
@@ -83,8 +83,8 @@ class PostTest {
                     .addParameter("a", "b")
                     .addFormParameter("name", "Jörg")
                     .build()
-                    .setResponseListener(r -> {
-                        if (r.status().equals(HttpResponseStatus.OK)) {
+                    .setResponseListener(resp -> {
+                        if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
                             success.set(true);
                         }
                     });

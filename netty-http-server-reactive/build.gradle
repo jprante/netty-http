@@ -1,7 +1,7 @@
 dependencies {
     compile project(':netty-http-server')
-    implementation "org.reactivestreams:reactive-streams:${project.property('reactivestreams.version')}"
-    testImplementation("org.reactivestreams:reactive-streams-tck:${project.property('reactivestreams.version')}") {
+    compile "org.reactivestreams:reactive-streams:${project.property('reactivestreams.version')}"
+    testCompile("org.reactivestreams:reactive-streams-tck:${project.property('reactivestreams.version')}") {
         exclude module: 'testng'
     }
 }

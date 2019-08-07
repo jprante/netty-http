@@ -36,18 +36,14 @@ class WebtideTest {
             Request request1 = Request.builder(HttpMethod.GET)
                     .url("https://webtide.com").setVersion("HTTP/2.0")
                     .build()
-                    .setResponseListener(msg -> logger.log(Level.INFO, "got response: " +
-                            msg.headers().entries() +
-                            //msg.content().toString(StandardCharsets.UTF_8) +
-                            " status=" + msg.status().code()));
+                    .setResponseListener(resp -> logger.log(Level.INFO, "got response: " +
+                            resp.getHeaders() + " status=" + resp.getStatus()));
 
             Request request2 = Request.builder(HttpMethod.GET)
                     .url("https://webtide.com/why-choose-jetty/").setVersion("HTTP/2.0")
                     .build()
-                    .setResponseListener(msg -> logger.log(Level.INFO, "got response: " +
-                            msg.headers().entries() +
-                            //msg.content().toString(StandardCharsets.UTF_8) +
-                            " status=" + msg.status().code()));
+                    .setResponseListener(resp -> logger.log(Level.INFO, "got response: " +
+                            resp.getHeaders() + " status=" +resp.getStatus()));
 
             client.execute(request1).execute(request2);
         } finally {

@@ -1,6 +1,4 @@
 dependencies {
-    implementation project(":netty-http-server")
-    implementation "io.netty:netty-codec-http2:${project.property('netty.version')}"
-    implementation "org.xbib:net-url:${project.property('xbib-net-url.version')}"
-    implementation "org.xbib:guice:${project.property('xbib-guice.version')}"
+    compile project(":netty-http-server")
+    compile "org.xbib:guice:${project.property('xbib-guice.version')}"
 }

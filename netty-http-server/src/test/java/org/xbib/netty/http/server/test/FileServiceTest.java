@@ -44,8 +44,8 @@ class FileServiceTest {
             Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base().resolve("/static/test.txt"))
                     .build()
-                    .setResponseListener(r -> {
-                        assertEquals("Hello Jörg", r.content().toString(StandardCharsets.UTF_8));
+                    .setResponseListener(resp -> {
+                        assertEquals("Hello Jörg", resp.getBodyAsString(StandardCharsets.UTF_8));
                         success.set(true);
                     });
             logger.log(Level.INFO, request.toString());
@@ -79,8 +79,8 @@ class FileServiceTest {
                     .setVersion(HttpVersion.valueOf("HTTP/2.0"))
                     .url(server.getServerConfig().getAddress().base().resolve("/static/test.txt"))
                     .build()
-                    .setResponseListener(r -> {
-                        assertEquals("Hello Jörg", r.content().toString(StandardCharsets.UTF_8));
+                    .setResponseListener(resp -> {
+                        assertEquals("Hello Jörg", resp.getBodyAsString(StandardCharsets.UTF_8));
                         success.set(true);
                     });
             logger.log(Level.INFO, request.toString());

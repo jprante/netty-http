@@ -1,6 +1,5 @@
 package org.xbib.netty.http.common;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
 
@@ -21,7 +20,7 @@ public interface HttpRequest {
 
     Map<String, String> getHeaders();
 
-    InputStream getContent() throws IOException;
+    InputStream getContent();
 
     String getContentType();
 

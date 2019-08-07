@@ -35,9 +35,8 @@ class PooledClientTest {
                 .setPoolNodeConnectionLimit(threads)
                 .build();
         AtomicInteger count = new AtomicInteger();
-        ResponseListener responseListener = fullHttpResponse -> {
-            String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-            //logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
+        ResponseListener responseListener = resp -> {
+            String response = resp.getBodyAsString(StandardCharsets.UTF_8);
             count.getAndIncrement();
         };
         try {
@@ -49,7 +48,6 @@ class PooledClientTest {
                         for (int i = 0; i < loop; i++) {
                             Request request = Request.get().setVersion(httpAddress.getVersion())
                                     .url(url.toString())
-                                    //.setTimeoutInMillis(25000L)
                                     .build()
                                     .setResponseListener(responseListener);
                             client.newTransport().execute(request).get();

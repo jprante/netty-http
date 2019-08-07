@@ -47,9 +47,9 @@ class StreamTest {
                     .url(server.getServerConfig().getAddress().base().resolve("/"))
                     .content("my body parameter", "text/plain")
                     .build()
-                    .setResponseListener(response -> {
-                        if (response.status().equals(HttpResponseStatus.OK)) {
-                            assertEquals("Hello World", response.content().toString(StandardCharsets.UTF_8));
+                    .setResponseListener(resp -> {
+                        if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
+                            assertEquals("Hello World", resp.getBodyAsString(StandardCharsets.UTF_8));
                             count.incrementAndGet();
                         }
                     });

@@ -36,9 +36,9 @@ class CookieSetterHttpBinTest {
                     .url("http://httpbin.org/cookies/set?name=value")
                     .build()
                     .setCookieListener(cookie -> logger.log(Level.INFO, "this is the cookie: " + cookie.toString()))
-                    .setResponseListener(fullHttpResponse -> {
-                        String response = fullHttpResponse.content().toString(StandardCharsets.UTF_8);
-                        logger.log(Level.INFO, "status = " + fullHttpResponse.status() + " response body = " + response);
+                    .setResponseListener(resp -> {
+                        logger.log(Level.INFO, "status = " + resp.getStatus() +
+                                " response body = " + resp.getBodyAsString(StandardCharsets.UTF_8));
                     });
             client.execute(request).get();
         } finally {

@@ -13,7 +13,6 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.pool.ChannelPoolHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.proxy.HttpProxyHandler;
@@ -33,6 +32,7 @@ import org.xbib.netty.http.client.transport.Http2Transport;
 import org.xbib.netty.http.client.transport.HttpTransport;
 import org.xbib.netty.http.client.transport.Transport;
 import org.xbib.netty.http.common.HttpAddress;
+import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.common.NetworkUtils;
 import org.xbib.netty.http.common.security.SecurityUtil;
 
@@ -261,7 +261,7 @@ public final class Client {
     }
 
     public <T> CompletableFuture<T> execute(Request request,
-                                            Function<FullHttpResponse, T> supplier) throws IOException {
+                                            Function<HttpResponse, T> supplier) throws IOException {
         return newTransport(HttpAddress.of(request.url(), request.httpVersion()))
                 .execute(request, supplier);
     }

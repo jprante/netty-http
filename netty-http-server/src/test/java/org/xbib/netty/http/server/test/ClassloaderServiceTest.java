@@ -43,9 +43,9 @@ class ClassloaderServiceTest {
             Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base().resolve("/classloader/test.txt"))
                     .build()
-                    .setResponseListener(r -> {
-                        if (r.status().equals(HttpResponseStatus.OK)) {
-                            assertEquals("Hello Jörg", r.content().toString(StandardCharsets.UTF_8));
+                    .setResponseListener(resp -> {
+                        if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
+                            assertEquals("Hello Jörg", resp.getBodyAsString(StandardCharsets.UTF_8));
                             count.incrementAndGet();
                         }
                     });
