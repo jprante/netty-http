@@ -39,6 +39,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -520,9 +521,6 @@ public class Request {
             if (url == null) {
                 throw new IllegalStateException("URL not set");
             }
-            if (url.getHost() == null) {
-                throw new IllegalStateException("host in URL not defined: " + url);
-            }
             // form parameters
             if (!formParameters.isEmpty()) {
                 try {
@@ -533,9 +531,10 @@ public class Request {
                 }
             }
             // attach user query parameters to URL
-            URL.Builder builder = url.newBuilder();
-            uriParameters.forEach((k, v) -> v.forEach(value -> builder.queryParam(k, value)));
-            url = builder.build();
+            URL.Builder mutator = url.mutator();
+            uriParameters.forEach((k, v) -> v.forEach(value -> mutator.queryParam(k, value)));
+            url = mutator.build();
+            Objects.requireNonNull(url.getHost());
             // let Netty's query string decoder/encoder work over the URL to add parameters given implicitly in url()
             String path = url.getPath();
             String query = url.getQuery();

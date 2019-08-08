@@ -225,7 +225,7 @@ class EndpointTest {
             client.execute(request).get();
             Request request1 = Request.get().setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base()
-                            .resolve("/static1/test1.txt").newBuilder().fragment("frag").build())
+                            .resolve("/static1/test1.txt").mutator().fragment("frag").build())
                     .build()
                     .setResponseListener(resp -> {
                         if (resp.getStatus().getCode() ==  HttpResponseStatus.OK.code()) {
@@ -237,7 +237,8 @@ class EndpointTest {
                     });
             client.execute(request1).get();
             Request request2 = Request.get().setVersion(HttpVersion.HTTP_1_1)
-                    .url(server.getServerConfig().getAddress().base().resolve("/static2/test2.txt"))
+                    .url(server.getServerConfig().getAddress().base()
+                            .resolve("/static2/test2.txt"))
                     .content("{\"a\":\"b\"}","application/json")
                     .build()
                     .setResponseListener(resp -> {
