@@ -44,7 +44,7 @@ class Flow {
     }
 
     Integer nextStreamId() {
-        Integer streamId = counter.getAndAdd(2);
+        int streamId = counter.getAndAdd(2);
         if (streamId == Integer.MIN_VALUE) {
             // reset if overflow, Java wraps atomic integers to Integer.MIN_VALUE
             // should we send a GOAWAY?
@@ -63,6 +63,10 @@ class Flow {
 
     public void close() {
         map.clear();
+    }
+
+    public boolean isClosed() {
+        return map.isEmpty();
     }
 
     @Override

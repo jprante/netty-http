@@ -13,9 +13,9 @@ public class HttpEndpointDescriptor implements EndpointDescriptor, Comparable<Ht
     private final String contentType;
 
     public HttpEndpointDescriptor(HttpServerRequest serverRequest) {
-        this.path = extractPath(serverRequest.getRequest().uri());
-        this.method = serverRequest.getRequest().method().name();
-        this.contentType = serverRequest.getRequest().headers().get(CONTENT_TYPE);
+        this.path = extractPath(serverRequest.getRequestURI());
+        this.method = serverRequest.getMethod().name();
+        this.contentType = serverRequest.getHeaders().get(CONTENT_TYPE);
     }
 
     public String getPath() {

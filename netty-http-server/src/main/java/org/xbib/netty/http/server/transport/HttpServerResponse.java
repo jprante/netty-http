@@ -19,13 +19,13 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.stream.ChunkedInput;
 import org.xbib.netty.http.common.cookie.Cookie;
+import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.ServerName;
 import org.xbib.netty.http.server.ServerRequest;
 import org.xbib.netty.http.server.ServerResponse;
 import org.xbib.netty.http.server.cookie.ServerCookieEncoder;
 import org.xbib.netty.http.server.handler.http.HttpPipelinedResponse;
 
-import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -38,6 +38,10 @@ public class HttpServerResponse implements ServerResponse {
 
     private static final Logger logger = Logger.getLogger(HttpServerResponse.class.getName());
 
+    private static final ByteBuf EMPTY = Unpooled.buffer(0);
+
+    private final Server server;
+
     private final ServerRequest serverRequest;
 
     private final ChannelHandlerContext ctx;
@@ -48,13 +52,10 @@ public class HttpServerResponse implements ServerResponse {
 
     private HttpResponseStatus httpResponseStatus;
 
-    private ByteBufOutputStream byteBufOutputStream;
-
-    public HttpServerResponse(HttpServerRequest serverRequest) {
-        Objects.requireNonNull(serverRequest, "serverRequest");
-        Objects.requireNonNull(serverRequest.getChannelHandlerContext(), "serverRequest channelHandlerContext");
+    HttpServerResponse(Server server, HttpServerRequest serverRequest, ChannelHandlerContext ctx) {
+        this.server = server;
         this.serverRequest = serverRequest;
-        this.ctx = serverRequest.getChannelHandlerContext();
+        this.ctx = ctx;
         this.headers = new DefaultHttpHeaders();
         this.trailingHeaders = new DefaultHttpHeaders();
     }
@@ -107,8 +108,7 @@ public class HttpServerResponse implements ServerResponse {
 
     @Override
     public ByteBufOutputStream getOutputStream() {
-        this.byteBufOutputStream = new ByteBufOutputStream(ctx.alloc().buffer());
-        return byteBufOutputStream;
+        return new ByteBufOutputStream(ctx.alloc().buffer());
     }
 
     @Override
@@ -153,18 +153,23 @@ public class HttpServerResponse implements ServerResponse {
         }
         headers.add(HttpHeaderNames.SERVER, ServerName.getServerName());
         if (ctx.channel().isWritable()) {
-            FullHttpResponse fullHttpResponse = byteBuf != null ?
-                    new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, httpResponseStatus, byteBuf, headers, trailingHeaders) :
-                    new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, httpResponseStatus, Unpooled.buffer(0), headers, trailingHeaders);
+            FullHttpResponse fullHttpResponse;
+            if (byteBuf != null) {
+                fullHttpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, httpResponseStatus, byteBuf, headers, trailingHeaders);
+            } else {
+                fullHttpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, httpResponseStatus, EMPTY, headers, trailingHeaders);
+            }
             if (serverRequest != null && serverRequest.getSequenceId() != null) {
                 HttpPipelinedResponse httpPipelinedResponse = new HttpPipelinedResponse(fullHttpResponse,
                         ctx.channel().newPromise(), serverRequest.getSequenceId());
                 ctx.channel().writeAndFlush(httpPipelinedResponse);
+                server.getResponseCounter().incrementAndGet();
             } else {
                 ctx.channel().writeAndFlush(fullHttpResponse);
+                server.getResponseCounter().incrementAndGet();
             }
         } else {
-            logger.log(Level.WARNING, "channel not writeable");
+            logger.log(Level.WARNING, "channel not writeable: " + ctx.channel());
         }
     }
 

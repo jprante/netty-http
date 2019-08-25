@@ -11,7 +11,7 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-@ExtendWith(NettyHttpExtension.class)
+@ExtendWith(NettyHttpTestExtension.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ThreadLeakTest {
 

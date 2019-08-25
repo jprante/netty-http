@@ -78,8 +78,8 @@ abstract class BaseTransport implements Transport {
      * @return completable future
      */
     @Override
-    public <T> CompletableFuture<T> execute(Request request,
-                                            Function<HttpResponse, T> supplier) throws IOException {
+    public <T> CompletableFuture<T> execute(Request request, Function<HttpResponse, T> supplier)
+            throws IOException {
         Objects.requireNonNull(supplier);
         final CompletableFuture<T> completableFuture = new CompletableFuture<>();
         request.setResponseListener(response -> {
@@ -94,8 +94,10 @@ abstract class BaseTransport implements Transport {
     }
 
     @Override
-    public synchronized void close() {
-        get();
+    public void close() {
+        if (!channels.isEmpty()) {
+            get();
+        }
     }
 
     @Override
@@ -133,25 +135,30 @@ abstract class BaseTransport implements Transport {
 
     @Override
     public Transport get(long value, TimeUnit timeUnit) {
+        if (channels.isEmpty()) {
+            return this;
+        }
         for (Map.Entry<String, Flow> entry : channelFlowMap.entrySet()) {
             Flow flow = entry.getValue();
-            for (Integer key : flow.keys()) {
-                try {
-                    flow.get(key).get(value, timeUnit);
-                } catch (Exception e) {
-                    String requestKey = getRequestKey(entry.getKey(), key);
-                    if (requestKey != null) {
-                        Request request = requests.get(requestKey);
-                        if (request != null && request.getCompletableFuture() != null) {
-                            request.getCompletableFuture().completeExceptionally(e);
+            if (!flow.isClosed()) {
+                for (Integer key : flow.keys()) {
+                    try {
+                        flow.get(key).get(value, timeUnit);
+                    } catch (Exception e) {
+                        String requestKey = getRequestKey(entry.getKey(), key);
+                        if (requestKey != null) {
+                            Request request = requests.get(requestKey);
+                            if (request != null && request.getCompletableFuture() != null) {
+                                request.getCompletableFuture().completeExceptionally(e);
+                            }
                         }
+                        flow.fail(e);
+                    } finally {
+                        flow.remove(key);
                     }
-                    flow.fail(e);
-                } finally {
-                    flow.remove(key);
                 }
+                flow.close();
             }
-            flow.close();
         }
         channels.values().forEach(channel -> {
             try {
@@ -160,14 +167,14 @@ abstract class BaseTransport implements Transport {
                 logger.log(Level.WARNING, e.getMessage(), e);
             }
         });
-        channelFlowMap.clear();
-        channels.clear();
-        requests.clear();
         return this;
     }
 
     @Override
     public void cancel() {
+        if (channels.isEmpty()) {
+            return;
+        }
         for (Map.Entry<String, Flow> entry : channelFlowMap.entrySet()) {
             Flow flow = entry.getValue();
             for (Integer key : flow.keys()) {
@@ -198,6 +205,7 @@ abstract class BaseTransport implements Transport {
         requests.clear();
     }
 
+    @Override
     public SSLSession getSession() {
         return sslSession;
     }

@@ -18,7 +18,7 @@ import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@ExtendWith(NettyHttpExtension.class)
+@ExtendWith(NettyHttpTestExtension.class)
 class ClassloaderServiceTest {
 
     private static final Logger logger = Logger.getLogger(ClassloaderServiceTest.class.getName());

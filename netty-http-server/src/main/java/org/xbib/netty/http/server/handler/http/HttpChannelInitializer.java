@@ -15,13 +15,13 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.logging.LogLevel;
-import io.netty.handler.ssl.SniHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.util.DomainNameMapping;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.ServerConfig;
+import org.xbib.netty.http.server.handler.ExtendedSNIHandler;
 import org.xbib.netty.http.server.handler.TrafficLoggingHandler;
 import org.xbib.netty.http.server.transport.Transport;
 
@@ -39,7 +39,6 @@ public class HttpChannelInitializer extends ChannelInitializer<SocketChannel> {
 
     private final HttpAddress httpAddress;
 
-    private final HttpHandler httpHandler;
 
     private final DomainNameMapping<SslContext> domainNameMapping;
 
@@ -49,7 +48,6 @@ public class HttpChannelInitializer extends ChannelInitializer<SocketChannel> {
         this.server = server;
         this.serverConfig = server.getServerConfig();
         this.httpAddress = httpAddress;
-        this.httpHandler = new HttpHandler(server);
         this.domainNameMapping = domainNameMapping;
     }
 
@@ -71,7 +69,8 @@ public class HttpChannelInitializer extends ChannelInitializer<SocketChannel> {
     }
 
     private void configureEncrypted(SocketChannel channel)  {
-        channel.pipeline().addLast("sni-handker", new SniHandler(domainNameMapping));
+        channel.pipeline().addLast("sni-handler",
+                new ExtendedSNIHandler(domainNameMapping, serverConfig, httpAddress));
         configureCleartext(channel);
     }
 
@@ -92,7 +91,7 @@ public class HttpChannelInitializer extends ChannelInitializer<SocketChannel> {
         pipeline.addLast("http-server-aggregator", httpObjectAggregator);
         pipeline.addLast("http-server-pipelining", new HttpPipeliningHandler(1024));
         pipeline.addLast("http-server-chunked-write", new ChunkedWriteHandler());
-        pipeline.addLast(httpHandler);
+        pipeline.addLast("http-server-handler", new HttpHandler(server));
     }
 
     @Sharable
@@ -108,12 +107,14 @@ public class HttpChannelInitializer extends ChannelInitializer<SocketChannel> {
 
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+            logger.log(Level.FINE, "channelRead: " + msg.getClass().getName());
             if (msg instanceof HttpPipelinedRequest) {
                 HttpPipelinedRequest httpPipelinedRequest = (HttpPipelinedRequest) msg;
                 if (httpPipelinedRequest.getRequest() instanceof FullHttpRequest) {
                     FullHttpRequest fullHttpRequest = (FullHttpRequest) httpPipelinedRequest.getRequest();
                     Transport transport = server.newTransport(fullHttpRequest.protocolVersion());
                     transport.requestReceived(ctx, fullHttpRequest, httpPipelinedRequest.getSequenceId());
+                    fullHttpRequest.release();
                 }
             } else {
                 super.channelRead(ctx, msg);

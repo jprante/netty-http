@@ -1,7 +1,6 @@
 plugins {
     id "com.github.spotbugs" version "2.0.0"
-    id "org.sonarqube" version "2.6.1"
-    id "io.codearte.nexus-staging" version "0.11.0"
+    id "io.codearte.nexus-staging" version "0.21.0"
     id "org.xbib.gradle.plugin.asciidoctor" version "1.5.6.0.1"
 }
 
@@ -10,13 +9,7 @@ apply plugin: "io.codearte.nexus-staging"
 
 subprojects {
     apply plugin: 'java'
-    apply plugin: 'maven'
-    apply plugin: 'signing'
     apply plugin: "com.github.spotbugs"
-    
-    configurations {
-        asciidoclet
-    }
 
     dependencies {
         testCompile "org.junit.jupiter:junit-jupiter-api:${project.property('junit.version')}"
@@ -24,7 +17,6 @@ subprojects {
         testCompile "org.junit.jupiter:junit-jupiter-engine:${project.property('junit.version')}"
         testCompile "org.junit.vintage:junit-vintage-engine:${project.property('junit.version')}"
         testCompile "junit:junit:${project.property('junit4.version')}"
-        asciidoclet "org.asciidoctor:asciidoclet:${project.property('asciidoclet.version')}"
     }
 
     compileJava {
@@ -52,10 +44,10 @@ subprojects {
 
     test {
         useJUnitPlatform()
-        systemProperty 'java.util.logging.config.file', 'src/test/resources/logging.properties'
         failFast = false
         testLogging {
             events 'STARTED', 'PASSED', 'FAILED', 'SKIPPED'
+            showStandardStreams = false
         }
         afterSuite { desc, result ->
             if (!desc.parent) {
@@ -82,6 +74,21 @@ subprojects {
                 linkattrs: true,
                 imagesdir: 'img',
                 'source-highlighter': 'coderay'
+    }
+
+    spotbugs {
+        toolVersion = '3.1.12'
+        sourceSets = [sourceSets.main]
+        ignoreFailures = true
+        effort = "max"
+        reportLevel = "high"
+        // includeFilter = file("config/findbugs/findbugs-include.xml")
+        // excludeFilter = file("config/findbugs/findbugs-excludes.xml")
+    }
+
+    tasks.withType(com.github.spotbugs.SpotBugsTask) {
+        reports.xml.enabled = false
+        reports.html.enabled = true
     }
 
     /*javadoc {
@@ -115,12 +122,73 @@ subprojects {
     ext {
         user = 'jprante'
         name = 'netty-http'
-        description = 'HTTP client and server for Netty'
-        scmUrl = 'https://github.com/' + user + '/' + name
-        scmConnection = 'scm:git:git://github.com/' + user + '/' + name + '.git'
-        scmDeveloperConnection = 'scm:git:git://github.com/' + user + '/' + name + '.git'
+        projectDescription = 'HTTP client and server for Netty'
+        scmUrl = 'https://github.com/jprante/netty-http'
+        scmConnection = 'scm:git:git://github.com/jprante/netty-http.git'
+        scmDeveloperConnection = 'scm:git:git://github.com/jprante/netty-http.git'
+        inceptionDate = '2012'
+        organizationName = 'xbib'
+        organizationUrl = 'http://xbib.org'
+        licenseName = 'The Apache License, Version 2.0'
+        licenseUrl = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
     }
-    
+
+    /*publishing {
+        publications {
+            mavenJava(MavenPublication) {
+                from components.java
+                groupId project.group
+                artifactId project.name
+                version project.version
+                artifact sourcesJar
+                artifact javadocJar
+                pom {
+                    name = project.name
+                    description = projectDescription
+                    inceptionYear = inceptionDate
+                    url = scmUrl
+                    organization {
+                        name = organizationName
+                        url = organizationUrl
+                    }
+                    scm {
+                        url = scmUrl
+                        connection = scmConnection
+                        developerConnection = scmDeveloperConnection
+                    }
+                    licenses {
+                        license {
+                            name = licenseName
+                            url = licenseUrl
+                        }
+                    }
+                    developers {
+                        developer {
+                            id = user
+                            name = 'Jörg Prante'
+                            email = 'joergprante@gmail.com'
+                            url = 'https://github.com/jprante'
+                        }
+                    }
+                }
+            }
+        }
+        repositories {
+            maven {
+                url "https://oss.sonatype.org/service/local/staging/deploy/maven2"
+                credentials {
+                    username ossrhUsername
+                    password ossrhPassword
+                }
+            }
+        }
+    }
+
+    signing {
+        sign publishing.publications.mavenJava
+    }*/
+
+
     task sonaTypeUpload(type: Upload) {
         group = 'publish'
         configuration = configurations.archives
@@ -142,11 +210,11 @@ subprojects {
                         name project.name
                         description description
                         packaging 'jar'
-                        inceptionYear '2012'
+                        inceptionYear inceptionDate
                         url scmUrl
                         organization {
-                            name 'xbib'
-                            url 'http://xbib.org'
+                            name organizationName
+                            url organizationUrl
                         }
                         developers {
                             developer {
@@ -163,8 +231,8 @@ subprojects {
                         }
                         licenses {
                             license {
-                                name 'The Apache License, Version 2.0'
-                                url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                                name licenseName
+                                url licenseUrl
                             }
                         }
                     }
@@ -172,34 +240,7 @@ subprojects {
             }
         }
     }
-
-    spotbugs {
-        toolVersion = '3.1.12'
-        sourceSets = [sourceSets.main]
-        ignoreFailures = true
-        effort = "max"
-        reportLevel = "high"
-        // includeFilter = file("config/findbugs/findbugs-include.xml")
-        // excludeFilter = file("config/findbugs/findbugs-excludes.xml")
+    nexusStaging {
+        packageGroup = "org.xbib"
     }
-
-    // To generate an HTML report instead of XML
-    tasks.withType(com.github.spotbugs.SpotBugsTask) {
-        reports.xml.enabled = false
-        reports.html.enabled = true
-    }
-}
-
-sonarqube {
-    properties {
-        property "sonar.projectName", "${project.group} ${project.name}"
-        property "sonar.sourceEncoding", "UTF-8"
-        property "sonar.tests", "src/test/java"
-        property "sonar.scm.provider", "git"
-        property "sonar.junit.reportsPath", "build/test-results/test/"
-    }
-}
-
-nexusStaging {
-    packageGroup = "org.xbib"
 }

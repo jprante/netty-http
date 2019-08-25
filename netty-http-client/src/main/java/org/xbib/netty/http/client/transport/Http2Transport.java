@@ -3,6 +3,7 @@ package org.xbib.netty.http.client.transport;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http2.DefaultHttp2DataFrame;
@@ -22,6 +23,7 @@ import org.xbib.netty.http.client.handler.http2.Http2ResponseHandler;
 import org.xbib.netty.http.client.handler.http2.Http2StreamFrameToHttpObjectCodec;
 import org.xbib.netty.http.client.listener.CookieListener;
 import org.xbib.netty.http.client.listener.StatusListener;
+import org.xbib.netty.http.common.DefaultHttpResponse;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.client.listener.ResponseListener;
@@ -50,7 +52,7 @@ public class Http2Transport extends BaseTransport {
         super(client, httpAddress);
         this.settingsPromise = httpAddress != null ? new CompletableFuture<>() : null;
         final Transport transport = this;
-        this.initializer = new ChannelInitializer<Channel>() {
+        this.initializer = new ChannelInitializer<>() {
             @Override
             protected void initChannel(Channel ch)  {
                 ch.attr(TRANSPORT_ATTRIBUTE_KEY).set(transport);
@@ -104,6 +106,7 @@ public class Http2Transport extends BaseTransport {
             childChannel.write(dataFrame);
         }
         childChannel.flush();
+        client.getRequestCounter().incrementAndGet();
         if (client.hasPooledConnections()) {
             client.releaseChannel(channel, false);
         }
@@ -134,29 +137,38 @@ public class Http2Transport extends BaseTransport {
     }
 
     @Override
-    public void responseReceived(Channel channel, Integer streamId, HttpResponse httpResponse) {
+    public void responseReceived(Channel channel, Integer streamId, FullHttpResponse fullHttpResponse) {
         if (throwable != null) {
-            logger.log(Level.WARNING, "throwable not null for response " + httpResponse, throwable);
+            logger.log(Level.WARNING, "throwable is not null?", throwable);
             return;
         }
         if (streamId == null) {
-            logger.log(Level.WARNING, "stream ID is null for response " + httpResponse);
+            logger.log(Level.WARNING, "stream ID is null?");
             return;
         }
-        // format of childchan channel ID is <parent channel ID> "/" <substream ID>
-        String channelId = channel.id().toString();
-        int pos = channelId.indexOf('/');
-        channelId = pos > 0 ? channelId.substring(0, pos) : channelId;
-        Flow flow = channelFlowMap.get(channelId);
-        if (flow == null) {
-            return;
-        }
-        String requestKey = getRequestKey(channelId, streamId);
-        CompletableFuture<Boolean> promise = flow.get(streamId);
-        if (promise != null) {
-            Request request = requests.get(requestKey);
+        DefaultHttpResponse httpResponse = new DefaultHttpResponse(httpAddress, fullHttpResponse);
+        client.getResponseCounter().incrementAndGet();
+        try {
+            // format of childchan channel ID is <parent channel ID> "/" <substream ID>
+            String channelId = channel.id().toString();
+            int pos = channelId.indexOf('/');
+            channelId = pos > 0 ? channelId.substring(0, pos) : channelId;
+            Flow flow = channelFlowMap.get(channelId);
+            if (flow == null) {
+                if (logger.isLoggable(Level.WARNING)) {
+                    logger.log(Level.WARNING, "flow is null? channelId = " + channelId);
+                }
+                return;
+            }
+            Request request = requests.remove(getRequestKey(channelId, streamId));
             if (request == null) {
-                promise.completeExceptionally(new IllegalStateException());
+                CompletableFuture<Boolean> promise = flow.get(streamId);
+                if (promise != null) {
+                    if (logger.isLoggable(Level.WARNING)) {
+                        logger.log(Level.WARNING, "request is null? channelId = " + channelId + " streamId = " + streamId);
+                    }
+                    promise.completeExceptionally(new IllegalStateException("no request"));
+                }
             } else {
                 StatusListener statusListener = request.getStatusListener();
                 if (statusListener != null) {
@@ -170,11 +182,12 @@ public class Http2Transport extends BaseTransport {
                         cookieListener.onCookie(cookie);
                     }
                 }
-                ResponseListener<HttpResponse> responseListener = request.getResponseListener();
-                if (responseListener != null) {
-                    responseListener.onResponse(httpResponse);
-                }
+                CompletableFuture<Boolean> promise = flow.get(streamId);
                 try {
+                    ResponseListener<HttpResponse> responseListener = request.getResponseListener();
+                    if (responseListener != null) {
+                        responseListener.onResponse(httpResponse);
+                    }
                     Request retryRequest = retry(request, httpResponse);
                     if (retryRequest != null) {
                         // retry transport, wait for completion
@@ -186,14 +199,25 @@ public class Http2Transport extends BaseTransport {
                             client.continuation(this, continueRequest);
                         }
                     }
-                    promise.complete(true);
+                    if (promise != null) {
+                        promise.complete(true);
+                    } else {
+                        // when transport is closed, flow map will be emptied
+                        logger.log(Level.FINE, "promise is null, flow lost");
+                    }
                 } catch (URLSyntaxException | IOException e) {
-                    promise.completeExceptionally(e);
+                    if (promise != null) {
+                        promise.completeExceptionally(e);
+                    } else {
+                        logger.log(Level.FINE, "promise is null, can't abort flow");
+                    }
+                } finally {
+                    flow.remove(streamId);
                 }
             }
+        } finally {
+            httpResponse.release();
         }
-        channelFlowMap.get(channelId).remove(streamId);
-        requests.remove(requestKey);
     }
 
     @Override

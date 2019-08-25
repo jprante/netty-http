@@ -111,6 +111,7 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
             counts.put(node, 0);
             failedCounts.put(node, 0);
         }
+        logger.log(Level.FINE, "pool is up");
     }
 
     public HttpVersion getVersion() {
@@ -174,7 +175,7 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
                         channelQueue.add(channel);
                     }
                 } else if (channel.isOpen() && close) {
-                    logger.log(Level.FINE, "trying to close channel " + channel);
+                    logger.log(Level.FINE, "closing channel " + channel);
                     channel.close();
                 }
                 if (channelPoolhandler != null) {
@@ -211,7 +212,7 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
                             channelPromise.get();
                             logger.log(Level.FINE, "goaway frame sent to " + channel);
                         } catch (ExecutionException e) {
-                            // ignore error if goaway can not be sent
+                            logger.log(Level.FINE, e.getMessage(), e);
                         } catch (InterruptedException e) {
                             throw new IOException(e);
                         }
@@ -235,9 +236,8 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
         K key = null;
         Integer min = Integer.MAX_VALUE;
         Integer next;
-        //int r = ThreadLocalRandom.current().nextInt(numberOfNodes);
         for (int j = 0; j < numberOfNodes; j++) {
-            K nextKey = poolKeySelector.key(); //nodes.get(j % numberOfNodes);
+            K nextKey = poolKeySelector.key();
             next = counts.get(nextKey);
             if (next == null || next == 0) {
                 key = nextKey;
@@ -303,9 +303,9 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
     private Channel poll() {
         Queue<Channel> channelQueue;
         Channel channel;
-        //int r = ThreadLocalRandom.current().nextInt(numberOfNodes);
         for (int j = 0; j < numberOfNodes; j++) {
-            K key = poolKeySelector.key();   //nodes.get(j % numberOfNodes);
+            K key = poolKeySelector.key();
+            logger.log(Level.FINE, "poll: key = " + key);
             channelQueue = availableChannels.get(key);
             if (channelQueue != null) {
                 channel = channelQueue.poll();
@@ -317,10 +317,6 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
             }
         }
         return null;
-    }
-
-    public enum PoolKeySelectorType {
-        RANDOM, ROUNDROBIN
     }
 
     private interface PoolKeySelector<K extends PoolKey> {

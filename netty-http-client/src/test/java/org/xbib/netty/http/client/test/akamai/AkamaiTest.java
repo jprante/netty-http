@@ -4,14 +4,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.Request;
-import org.xbib.netty.http.client.test.NettyHttpExtension;
+import org.xbib.netty.http.client.test.NettyHttpTestExtension;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-@ExtendWith(NettyHttpExtension.class)
+@ExtendWith(NettyHttpTestExtension.class)
 public class AkamaiTest {
 
     private static Logger logger = Logger.getLogger(AkamaiTest.class.getName());

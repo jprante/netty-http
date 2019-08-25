@@ -9,4 +9,8 @@ public interface Pool<T> extends Closeable {
     T acquire() throws Exception;
 
     void release(T t, boolean close) throws Exception;
+
+    enum PoolKeySelectorType {
+        RANDOM, ROUNDROBIN
+    }
 }

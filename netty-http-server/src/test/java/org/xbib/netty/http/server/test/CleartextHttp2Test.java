@@ -13,7 +13,6 @@ import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.ServerResponse;
 import org.xbib.netty.http.server.Domain;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -24,7 +23,7 @@ import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@ExtendWith(NettyHttpExtension.class)
+@ExtendWith(NettyHttpTestExtension.class)
 class CleartextHttp2Test {
 
     private static final Logger logger = Logger.getLogger(CleartextHttp2Test.class.getName());
@@ -34,20 +33,23 @@ class CleartextHttp2Test {
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
         Domain domain = Domain.builder(httpAddress)
                 .singleEndpoint("/", (request, response) ->
-                                response.withStatus(HttpResponseStatus.OK)
-                                        .withContentType("text/plain")
-                                        .write(request.getContent().retain()))
+                        ServerResponse.write(response, HttpResponseStatus.OK, "text.plain",
+                                request.getContent().toString(StandardCharsets.UTF_8)))
                 .build();
-        Server server = Server.builder(domain).build();
+        Server server = Server.builder(domain)
+                .build();
         server.accept();
         Client client = Client.builder()
                 .build();
         AtomicInteger counter = new AtomicInteger();
         // a single instance of HTTP/2 response listener, always receives responses out-of-order
         ResponseListener<HttpResponse> responseListener = resp -> {
-            logger.log(Level.INFO, "response listener: headers = " + resp.getHeaders() +
-                    " response body = " + resp.getBodyAsString(StandardCharsets.UTF_8));
-            counter.incrementAndGet();
+            if (resp.getStatus().getCode() ==  HttpResponseStatus.OK.code()) {
+                counter.incrementAndGet();
+            } else {
+                logger.log(Level.INFO, "response listener: headers = " + resp.getHeaders() +
+                        " response body = " + resp.getBodyAsString(StandardCharsets.UTF_8));
+            }
         };
         try {
             String payload = 0 + "/" + 0;
@@ -63,23 +65,25 @@ class CleartextHttp2Test {
             }
             transport.get();
         } finally {
-            client.shutdownGracefully();
             server.shutdownGracefully();
+            client.shutdownGracefully();
         }
+        logger.log(Level.INFO, "expecting=" + 1 + " counter=" + counter.get());
         assertEquals(1, counter.get());
     }
 
     @Test
     void testPooledClearTextHttp2() throws Exception {
-        int loop = 4096;
+        int loop = 1000;
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
         Domain domain = Domain.builder(httpAddress)
                 .singleEndpoint("/", (request, response) ->
-                                response.withStatus(HttpResponseStatus.OK)
-                                        .withContentType("text/plain")
-                                        .write(request.getContent().retain()))
+                        response.withStatus(HttpResponseStatus.OK)
+                                .withContentType("text/plain")
+                                .write(request.getContent().retain()))
                 .build();
-        Server server = Server.builder(domain).build();
+        Server server = Server.builder(domain)
+                .build();
         server.accept();
         Client client = Client.builder()
                 .addPoolNode(httpAddress)
@@ -87,7 +91,14 @@ class CleartextHttp2Test {
                 .build();
         AtomicInteger counter = new AtomicInteger();
         // a single instance of HTTP/2 response listener, always receives responses out-of-order
-        final ResponseListener<HttpResponse> responseListener = resp -> counter.incrementAndGet();
+        final ResponseListener<HttpResponse> responseListener = resp -> {
+            if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
+                counter.incrementAndGet();
+            } else {
+                logger.log(Level.INFO, "response listener: headers = " + resp.getHeaders() +
+                        " response body = " + resp.getBodyAsString(StandardCharsets.UTF_8));
+            }
+        };
         try {
             // single transport, single thread
             Transport transport = client.newTransport();
@@ -106,8 +117,8 @@ class CleartextHttp2Test {
             }
             transport.get();
         } finally {
-            client.shutdownGracefully();
             server.shutdownGracefully();
+            client.shutdownGracefully();
         }
         logger.log(Level.INFO, "expecting=" + loop + " counter=" + counter.get());
         assertEquals(loop, counter.get());
@@ -116,14 +127,15 @@ class CleartextHttp2Test {
     @Test
     void testMultithreadPooledClearTextHttp2() throws Exception {
         int threads = 2;
-        int loop = 2 * 1024;
+        int loop = 2000;
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
         Domain domain = Domain.builder(httpAddress)
                 .singleEndpoint("/", (request, response) ->
                         ServerResponse.write(response, HttpResponseStatus.OK, "text/plain",
-                                request.getContent().toString(StandardCharsets.UTF_8)))
+                                request.getContent().retain()))
                 .build();
-        Server server = Server.builder(domain).build();
+        Server server = Server.builder(domain)
+                .build();
         server.accept();
         Client client = Client.builder()
                 .addPoolNode(httpAddress)
@@ -131,9 +143,16 @@ class CleartextHttp2Test {
                 .build();
         AtomicInteger counter = new AtomicInteger();
         // a HTTP/2 listener always receives responses out-of-order
-        final ResponseListener<HttpResponse> responseListener = resp -> counter.incrementAndGet();
+        final ResponseListener<HttpResponse> responseListener = resp -> {
+            if (resp.getStatus().getCode() ==  HttpResponseStatus.OK.code()) {
+                counter.incrementAndGet();
+            } else {
+                logger.log(Level.INFO, "response listener: headers = " + resp.getHeaders() +
+                        " response body = " + resp.getBodyAsString(StandardCharsets.UTF_8));
+            }
+        };
         try {
-            // note: for HTTP/2 only, we can use a single shared transport
+            // note: for HTTP/2 only, we use a single shared transport
             final Transport transport = client.newTransport();
             ExecutorService executorService = Executors.newFixedThreadPool(threads);
             for (int n = 0; n < threads; n++) {
@@ -153,19 +172,24 @@ class CleartextHttp2Test {
                                 break;
                             }
                         }
-                    } catch (IOException e) {
+                    } catch (Throwable e) {
                         logger.log(Level.WARNING, e.getMessage(), e);
                     }
                 });
             }
             executorService.shutdown();
-            boolean terminated = executorService.awaitTermination(60, TimeUnit.SECONDS);
+            boolean terminated = executorService.awaitTermination(10L, TimeUnit.SECONDS);
+            executorService.shutdownNow();
             logger.log(Level.INFO, "terminated = " + terminated + ", now waiting for transport to complete");
-            transport.get(60, TimeUnit.SECONDS);
+            transport.get(10L, TimeUnit.SECONDS);
         } finally {
-            client.shutdownGracefully();
-            server.shutdownGracefully();
+            server.shutdownGracefully(10L, TimeUnit.SECONDS);
+            client.shutdownGracefully(10L, TimeUnit.SECONDS);
         }
+        logger.log(Level.INFO, "server requests = " + server.getRequestCounter() +
+                " server responses = " + server.getResponseCounter());
+        logger.log(Level.INFO, "client requests = " + client.getRequestCounter() +
+                " client responses = " + client.getResponseCounter());
         logger.log(Level.INFO, "expected=" + (threads * loop) + " counter=" + counter.get());
         assertEquals(threads * loop , counter.get());
     }
@@ -173,18 +197,18 @@ class CleartextHttp2Test {
     @Test
     void testTwoPooledClearTextHttp2() throws Exception {
         int threads = 2;
-        int loop = 4 * 1024;
-
+        int loop = 4000;
         HttpAddress httpAddress1 = HttpAddress.http2("localhost", 8008);
         AtomicInteger counter1 = new AtomicInteger();
         Domain domain1 = Domain.builder(httpAddress1)
                 .singleEndpoint("/", (request, response) -> {
-                        ServerResponse.write(response, HttpResponseStatus.OK, "text/plain",
-                                request.getContent().toString(StandardCharsets.UTF_8));
-                        counter1.incrementAndGet();
+                    ServerResponse.write(response, HttpResponseStatus.OK, "text.plain",
+                          request.getContent().toString(StandardCharsets.UTF_8));
+                    counter1.incrementAndGet();
                 })
                 .build();
-        Server server1 = Server.builder(domain1).build();
+        Server server1 = Server.builder(domain1)
+                .build();
         server1.accept();
         HttpAddress httpAddress2 = HttpAddress.http2("localhost", 8009);
         AtomicInteger counter2 = new AtomicInteger();
@@ -195,7 +219,8 @@ class CleartextHttp2Test {
                     counter2.incrementAndGet();
                 })
                 .build();
-        Server server2 = Server.builder(domain2).build();
+        Server server2 = Server.builder(domain2)
+                .build();
         server2.accept();
         Client client = Client.builder()
                 .addPoolNode(httpAddress1)
@@ -204,7 +229,14 @@ class CleartextHttp2Test {
                 .build();
         AtomicInteger counter = new AtomicInteger();
         // a single instance of HTTP/2 response listener, always receives responses out-of-order
-        final ResponseListener<HttpResponse> responseListener = resp -> counter.incrementAndGet();
+        final ResponseListener<HttpResponse> responseListener = resp -> {
+            if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
+                counter.incrementAndGet();
+            } else {
+                logger.log(Level.INFO, "response listener: headers = " + resp.getHeaders() +
+                        " response body = " + resp.getBodyAsString(StandardCharsets.UTF_8));
+            }
+        };
         try {
             // note: for HTTP/2 only, we can use a single shared transport
             final Transport transport = client.newTransport();
@@ -215,7 +247,9 @@ class CleartextHttp2Test {
                     try {
                         for (int i = 0; i < loop; i++) {
                             String payload = t + "/" + i;
-                            Request request = Request.get().setVersion("HTTP/2.0")
+                            Request request = Request.get()
+                                    .setVersion("HTTP/2.0")
+                                    //.url(server1.getServerConfig().getAddress().base())
                                     .uri("/")
                                     .content(payload, "text/plain")
                                     .build()
@@ -226,20 +260,27 @@ class CleartextHttp2Test {
                                 break;
                             }
                         }
-                    } catch (IOException e) {
+                    } catch (Throwable e) {
                         logger.log(Level.WARNING, e.getMessage(), e);
                     }
                 });
             }
             executorService.shutdown();
-            boolean terminated = executorService.awaitTermination(60, TimeUnit.SECONDS);
+            boolean terminated = executorService.awaitTermination(10L, TimeUnit.SECONDS);
             logger.log(Level.INFO, "terminated = " + terminated + ", now waiting for transport to complete");
-            transport.get(60, TimeUnit.SECONDS);
+            transport.get(10L, TimeUnit.SECONDS);
+            logger.log(Level.INFO, "transport complete");
         } finally {
-            client.shutdownGracefully();
-            server1.shutdownGracefully();
-            server2.shutdownGracefully();
+            server1.shutdownGracefully(10L, TimeUnit.SECONDS);
+            server2.shutdownGracefully(10L, TimeUnit.SECONDS);
+            client.shutdownGracefully(10L, TimeUnit.SECONDS);
         }
+        logger.log(Level.INFO, "server1 requests = " + server1.getRequestCounter() +
+                " server1 responses = " + server1.getResponseCounter());
+        logger.log(Level.INFO, "server2 requests = " + server1.getRequestCounter() +
+                " server2 responses = " + server1.getResponseCounter());
+        logger.log(Level.INFO, "client requests = " + client.getRequestCounter() +
+                " client responses = " + client.getResponseCounter());
         logger.log(Level.INFO, "counter1=" + counter1.get() + " counter2=" + counter2.get());
         logger.log(Level.INFO, "expecting=" + threads * loop + " counter=" + counter.get());
         assertEquals(threads * loop, counter.get());

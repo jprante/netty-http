@@ -6,9 +6,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.net.URL;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.listener.ResponseListener;
-import org.xbib.netty.http.client.test.NettyHttpExtension;
+import org.xbib.netty.http.client.test.NettyHttpTestExtension;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.Request;
+import org.xbib.netty.http.common.HttpResponse;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -19,7 +20,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-@ExtendWith(NettyHttpExtension.class)
+@ExtendWith(NettyHttpTestExtension.class)
 class PooledClientTest {
 
     private static final Logger logger = Logger.getLogger(PooledClientTest.class.getName());
@@ -28,14 +29,14 @@ class PooledClientTest {
     void testPooledClientWithSingleNode() throws IOException {
         int loop = 10;
         int threads = Runtime.getRuntime().availableProcessors();
-        URL url = URL.from("https://fl-test.hbz-nrw.de/app/fl");
+        URL url = URL.from("https://fl-test.hbz-nrw.de/");
         HttpAddress httpAddress = HttpAddress.of(url, HttpVersion.valueOf("HTTP/2.0"));
         Client client = Client.builder()
                 .addPoolNode(httpAddress)
                 .setPoolNodeConnectionLimit(threads)
                 .build();
         AtomicInteger count = new AtomicInteger();
-        ResponseListener responseListener = resp -> {
+        ResponseListener<HttpResponse> responseListener = resp -> {
             String response = resp.getBodyAsString(StandardCharsets.UTF_8);
             count.getAndIncrement();
         };

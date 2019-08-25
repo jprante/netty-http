@@ -18,6 +18,7 @@ import io.netty.handler.codec.http2.Http2HeadersFrame;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.stream.ChunkedInput;
 import org.xbib.netty.http.common.cookie.Cookie;
+import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.ServerName;
 import org.xbib.netty.http.server.ServerRequest;
 import org.xbib.netty.http.server.ServerResponse;
@@ -35,6 +36,8 @@ public class Http2ServerResponse implements ServerResponse {
 
     private static final Logger logger = Logger.getLogger(Http2ServerResponse.class.getName());
 
+    private final Server server;
+
     private final ServerRequest serverRequest;
 
     private final ChannelHandlerContext ctx;
@@ -43,13 +46,10 @@ public class Http2ServerResponse implements ServerResponse {
 
     private HttpResponseStatus httpResponseStatus;
 
-    private ByteBufOutputStream byteBufOutputStream;
-
-    public Http2ServerResponse(HttpServerRequest serverRequest) {
-        Objects.requireNonNull(serverRequest);
-        Objects.requireNonNull(serverRequest.getChannelHandlerContext());
+    Http2ServerResponse(Server server, HttpServerRequest serverRequest, ChannelHandlerContext ctx) {
+        this.server = server;
         this.serverRequest = serverRequest;
-        this.ctx = serverRequest.getChannelHandlerContext();
+        this.ctx = ctx;
         this.headers = new DefaultHttp2Headers();
     }
 
@@ -101,8 +101,7 @@ public class Http2ServerResponse implements ServerResponse {
 
     @Override
     public ByteBufOutputStream getOutputStream() {
-        this.byteBufOutputStream = new ByteBufOutputStream(ctx.alloc().buffer());
-        return byteBufOutputStream;
+        return new ByteBufOutputStream(ctx.alloc().buffer());
     }
 
     @Override
@@ -159,6 +158,9 @@ public class Http2ServerResponse implements ServerResponse {
                 ctx.channel().write(http2DataFrame);
             }
             ctx.channel().flush();
+            server.getResponseCounter().incrementAndGet();
+        } else {
+            logger.log(Level.WARNING, "channel is not writeable: " + ctx.channel());
         }
     }
 
@@ -185,15 +187,15 @@ public class Http2ServerResponse implements ServerResponse {
         if (ctx.channel().isWritable()) {
             Http2Headers http2Headers = new DefaultHttp2Headers().status(httpResponseStatus.codeAsText()).add(headers);
             Http2HeadersFrame http2HeadersFrame = new DefaultHttp2HeadersFrame(http2Headers,false);
-            logger.log(Level.FINEST, http2HeadersFrame::toString);
             ctx.channel().write(http2HeadersFrame);
             ChannelFuture channelFuture = ctx.channel().writeAndFlush(new HttpChunkedInput(chunkedInput));
             if ("close".equalsIgnoreCase(serverRequest.getHeaders().get(HttpHeaderNames.CONNECTION)) &&
                     !headers.contains(HttpHeaderNames.CONNECTION)) {
                 channelFuture.addListener(ChannelFutureListener.CLOSE);
             }
+            server.getResponseCounter().incrementAndGet();
         } else {
-            logger.log(Level.WARNING, "channel not writeable");
+            logger.log(Level.WARNING, "channel is not writeable: " + ctx.channel());
         }
     }
 }

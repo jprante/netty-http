@@ -22,7 +22,6 @@ import io.netty.handler.codec.http2.Http2MultiplexCodecBuilder;
 import io.netty.handler.codec.http2.Http2ServerUpgradeCodec;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.logging.LogLevel;
-import io.netty.handler.ssl.SniHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.util.AsciiString;
@@ -30,6 +29,7 @@ import io.netty.util.DomainNameMapping;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.ServerConfig;
+import org.xbib.netty.http.server.handler.ExtendedSNIHandler;
 import org.xbib.netty.http.server.handler.TrafficLoggingHandler;
 import org.xbib.netty.http.server.transport.Transport;
 
@@ -76,7 +76,8 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
     }
 
     private void configureEncrypted(Channel channel) {
-        channel.pipeline().addLast("sni-handler", new SniHandler(domainNameMapping));
+        channel.pipeline().addLast("sni-handler",
+                new ExtendedSNIHandler(domainNameMapping, serverConfig, httpAddress));
         configureCleartext(channel);
     }
 
@@ -123,19 +124,16 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
         pipeline.addLast("server-messages", new ServerMessages());
     }
 
-    class ServerRequestHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
+    static class ServerRequestHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest fullHttpRequest) throws IOException {
-            if (server.getServerConfig().isDebug() && logger.isLoggable(Level.FINE)) {
-                logger.log(Level.FINE, "HTTP/2 server pipeline: " + ctx.channel().pipeline().names());
-            }
             Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
-            transport.requestReceived(ctx, fullHttpRequest);
+            transport.requestReceived(ctx, fullHttpRequest, null);
         }
     }
 
-    class ServerMessages extends ChannelInboundHandlerAdapter {
+    static class ServerMessages extends ChannelInboundHandlerAdapter {
 
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {

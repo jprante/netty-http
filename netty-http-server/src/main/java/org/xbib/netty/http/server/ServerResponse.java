@@ -66,10 +66,18 @@ public interface ServerResponse {
     }
 
     static void write(ServerResponse serverResponse, HttpResponseStatus status, String contentType, String text) {
+        ByteBuf byteBuf = ByteBufUtil.writeUtf8(serverResponse.getChannelHandlerContext().alloc(), text);
         serverResponse.withStatus(status)
                 .withContentType(contentType)
                 .withCharset(StandardCharsets.UTF_8)
-                .write(ByteBufUtil.writeUtf8(serverResponse.getChannelHandlerContext().alloc(), text));
+                .write(byteBuf);
+    }
+
+    static void write(ServerResponse serverResponse, HttpResponseStatus status, String contentType, ByteBuf byteBuf) {
+        serverResponse.withStatus(status)
+                .withContentType(contentType)
+                .withCharset(StandardCharsets.UTF_8)
+                .write(byteBuf);
     }
 
     static void write(ServerResponse serverResponse,
@@ -79,10 +87,11 @@ public interface ServerResponse {
 
     static void write(ServerResponse serverResponse, HttpResponseStatus status, String contentType,
                       CharBuffer charBuffer, Charset charset) {
+        ByteBuf byteBuf = ByteBufUtil.encodeString(serverResponse.getChannelHandlerContext().alloc(), charBuffer, charset);
         serverResponse.withStatus(status)
                 .withContentType(contentType)
                 .withCharset(charset)
-                .write(ByteBufUtil.encodeString(serverResponse.getChannelHandlerContext().alloc(), charBuffer, charset));
+                .write(byteBuf);
     }
 
     String EMPTY_STRING = "";

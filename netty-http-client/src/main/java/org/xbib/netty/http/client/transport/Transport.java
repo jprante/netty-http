@@ -1,6 +1,7 @@
 package org.xbib.netty.http.client.transport;
 
 import io.netty.channel.Channel;
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.util.AttributeKey;
@@ -29,7 +30,7 @@ public interface Transport {
 
     void settingsReceived(Http2Settings http2Settings) throws IOException;
 
-    void responseReceived(Channel channel, Integer streamId, HttpResponse fullHttpResponse) throws IOException;
+    void responseReceived(Channel channel, Integer streamId, FullHttpResponse fullHttpResponse) throws IOException;
 
     void pushPromiseReceived(Channel channel, Integer streamId, Integer promisedStreamId, Http2Headers headers);
 

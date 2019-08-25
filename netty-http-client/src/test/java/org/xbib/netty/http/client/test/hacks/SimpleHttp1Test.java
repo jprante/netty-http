@@ -22,6 +22,8 @@ import io.netty.util.AttributeKey;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.xbib.netty.http.client.test.NettyHttpTestExtension;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -39,30 +41,14 @@ import java.util.logging.LogManager;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 
+@ExtendWith(NettyHttpTestExtension.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class SimpleHttp1Test {
+class SimpleHttp1Test {
 
     private static final Logger logger = Logger.getLogger(SimpleHttp1Test.class.getName());
 
-    static {
-        System.setProperty("io.netty.leakDetection.level", "paranoid");
-        System.setProperty("io.netty.noKeySetOptimization", Boolean.toString(true));
-        System.setProperty("java.util.logging.SimpleFormatter.format",
-                "%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS.%1$tL %4$-7s [%3$s] %2$s %5$s %6$s%n");
-        LogManager.getLogManager().reset();
-        Logger rootLogger = LogManager.getLogManager().getLogger("");
-        Handler handler = new ConsoleHandler();
-        handler.setFormatter(new SimpleFormatter());
-        rootLogger.addHandler(handler);
-        rootLogger.setLevel(Level.ALL);
-        for (Handler h : rootLogger.getHandlers()) {
-            handler.setFormatter(new SimpleFormatter());
-            h.setLevel(Level.ALL);
-        }
-    }
-
     @AfterAll
-    public void checkThreads() {
+    void checkThreads() {
         Set<Thread> threadSet = Thread.getAllStackTraces().keySet();
         logger.log(Level.INFO, "threads = " + threadSet.size() );
         threadSet.forEach( thread -> {
@@ -117,16 +103,12 @@ public class SimpleHttp1Test {
 
         private final Bootstrap bootstrap;
 
-        private final HttpResponseHandler httpResponseHandler;
-
-        private final Initializer initializer;
-
         private final List<HttpTransport> transports;
 
         Client() {
             eventLoopGroup = new NioEventLoopGroup();
-            httpResponseHandler = new HttpResponseHandler();
-            initializer = new Initializer(httpResponseHandler);
+            HttpResponseHandler httpResponseHandler = new HttpResponseHandler();
+            Initializer initializer = new Initializer(httpResponseHandler);
             bootstrap = new Bootstrap()
                     .group(eventLoopGroup)
                     .channel(NioSocketChannel.class)
@@ -154,7 +136,7 @@ public class SimpleHttp1Test {
             return transport;
         }
 
-        synchronized void close() {
+        void close() {
             for (HttpTransport transport : transports) {
                 transport.close();
             }

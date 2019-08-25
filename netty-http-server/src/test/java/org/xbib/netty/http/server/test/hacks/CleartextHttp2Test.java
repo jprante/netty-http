@@ -31,7 +31,7 @@ import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.xbib.netty.http.server.test.NettyHttpExtension;
+import org.xbib.netty.http.server.test.NettyHttpTestExtension;
 
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
@@ -39,7 +39,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-@ExtendWith(NettyHttpExtension.class)
+@ExtendWith(NettyHttpTestExtension.class)
 class CleartextHttp2Test {
 
     private static final Logger clientLogger = Logger.getLogger("client");

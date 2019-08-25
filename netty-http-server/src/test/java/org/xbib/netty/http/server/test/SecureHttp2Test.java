@@ -23,7 +23,7 @@ import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@ExtendWith(NettyHttpExtension.class)
+@ExtendWith(NettyHttpTestExtension.class)
 class SecureHttp2Test {
 
     private static final Logger logger = Logger.getLogger(SecureHttp2Test.class.getName());

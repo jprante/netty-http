@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-@ExtendWith(NettyHttpExtension.class)
+@ExtendWith(NettyHttpTestExtension.class)
 class CookieSetterHttpBinTest {
 
     private static final Logger logger = Logger.getLogger(CookieSetterHttpBinTest.class.getName());

@@ -18,4 +18,6 @@ public interface HttpResponse {
     InputStream getBodyAsStream();
 
     String getBodyAsString(Charset charset);
+
+    void release();
 }

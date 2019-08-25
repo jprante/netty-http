@@ -37,7 +37,7 @@ import io.netty.handler.codec.http2.Http2StreamFrameToHttpObjectCodec;
 import io.netty.util.AsciiString;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.xbib.netty.http.server.test.NettyHttpExtension;
+import org.xbib.netty.http.server.test.NettyHttpTestExtension;
 
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
@@ -53,7 +53,7 @@ import java.util.logging.Logger;
  * Multithreaded Http2MultiplexCodec demo for cleartext HTTP/2 between a server and a client.
  *
  */
-@ExtendWith(NettyHttpExtension.class)
+@ExtendWith(NettyHttpTestExtension.class)
 class MultithreadedMultiplexCodecCleartextHttp2Test {
 
     private static final Logger clientLogger = Logger.getLogger("client");

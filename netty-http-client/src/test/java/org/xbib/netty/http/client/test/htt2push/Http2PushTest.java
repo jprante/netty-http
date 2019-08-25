@@ -5,13 +5,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.Request;
-import org.xbib.netty.http.client.test.NettyHttpExtension;
+import org.xbib.netty.http.client.test.NettyHttpTestExtension;
 
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-@ExtendWith(NettyHttpExtension.class)
+@ExtendWith(NettyHttpTestExtension.class)
 class Http2PushTest {
 
     private static final Logger logger = Logger.getLogger(Http2PushTest.class.getName());

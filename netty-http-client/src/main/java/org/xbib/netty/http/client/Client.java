@@ -57,11 +57,12 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public final class Client {
+public final class Client implements AutoCloseable {
 
     private static final Logger logger = Logger.getLogger(Client.class.getName());
 
@@ -79,6 +80,9 @@ public final class Client {
             System.setProperty("io.netty.noKeySetOptimization", Boolean.toString(true));
         }
     }
+    private static final AtomicLong requestCounter = new AtomicLong();
+
+    private static final AtomicLong responseCounter = new AtomicLong();
 
     private final ClientConfig clientConfig;
 
@@ -140,7 +144,7 @@ public final class Client {
             ClientChannelPoolHandler clientChannelPoolHandler = new ClientChannelPoolHandler();
             this.pool = new BoundedChannelPool<>(semaphore, clientConfig.getPoolVersion(),
                     nodes, bootstrap, clientChannelPoolHandler, retries,
-                    BoundedChannelPool.PoolKeySelectorType.ROUNDROBIN);
+                    clientConfig.getPoolKeySelectorType());
             Integer nodeConnectionLimit = clientConfig.getPoolNodeConnectionLimit();
             if (nodeConnectionLimit == null || nodeConnectionLimit == 0) {
                 nodeConnectionLimit = nodes.size();
@@ -150,6 +154,7 @@ public final class Client {
             } catch (Exception e) {
                 logger.log(Level.SEVERE, e.getMessage(), e);
             }
+            logger.log(Level.FINE, "client pool prepared: size = " + nodeConnectionLimit);
         }
     }
 
@@ -180,6 +185,14 @@ public final class Client {
         logger.log(level, () -> "Socket: " + socketChannelClass.getName());
         logger.log(level, () -> "Allocator: " + byteBufAllocator.getClass().getName());
         logger.log(level, NetworkUtils::displayNetworkInterfaces);
+    }
+
+    public AtomicLong getRequestCounter() {
+        return requestCounter;
+    }
+
+    public AtomicLong getResponseCounter() {
+        return responseCounter;
     }
 
     public Transport newTransport() {
@@ -293,8 +306,21 @@ public final class Client {
         close(transport);
     }
 
+    @Override
+    public void close() {
+        try {
+            shutdownGracefully();
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, e.getMessage(), e);
+        }
+    }
+
     public void shutdownGracefully() throws IOException {
-        logger.log(Level.FINE, "shutting down gracefully");
+        shutdownGracefully(30L, TimeUnit.SECONDS);
+    }
+
+    public void shutdownGracefully(long amount, TimeUnit timeUnit) throws IOException {
+        logger.log(Level.FINE, "shutting down");
         for (Transport transport : transports) {
             close(transport);
         }
@@ -302,12 +328,11 @@ public final class Client {
         if (hasPooledConnections()) {
             pool.close();
         }
-        logger.log(Level.FINE, "shutting down");
-        eventLoopGroup.shutdownGracefully();
+        eventLoopGroup.shutdownGracefully(1L, amount, timeUnit);
         try {
-            eventLoopGroup.awaitTermination(10L, TimeUnit.SECONDS);
+            eventLoopGroup.awaitTermination(amount, timeUnit);
         } catch (InterruptedException e) {
-            // ignore
+            throw new IOException(e);
         }
     }
 
@@ -359,14 +384,17 @@ public final class Client {
             default:
                 break;
         }
+        engine.setEnabledProtocols(clientConfig.getProtocols());
         return sslHandler;
     }
 
     private static SslContext newSslContext(ClientConfig clientConfig, HttpVersion httpVersion) throws SSLException {
+        // Conscrypt?
         SslContextBuilder sslContextBuilder = SslContextBuilder.forClient()
                 .sslProvider(clientConfig.getSslProvider())
                 .ciphers(clientConfig.getCiphers(), clientConfig.getCipherSuiteFilter())
                 .applicationProtocolConfig(newApplicationProtocolConfig(httpVersion));
+
         if (clientConfig.getSslContextProvider() != null) {
             sslContextBuilder.sslContextProvider(clientConfig.getSslContextProvider());
         }
@@ -415,12 +443,14 @@ public final class Client {
             HttpAddress httpAddress = channel.attr(pool.getAttributeKey()).get();
             HttpVersion httpVersion = httpAddress.getVersion();
             SslContext sslContext = newSslContext(clientConfig, httpAddress.getVersion());
-            SslHandlerFactory sslHandlerFactory = new SslHandlerFactory(sslContext, clientConfig, httpAddress, byteBufAllocator);
+            SslHandlerFactory sslHandlerFactory = new SslHandlerFactory(sslContext,
+                    clientConfig, httpAddress, byteBufAllocator);
             Http2ChannelInitializer http2ChannelInitializer =
                     new Http2ChannelInitializer(clientConfig, httpAddress, sslHandlerFactory);
             if (httpVersion.majorVersion() == 1) {
                 HttpChannelInitializer initializer =
-                        new HttpChannelInitializer(clientConfig, httpAddress, sslHandlerFactory, http2ChannelInitializer);
+                        new HttpChannelInitializer(clientConfig, httpAddress,
+                                sslHandlerFactory, http2ChannelInitializer);
                 initializer.initChannel(channel);
             } else {
                 http2ChannelInitializer.initChannel(channel);
@@ -428,7 +458,7 @@ public final class Client {
         }
     }
 
-    public class SslHandlerFactory {
+    public static class SslHandlerFactory {
 
         private final SslContext sslContext;
 
@@ -438,7 +468,8 @@ public final class Client {
 
         private final ByteBufAllocator allocator;
 
-        SslHandlerFactory(SslContext sslContext, ClientConfig clientConfig, HttpAddress httpAddress, ByteBufAllocator allocator) {
+        SslHandlerFactory(SslContext sslContext, ClientConfig clientConfig,
+                          HttpAddress httpAddress, ByteBufAllocator allocator) {
             this.sslContext = sslContext;
             this.clientConfig = clientConfig;
             this.httpAddress = httpAddress;
@@ -559,7 +590,7 @@ public final class Client {
             return this;
         }
 
-        public Builder setEnableGzip(boolean enableGzip) {
+        public Builder enableGzip(boolean enableGzip) {
             clientConfig.setEnableGzip(enableGzip);
             return this;
         }
@@ -583,6 +614,11 @@ public final class Client {
 
         public Builder setSslContextProvider(Provider provider) {
             clientConfig.setSslContextProvider(provider);
+            return this;
+        }
+
+        public Builder setTlsProtocols(String[] protocols) {
+            clientConfig.setProtocols(protocols);
             return this;
         }
 

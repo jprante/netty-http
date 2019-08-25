@@ -8,19 +8,26 @@ import org.xbib.netty.http.client.Request;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.Provider;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-@ExtendWith(NettyHttpExtension.class)
+@ExtendWith(NettyHttpTestExtension.class)
 class ConscryptTest {
 
     private static final Logger logger = Logger.getLogger(ConscryptTest.class.getName());
 
     @Test
     void testConscrypt() throws IOException {
+
+        Provider provider = Conscrypt.newProviderBuilder()
+                .provideTrustManager(true)
+                .build();
+
         Client client = Client.builder()
                 .setJdkSslProvider()
-                .setSslContextProvider(Conscrypt.newProvider())
+                .setSslContextProvider(provider)
+                .setTlsProtocols(new String[]{"TLSv1.2"}) // disable TLSv1.3 for Conscrypt
                 .build();
         logger.log(Level.INFO, client.getClientConfig().toString());
         try {

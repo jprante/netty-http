@@ -5,6 +5,9 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
+import io.netty.handler.codec.DelimiterBasedFrameDecoder;
+import io.netty.handler.codec.Delimiters;
+import io.netty.handler.codec.http.HttpContentDecompressor;
 import io.netty.handler.codec.http2.DefaultHttp2SettingsFrame;
 import io.netty.handler.codec.http2.Http2ConnectionPrefaceAndSettingsFrameWrittenEvent;
 import io.netty.handler.codec.http2.Http2FrameLogger;
@@ -74,6 +77,8 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
         Http2MultiplexCodec multiplexCodec = multiplexCodecBuilder.autoAckSettingsFrame(true) .build();
         ChannelPipeline pipeline = ch.pipeline();
         pipeline.addLast("client-multiplex", multiplexCodec);
+        // does not work
+        //pipeline.addLast("client-decompressor", new HttpContentDecompressor());
         pipeline.addLast("client-messages", new ClientMessages());
     }
 

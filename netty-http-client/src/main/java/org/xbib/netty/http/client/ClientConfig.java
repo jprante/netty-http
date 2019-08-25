@@ -8,6 +8,8 @@ import io.netty.handler.logging.LogLevel;
 import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.ssl.CipherSuiteFilter;
 import io.netty.handler.ssl.SslProvider;
+import org.xbib.netty.http.client.pool.BoundedChannelPool;
+import org.xbib.netty.http.client.pool.Pool;
 import org.xbib.netty.http.client.retry.BackOff;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.security.SecurityUtil;
@@ -18,6 +20,7 @@ import java.security.KeyStore;
 import java.security.Provider;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class ClientConfig {
 
@@ -119,6 +122,11 @@ public class ClientConfig {
         Provider SSL_CONTEXT_PROVIDER = null;
 
         /**
+         * Transport layer security protocol versions.
+         */
+        String[] PROTOCOLS = new String[] { "TLSv1.3", "TLSv1.2" };
+
+        /**
          * Default ciphers. We care about HTTP/2.
          */
         Iterable<String> CIPHERS = SecurityUtil.Defaults.DEFAULT_CIPHERS;
@@ -142,6 +150,8 @@ public class ClientConfig {
          * Default pool HTTP version.
          */
         HttpVersion POOL_VERSION = HttpVersion.HTTP_1_1;
+
+        Pool.PoolKeySelectorType POOL_KEY_SELECTOR_TYPE = Pool.PoolKeySelectorType.ROUNDROBIN;
 
         /**
          * Default connection pool security.
@@ -204,6 +214,8 @@ public class ClientConfig {
 
     private Provider sslContextProvider = Defaults.SSL_CONTEXT_PROVIDER;
 
+    private String[] protocols = Defaults.PROTOCOLS;
+
     private Iterable<String> ciphers = Defaults.CIPHERS;
 
     private CipherSuiteFilter cipherSuiteFilter = Defaults.CIPHER_SUITE_FILTER;
@@ -223,6 +235,8 @@ public class ClientConfig {
     private HttpProxyHandler httpProxyHandler;
 
     private List<HttpAddress> poolNodes = new ArrayList<>();
+
+    private Pool.PoolKeySelectorType poolKeySelectorType = Defaults.POOL_KEY_SELECTOR_TYPE;
 
     private Integer poolNodeConnectionLimit;
 
@@ -465,6 +479,15 @@ public class ClientConfig {
         return sslContextProvider;
     }
 
+    public ClientConfig setProtocols(String[] protocols) {
+        this.protocols = protocols;
+        return this;
+    }
+
+    public String[] getProtocols() {
+        return protocols;
+    }
+
     public ClientConfig setCiphers(Iterable<String> ciphers) {
         this.ciphers = ciphers;
         return this;
@@ -534,6 +557,15 @@ public class ClientConfig {
 
     public List<HttpAddress> getPoolNodes() {
         return poolNodes;
+    }
+
+    public ClientConfig setPoolKeySelectorType(Pool.PoolKeySelectorType poolKeySelectorType) {
+        this.poolKeySelectorType = poolKeySelectorType;
+        return this;
+    }
+
+    public Pool.PoolKeySelectorType getPoolKeySelectorType() {
+        return poolKeySelectorType;
     }
 
     public ClientConfig addPoolNode(HttpAddress poolNodeAddress) {

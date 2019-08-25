@@ -11,14 +11,15 @@ import java.nio.charset.StandardCharsets;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-@ExtendWith(NettyHttpExtension.class)
+@ExtendWith(NettyHttpTestExtension.class)
 class SecureHttpTest {
 
     private static final Logger logger = Logger.getLogger(SecureHttpTest.class.getName());
 
     @Test
-    void testHttp1() throws Exception {
+    void testHttp1WithTlsV13() throws Exception {
         Client client = Client.builder()
+                .setTlsProtocols(new String[] { "TLSv1.3" })
                 .build();
         try {
             Request request = Request.get().url("https://www.google.com/").build()
@@ -37,13 +38,14 @@ class SecureHttpTest {
                 .build();
         try {
             Request request1 = Request.get().url("https://google.com").build()
-                    .setResponseListener(resp -> logger.log(Level.INFO, "got response: " +
+                    .setResponseListener(resp -> logger.log(Level.INFO, "got HTTP 1.1 response: " +
                             resp.getBodyAsString(StandardCharsets.UTF_8)));
             client.execute(request1).get();
 
+            // TODO decompression of frames
             Request request2 = Request.get().url("https://google.com").setVersion("HTTP/2.0").build()
-                    .setResponseListener(resp -> logger.log(Level.INFO, "got response: " +
-                            resp.getBodyAsString(StandardCharsets.UTF_8)));
+                    .setResponseListener(resp -> logger.log(Level.INFO, "got HTTP/2 response: " +
+                            resp.getHeaders() + resp.getBodyAsString(StandardCharsets.UTF_8)));
             client.execute(request2).get();
         } finally {
             client.shutdownGracefully();

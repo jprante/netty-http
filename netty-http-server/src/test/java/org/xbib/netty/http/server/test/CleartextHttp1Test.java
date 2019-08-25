@@ -12,7 +12,9 @@ import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.Domain;
+import org.xbib.netty.http.server.ServerResponse;
 
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -22,7 +24,7 @@ import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@ExtendWith(NettyHttpExtension.class)
+@ExtendWith(NettyHttpTestExtension.class)
 class CleartextHttp1Test {
 
     private static final Logger logger = Logger.getLogger(CleartextHttp1Test.class.getName());
@@ -32,9 +34,8 @@ class CleartextHttp1Test {
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         Domain domain = Domain.builder(httpAddress)
                 .singleEndpoint("/**", (request, response) ->
-                        response.withStatus(HttpResponseStatus.OK)
-                                .withContentType("text/plain")
-                                .write(request.getContent().retain()))
+                        ServerResponse.write(response, HttpResponseStatus.OK, "text/plain",
+                                request.getContent().retain()))
                 .build();
         Server server = Server.builder(domain).build();
         server.accept();
@@ -43,6 +44,7 @@ class CleartextHttp1Test {
         AtomicInteger counter = new AtomicInteger();
         final ResponseListener<HttpResponse> responseListener = resp -> {
             if (resp.getStatus().getCode() ==  HttpResponseStatus.OK.code()) {
+                logger.log(Level.INFO, resp.getBodyAsString(StandardCharsets.UTF_8));
                 counter.incrementAndGet();
             }
         };
@@ -62,13 +64,12 @@ class CleartextHttp1Test {
 
     @Test
     void testPooledClearTextHttp1() throws Exception {
-        int loop = 4096;
+        int loop = 1000;
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         Domain domain = Domain.builder(httpAddress)
                 .singleEndpoint("/**", (request, response) ->
-                                response.withStatus(HttpResponseStatus.OK)
-                                        .withContentType("text/plain")
-                                        .write(request.getContent().retain()))
+                        ServerResponse.write(response, HttpResponseStatus.OK, "text/plain",
+                                request.getContent().retain()))
                 .build();
         Server server = Server.builder(domain).build();
         server.accept();
@@ -79,6 +80,7 @@ class CleartextHttp1Test {
         AtomicInteger counter = new AtomicInteger();
         final ResponseListener<HttpResponse> responseListener = resp -> {
             if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
+                logger.log(Level.INFO, resp.getBodyAsString(StandardCharsets.UTF_8));
                 counter.incrementAndGet();
             }
         };
@@ -106,14 +108,13 @@ class CleartextHttp1Test {
 
     @Test
     void testMultithreadedPooledClearTextHttp1() throws Exception {
-        int threads = 4;
-        int loop = 4 * 1024;
+        int threads = 8;
+        int loop = 1000;
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         Domain domain = Domain.builder(httpAddress)
                 .singleEndpoint("/**", (request, response) ->
-                                response.withStatus(HttpResponseStatus.OK)
-                                        .withContentType("text/plain")
-                                        .write(request.getContent().retain()))
+                        ServerResponse.write(response, HttpResponseStatus.OK, "text/plain",
+                                request.getContent().retain()))
                 .build();
         Server server = Server.builder(domain).build();
         server.accept();
@@ -124,6 +125,7 @@ class CleartextHttp1Test {
         AtomicInteger counter = new AtomicInteger();
         final ResponseListener<HttpResponse> responseListener = resp -> {
             if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
+                logger.log(Level.FINE, resp.getBodyAsString(StandardCharsets.UTF_8));
                 counter.incrementAndGet();
             }
         };
@@ -134,7 +136,7 @@ class CleartextHttp1Test {
                 executorService.submit(() -> {
                     try {
                         for (int i = 0; i < loop; i++) {
-                            String payload = Integer.toString(t) + "/" + Integer.toString(i);
+                            String payload = t + "/" + i;
                             Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
                                     .url(server.getServerConfig().getAddress().base())
                                     .content(payload, "text/plain")

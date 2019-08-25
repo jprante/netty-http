@@ -19,9 +19,9 @@ public class DefaultHttpResponse implements HttpResponse {
 
     public DefaultHttpResponse(HttpAddress httpAddress, FullHttpResponse fullHttpResponse) {
         this.httpAddress = httpAddress;
-        this.fullHttpResponse = fullHttpResponse;
-        this.httpStatus = new HttpStatus(fullHttpResponse.status());
-        this.httpHeaders = new DefaultHttpHeaders(fullHttpResponse.headers());
+        this.fullHttpResponse = fullHttpResponse.retain();
+        this.httpStatus = new HttpStatus(this.fullHttpResponse.status());
+        this.httpHeaders = new DefaultHttpHeaders(this.fullHttpResponse.headers());
     }
 
     @Override
@@ -41,7 +41,7 @@ public class DefaultHttpResponse implements HttpResponse {
 
     @Override
     public ByteBuf getBody() {
-        return fullHttpResponse.content().asReadOnly();
+        return fullHttpResponse.content();
     }
 
     @Override
@@ -52,5 +52,10 @@ public class DefaultHttpResponse implements HttpResponse {
     @Override
     public String getBodyAsString(Charset charset) {
         return getBody().toString(charset);
+    }
+
+    @Override
+    public void release() {
+        this.fullHttpResponse.release();
     }
 }

@@ -8,6 +8,8 @@ import io.netty.handler.codec.http.LastHttpContent;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Implements HTTP pipelining ordering, ensuring that responses are completely served in the same order as their
@@ -18,6 +20,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class HttpPipeliningHandler extends ChannelDuplexHandler {
 
     private final int pipelineCapacity;
+
+    private final Lock lock;
 
     private final Queue<HttpPipelinedResponse> httpPipelinedResponses;
 
@@ -32,6 +36,7 @@ public class HttpPipeliningHandler extends ChannelDuplexHandler {
      */
     public HttpPipeliningHandler(int pipelineCapacity) {
         this.pipelineCapacity = pipelineCapacity;
+        this.lock = new ReentrantLock();
         this.httpPipelinedResponses = new PriorityQueue<>(3);
         this.requestCounter = new AtomicInteger();
         this.writtenRequests = new AtomicInteger();
@@ -48,7 +53,8 @@ public class HttpPipeliningHandler extends ChannelDuplexHandler {
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
         if (msg instanceof HttpPipelinedResponse) {
             boolean channelShouldClose = false;
-            synchronized (httpPipelinedResponses) {
+            lock.lock();
+            try {
                 if (httpPipelinedResponses.size() < pipelineCapacity) {
                     HttpPipelinedResponse currentEvent = (HttpPipelinedResponse) msg;
                     httpPipelinedResponses.add(currentEvent);
@@ -64,6 +70,8 @@ public class HttpPipeliningHandler extends ChannelDuplexHandler {
                 } else {
                     channelShouldClose = true;
                 }
+            } finally {
+                lock.unlock();
             }
             if (channelShouldClose) {
                 ctx.close();

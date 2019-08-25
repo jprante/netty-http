@@ -30,13 +30,15 @@ import org.xbib.netty.http.server.transport.Transport;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * HTTP server.
  */
-public final class Server {
+public final class Server implements AutoCloseable {
 
     private static final Logger logger = Logger.getLogger(Server.class.getName());
 
@@ -53,6 +55,10 @@ public final class Server {
             System.setProperty("io.netty.noKeySetOptimization", Boolean.toString(true));
         }
     }
+
+    private static final AtomicLong requestCounter = new AtomicLong();
+
+    private static final AtomicLong responseCounter = new AtomicLong();
 
     private final ServerConfig serverConfig;
 
@@ -136,16 +142,16 @@ public final class Server {
     /**
      * Returns the named server with the given name.
      *
-     * @param name the name of the virtual host to return, or null for
-     *             the default virtual host
-     * @return the virtual host with the given name, or null if it doesn't exist
+     * @param name the name of the virtual host to return or null for the
+     *             default domain
+     * @return the virtual host with the given name or the default domain
      */
     public Domain getNamedServer(String name) {
-        return serverConfig.getDomain(name);
-    }
-
-    public Domain getDefaultNamedServer() {
-        return serverConfig.getDefaultDomain();
+        Domain domain = serverConfig.getDomain(name);
+        if (domain == null) {
+            domain = serverConfig.getDefaultDomain();
+        }
+        return domain;
     }
 
     /**
@@ -170,7 +176,7 @@ public final class Server {
         logger.log(level, () -> "OpenSSL available: " + OpenSsl.isAvailable());
         logger.log(level, () -> "OpenSSL ALPN support: " + OpenSsl.isAlpnSupported());
         logger.log(level, () -> "Installed ciphers on default server: " +
-                (serverConfig.getAddress().isSecure() ? getDefaultNamedServer().getSslContext().cipherSuites() : ""));
+                (serverConfig.getAddress().isSecure() ? serverConfig.getDefaultDomain().getSslContext().cipherSuites() : ""));
         logger.log(level, () -> "Local host name: " + NetworkUtils.getLocalHostName("localhost"));
         logger.log(level, () -> "Parent event loop group: " + parentEventLoopGroup + " threads=" + serverConfig.getParentThreadCount());
         logger.log(level, () -> "Child event loop group: " + childEventLoopGroup + " threads=" +serverConfig.getChildThreadCount());
@@ -179,18 +185,49 @@ public final class Server {
         logger.log(level, NetworkUtils::displayNetworkInterfaces);
     }
 
+    public AtomicLong getRequestCounter() {
+        return requestCounter;
+    }
+
+    public AtomicLong getResponseCounter() {
+        return responseCounter;
+    }
+
     public Transport newTransport(HttpVersion httpVersion) {
         return httpVersion.majorVersion() == 1 ? new HttpTransport(this) : new Http2Transport(this);
     }
 
-    public synchronized void shutdownGracefully() throws IOException {
-        logger.log(Level.FINE, "shutting down gracefully");
+    @Override
+    public void close() {
+        try {
+            shutdownGracefully();
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, e.getMessage(), e);
+        }
+    }
+
+    public void shutdownGracefully() throws IOException {
+        shutdownGracefully(30L, TimeUnit.SECONDS);
+    }
+
+    public void shutdownGracefully(long amount, TimeUnit timeUnit) throws IOException {
+        logger.log(Level.FINE, "shutting down");
         // first, shut down threads, then server socket
-        childEventLoopGroup.shutdownGracefully();
-        parentEventLoopGroup.shutdownGracefully();
+        childEventLoopGroup.shutdownGracefully(1L, amount, timeUnit);
+        try {
+            childEventLoopGroup.awaitTermination(amount, timeUnit);
+        } catch (InterruptedException e) {
+            throw new IOException(e);
+        }
+        parentEventLoopGroup.shutdownGracefully(1L, amount, timeUnit);
+        try {
+            childEventLoopGroup.awaitTermination(amount, timeUnit);
+        } catch (InterruptedException e) {
+            throw new IOException(e);
+        }
         try {
             if (channelFuture != null) {
-                // close channel and wait
+                // close channel and wait for unbind
                 channelFuture.channel().closeFuture().sync();
             }
         } catch (InterruptedException e) {
@@ -441,5 +478,4 @@ public final class Server {
             return new Server(serverConfig, byteBufAllocator, parentEventLoopGroup, childEventLoopGroup, socketChannelClass);
         }
     }
-
 }

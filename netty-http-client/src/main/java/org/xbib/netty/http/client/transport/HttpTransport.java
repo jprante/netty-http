@@ -3,6 +3,7 @@ package org.xbib.netty.http.client.transport;
 import io.netty.channel.Channel;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2Settings;
@@ -13,6 +14,7 @@ import org.xbib.netty.http.client.cookie.ClientCookieDecoder;
 import org.xbib.netty.http.client.cookie.ClientCookieEncoder;
 import org.xbib.netty.http.client.listener.CookieListener;
 import org.xbib.netty.http.client.listener.StatusListener;
+import org.xbib.netty.http.common.DefaultHttpResponse;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.Request;
 import org.xbib.netty.http.client.listener.ResponseListener;
@@ -70,63 +72,70 @@ public class HttpTransport extends BaseTransport {
         // flush after putting request into requests map
         if (channel.isWritable()) {
             channel.writeAndFlush(fullHttpRequest);
+            client.getRequestCounter().incrementAndGet();
         }
         return this;
     }
 
     @Override
-    public void responseReceived(Channel channel, Integer streamId, HttpResponse httpResponse) {
+    public void responseReceived(Channel channel, Integer streamId, FullHttpResponse fullHttpResponse) {
         if (throwable != null) {
-            logger.log(Level.WARNING, "throwable not null for response " + httpResponse, throwable);
+            logger.log(Level.WARNING, "throwable not null", throwable);
             return;
         }
         if (requests.isEmpty()) {
             logger.log(Level.WARNING, "no request present for responding");
             return;
         }
-        // streamID is expected to be null, last request on memory is expected to be current, remove request from memory
-        Request request = requests.remove(requests.lastKey());
-        if (request != null) {
-            StatusListener statusListener = request.getStatusListener();
-            if (statusListener != null) {
-                statusListener.onStatus(httpResponse.getStatus());
-            }
-            for (String cookieString : httpResponse.getHeaders().getAllHeaders(HttpHeaderNames.SET_COOKIE)) {
-                Cookie cookie = ClientCookieDecoder.STRICT.decode(cookieString);
-                addCookie(cookie);
-                CookieListener cookieListener = request.getCookieListener();
-                if (cookieListener != null) {
-                    cookieListener.onCookie(cookie);
-                }
-            }
-            ResponseListener<HttpResponse> responseListener = request.getResponseListener();
-            if (responseListener != null) {
-                responseListener.onResponse(httpResponse);
-            }
-        }
+        HttpResponse httpResponse = new DefaultHttpResponse(httpAddress, fullHttpResponse);
+        client.getResponseCounter().incrementAndGet();
         try {
-            Request retryRequest = retry(request, httpResponse);
-            if (retryRequest != null) {
-                // retry transport, wait for completion
-                client.retry(this, retryRequest);
-            } else {
-                Request continueRequest = continuation(request, httpResponse);
-                if (continueRequest != null) {
-                    // continue with new transport, synchronous call here, wait for completion
-                    client.continuation(this, continueRequest);
+            // streamID is expected to be null, last request on memory is expected to be current, remove request from memory
+            Request request = requests.remove(requests.lastKey());
+            if (request != null) {
+                StatusListener statusListener = request.getStatusListener();
+                if (statusListener != null) {
+                    statusListener.onStatus(httpResponse.getStatus());
+                }
+                for (String cookieString : httpResponse.getHeaders().getAllHeaders(HttpHeaderNames.SET_COOKIE)) {
+                    Cookie cookie = ClientCookieDecoder.STRICT.decode(cookieString);
+                    addCookie(cookie);
+                    CookieListener cookieListener = request.getCookieListener();
+                    if (cookieListener != null) {
+                        cookieListener.onCookie(cookie);
+                    }
+                }
+                ResponseListener<HttpResponse> responseListener = request.getResponseListener();
+                if (responseListener != null) {
+                    responseListener.onResponse(httpResponse);
                 }
             }
-        } catch (URLSyntaxException | IOException e) {
-            logger.log(Level.WARNING, e.getMessage(), e);
-        }
-        String channelId = channel.id().toString();
-        Flow flow = channelFlowMap.get(channelId);
-        if (flow == null) {
-            return;
-        }
-        CompletableFuture<Boolean> promise = flow.get(flow.lastKey());
-        if (promise != null) {
-            promise.complete(true);
+            try {
+                Request retryRequest = retry(request, httpResponse);
+                if (retryRequest != null) {
+                    // retry transport, wait for completion
+                    client.retry(this, retryRequest);
+                } else {
+                    Request continueRequest = continuation(request, httpResponse);
+                    if (continueRequest != null) {
+                        // continue with new transport, synchronous call here, wait for completion
+                        client.continuation(this, continueRequest);
+                    }
+                }
+            } catch (URLSyntaxException | IOException e) {
+                logger.log(Level.WARNING, e.getMessage(), e);
+            }
+            String channelId = channel.id().toString();
+            Flow flow = channelFlowMap.get(channelId);
+            if (flow == null) {
+                return;
+            }
+            CompletableFuture<Boolean> promise = flow.get(flow.lastKey());
+            if (promise != null) {
+                promise.complete(true);
+            }
+        } finally {
+            httpResponse.release();
         }
     }
 

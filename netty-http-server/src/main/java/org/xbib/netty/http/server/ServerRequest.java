@@ -18,8 +18,6 @@ public interface ServerRequest {
 
     URL getURL();
 
-    Channel getChannel();
-
     HttpEndpointDescriptor getEndpointDescriptor();
 
     void setContext(List<String> context);
@@ -29,6 +27,8 @@ public interface ServerRequest {
     void addPathParameter(String key, String value) throws IOException;
 
     Map<String, String> getPathParameters();
+
+    String getRequestURI();
 
     HttpMethod getMethod();
 
@@ -44,7 +44,7 @@ public interface ServerRequest {
 
     Integer getStreamId();
 
-    Integer getRequestId();
+    Long getRequestId();
 
     SSLSession getSession();
 

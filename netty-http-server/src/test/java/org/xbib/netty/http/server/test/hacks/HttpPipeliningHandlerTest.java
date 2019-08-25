@@ -26,7 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.server.handler.http.HttpPipelinedRequest;
 import org.xbib.netty.http.server.handler.http.HttpPipelinedResponse;
 import org.xbib.netty.http.server.handler.http.HttpPipeliningHandler;
-import org.xbib.netty.http.server.test.NettyHttpExtension;
+import org.xbib.netty.http.server.test.NettyHttpTestExtension;
 
 import java.nio.channels.ClosedChannelException;
 import java.nio.charset.StandardCharsets;
@@ -52,7 +52,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** flaky */
 @Disabled
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@ExtendWith(NettyHttpExtension.class)
+@ExtendWith(NettyHttpTestExtension.class)
 class HttpPipeliningHandlerTest {
 
     private static final Logger logger = Logger.getLogger(HttpPipeliningHandlerTest.class.getName());

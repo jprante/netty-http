@@ -309,6 +309,8 @@ public class Request {
 
         private URL url;
 
+        private String uri;
+
         private HttpParameters uriParameters;
 
         private HttpParameters formParameters;
@@ -327,21 +329,21 @@ public class Request {
 
         Builder(ByteBufAllocator allocator) {
             this.allocator = allocator;
-            httpMethod = DEFAULT_METHOD;
-            httpVersion = DEFAULT_HTTP_VERSION;
-            userAgent = DEFAULT_USER_AGENT;
-            gzip = DEFAULT_GZIP;
-            keepalive = DEFAULT_KEEPALIVE;
-            url = DEFAULT_URL;
-            timeoutInMillis = DEFAULT_TIMEOUT_MILLIS;
-            followRedirect = DEFAULT_FOLLOW_REDIRECT;
-            maxRedirects = DEFAULT_MAX_REDIRECT;
-            headers = new DefaultHttpHeaders();
-            removeHeaders = new ArrayList<>();
-            cookies = new HashSet<>();
-            encoder = PercentEncoders.getQueryEncoder(StandardCharsets.UTF_8);
-            uriParameters = new HttpParameters();
-            formParameters = new HttpParameters(DEFAULT_FORM_CONTENT_TYPE);
+            this.httpMethod = DEFAULT_METHOD;
+            this.httpVersion = DEFAULT_HTTP_VERSION;
+            this.userAgent = DEFAULT_USER_AGENT;
+            this.gzip = DEFAULT_GZIP;
+            this.keepalive = DEFAULT_KEEPALIVE;
+            this.url = DEFAULT_URL;
+            this.timeoutInMillis = DEFAULT_TIMEOUT_MILLIS;
+            this.followRedirect = DEFAULT_FOLLOW_REDIRECT;
+            this.maxRedirects = DEFAULT_MAX_REDIRECT;
+            this.headers = new DefaultHttpHeaders();
+            this.removeHeaders = new ArrayList<>();
+            this.cookies = new HashSet<>();
+            this.encoder = PercentEncoders.getQueryEncoder(StandardCharsets.UTF_8);
+            this.uriParameters = new HttpParameters();
+            this.formParameters = new HttpParameters(DEFAULT_FORM_CONTENT_TYPE);
         }
 
         public Builder setMethod(HttpMethod httpMethod) {
@@ -394,7 +396,7 @@ public class Request {
         }
 
         public Builder uri(String uri) {
-            this.url = url.resolve(uri);
+            this.uri = uri;
             return this;
         }
 
@@ -482,12 +484,22 @@ public class Request {
         }
 
         public Builder text(String text) {
-            content(ByteBufUtil.writeUtf8(allocator, text), HttpHeaderValues.TEXT_PLAIN);
+            ByteBuf byteBuf = ByteBufUtil.writeUtf8(allocator, text);
+            try {
+                content(byteBuf, HttpHeaderValues.TEXT_PLAIN);
+            } finally {
+                byteBuf.release();
+            }
             return this;
         }
 
         public Builder json(String json) {
-            content(ByteBufUtil.writeUtf8(allocator, json), HttpHeaderValues.APPLICATION_JSON);
+            ByteBuf byteBuf = ByteBufUtil.writeUtf8(allocator, json);
+            try {
+                content(byteBuf, HttpHeaderValues.APPLICATION_JSON);
+            } finally {
+                byteBuf.release();
+            }
             return this;
         }
 
@@ -518,8 +530,46 @@ public class Request {
         }
 
         public Request build() {
-            if (url == null) {
-                throw new IllegalStateException("URL not set");
+            DefaultHttpHeaders validatedHeaders = new DefaultHttpHeaders(true);
+            if (url != null) {
+                // attach user query parameters to URL
+                URL.Builder mutator = url.mutator();
+                uriParameters.forEach((k, v) -> v.forEach(value -> mutator.queryParam(k, value)));
+                url = mutator.build();
+                // let Netty's query string decoder/encoder work over the URL to add parameters given implicitly in url()
+                String path = url.getPath();
+                String query = url.getQuery();
+                QueryStringDecoder queryStringDecoder = new QueryStringDecoder(query != null ? path + "?" + query : path, StandardCharsets.UTF_8);
+                QueryStringEncoder queryStringEncoder = new QueryStringEncoder(queryStringDecoder.path());
+                for (Map.Entry<String, List<String>> entry : queryStringDecoder.parameters().entrySet()) {
+                    for (String value : entry.getValue()) {
+                        queryStringEncoder.addParam(entry.getKey(), value);
+                    }
+                }
+                // build uri from QueryStringDecoder
+                String pathAndQuery = queryStringEncoder.toString();
+                StringBuilder sb = new StringBuilder();
+                if (!pathAndQuery.isEmpty()) {
+                    sb.append(pathAndQuery);
+                }
+                String fragment = url.getFragment();
+                if (fragment != null && !fragment.isEmpty()) {
+                    sb.append('#').append(fragment);
+                }
+                this.uri = sb.toString(); // the encoded form of path/query/fragment
+                validatedHeaders.set(headers);
+                String scheme = url.getScheme();
+                if (httpVersion.majorVersion() == 2) {
+                    validatedHeaders.set(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), scheme);
+                }
+                validatedHeaders.set(HttpHeaderNames.HOST, url.getHostInfo());
+            }
+            validatedHeaders.set(HttpHeaderNames.DATE, DateTimeFormatter.RFC_1123_DATE_TIME.format(ZonedDateTime.now(ZoneOffset.UTC)));
+            if (userAgent != null) {
+                validatedHeaders.set(HttpHeaderNames.USER_AGENT, userAgent);
+            }
+            if (gzip) {
+                validatedHeaders.set(HttpHeaderNames.ACCEPT_ENCODING, "gzip");
             }
             // form parameters
             if (!formParameters.isEmpty()) {
@@ -530,47 +580,7 @@ public class Request {
                     throw new IllegalArgumentException();
                 }
             }
-            // attach user query parameters to URL
-            URL.Builder mutator = url.mutator();
-            uriParameters.forEach((k, v) -> v.forEach(value -> mutator.queryParam(k, value)));
-            url = mutator.build();
-            Objects.requireNonNull(url.getHost());
-            // let Netty's query string decoder/encoder work over the URL to add parameters given implicitly in url()
-            String path = url.getPath();
-            String query = url.getQuery();
-            QueryStringDecoder queryStringDecoder = new QueryStringDecoder(query != null ? path + "?" + query : path, StandardCharsets.UTF_8);
-            QueryStringEncoder queryStringEncoder = new QueryStringEncoder(queryStringDecoder.path());
-            for (Map.Entry<String, List<String>> entry : queryStringDecoder.parameters().entrySet()) {
-                for (String value : entry.getValue()) {
-                    queryStringEncoder.addParam(entry.getKey(), value);
-                }
-            }
-            // build uri from QueryStringDecoder
-            String pathAndQuery = queryStringEncoder.toString();
-            StringBuilder sb = new StringBuilder();
-            if (!pathAndQuery.isEmpty()) {
-                sb.append(pathAndQuery);
-            }
-            String fragment = url.getFragment();
-            if (fragment != null && !fragment.isEmpty()) {
-                sb.append('#').append(fragment);
-            }
-            String uri = sb.toString(); // the encoded form of path/query/fragment
-            DefaultHttpHeaders validatedHeaders = new DefaultHttpHeaders(true);
-            validatedHeaders.set(headers);
-            String scheme = url.getScheme();
-            if (httpVersion.majorVersion() == 2) {
-                validatedHeaders.set(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), scheme);
-            }
-            validatedHeaders.set(HttpHeaderNames.HOST, url.getHostInfo());
-            validatedHeaders.set(HttpHeaderNames.DATE, DateTimeFormatter.RFC_1123_DATE_TIME.format(ZonedDateTime.now(ZoneOffset.UTC)));
-            if (userAgent != null) {
-                validatedHeaders.set(HttpHeaderNames.USER_AGENT, userAgent);
-            }
-            if (gzip) {
-                validatedHeaders.set(HttpHeaderNames.ACCEPT_ENCODING, "gzip");
-            }
-            int length = content != null ? content.capacity() : 0;
+            int length = content != null ? content.readableBytes() : 0;
             if (!validatedHeaders.contains(HttpHeaderNames.CONTENT_LENGTH) && !validatedHeaders.contains(HttpHeaderNames.TRANSFER_ENCODING)) {
                 if (length < 0) {
                     validatedHeaders.set(HttpHeaderNames.TRANSFER_ENCODING, "chunked");

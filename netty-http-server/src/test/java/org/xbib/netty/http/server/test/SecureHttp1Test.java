@@ -23,7 +23,7 @@ import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@ExtendWith(NettyHttpExtension.class)
+@ExtendWith(NettyHttpTestExtension.class)
 class SecureHttp1Test {
 
     private static final Logger logger = Logger.getLogger(SecureHttp1Test.class.getName());
@@ -38,6 +38,7 @@ class SecureHttp1Test {
                                         .withContentType("text/plain")
                                         .write(request.getContent().retain()))
                 .build())
+                .enableDebug()
                 .build();
         Client client = Client.builder()
                 .trustInsecure()

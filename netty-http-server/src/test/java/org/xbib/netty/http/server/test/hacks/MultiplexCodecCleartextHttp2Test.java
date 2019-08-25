@@ -42,7 +42,7 @@ import io.netty.handler.logging.LoggingHandler;
 import io.netty.util.AsciiString;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.xbib.netty.http.server.test.NettyHttpExtension;
+import org.xbib.netty.http.server.test.NettyHttpTestExtension;
 
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
@@ -68,7 +68,7 @@ import java.util.logging.Logger;
  *
  *
  */
-@ExtendWith(NettyHttpExtension.class)
+@ExtendWith(NettyHttpTestExtension.class)
 class MultiplexCodecCleartextHttp2Test {
 
     private static final Logger clientLogger = Logger.getLogger("client");
@@ -82,8 +82,8 @@ class MultiplexCodecCleartextHttp2Test {
 
     @Test
     void testMultiplexHttp2() throws Exception {
-        Http2FrameLogger serverFrameLogger = new Http2FrameLogger(LogLevel.INFO, "server");
-        Http2FrameLogger clientFrameLogger = new Http2FrameLogger(LogLevel.INFO, "client");
+        Http2FrameLogger serverFrameLogger = new Http2FrameLogger(LogLevel.DEBUG, "server");
+        Http2FrameLogger clientFrameLogger = new Http2FrameLogger(LogLevel.DEBUG, "client");
         EventLoopGroup serverEventLoopGroup = new NioEventLoopGroup();
         EventLoopGroup clientEventLoopGroup = new NioEventLoopGroup();
         try {
@@ -99,7 +99,8 @@ class MultiplexCodecCleartextHttp2Test {
                                 @Override
                                 protected void initChannel(Channel channel) {
                                     ChannelPipeline p = channel.pipeline();
-                                    p.addLast("multiplex-server-traffic", new TrafficLoggingHandler("multiplex-server-traffic", LogLevel.INFO));
+                                    p.addLast("multiplex-server-traffic",
+                                            new TrafficLoggingHandler("multiplex-server-traffic", LogLevel.DEBUG));
                                     p.addLast("multiplex-server-frame-converter", new Http2StreamFrameToHttpObjectCodec(true));
                                     p.addLast("multiplex-server-chunk-aggregator", new HttpObjectAggregator(1048576));
                                     p.addLast("multiplex-server-request-handler", new ServerRequestHandler());
@@ -119,7 +120,8 @@ class MultiplexCodecCleartextHttp2Test {
                         HttpServerUpgradeHandler upgradeHandler = new HttpServerUpgradeHandler(sourceCodec, upgradeCodecFactory);
                         CleartextHttp2ServerUpgradeHandler cleartextHttp2ServerUpgradeHandler =
                                 new CleartextHttp2ServerUpgradeHandler(sourceCodec, upgradeHandler, serverMultiplexCodec);
-                        p.addLast("server-traffic", new TrafficLoggingHandler("server-traffic", LogLevel.INFO));
+                        p.addLast("server-traffic",
+                                new TrafficLoggingHandler("server-traffic", LogLevel.DEBUG));
                         p.addLast("server-upgrade", cleartextHttp2ServerUpgradeHandler);
                         p.addLast("server-messages", new ServerMessages());
                     }
@@ -164,7 +166,8 @@ class MultiplexCodecCleartextHttp2Test {
                      @Override
                      protected void initChannel(Channel ch)  {
                          ChannelPipeline p = ch.pipeline();
-                         p.addLast("child-client-traffic", new TrafficLoggingHandler("child-client-traffic", LogLevel.INFO));
+                         p.addLast("child-client-traffic",
+                                 new TrafficLoggingHandler("child-client-traffic", LogLevel.DEBUG));
                          p.addLast("child-client-frame-converter", new Http2StreamFrameToHttpObjectCodec(false));
                          p.addLast("child-client-chunk-aggregator", new HttpObjectAggregator(1048576));
                          p.addLast("child-client-response-handler", new ClientResponseHandler());
@@ -195,7 +198,7 @@ class MultiplexCodecCleartextHttp2Test {
 
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, FullHttpResponse msg) {
-            clientLogger.log(Level.INFO, "response received on client: " + msg);
+            clientLogger.log(Level.FINE, "response received on client: " + msg);
             responseFuture.complete(true);
         }
     }
@@ -226,11 +229,11 @@ class MultiplexCodecCleartextHttp2Test {
 
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest msg) {
-            serverLogger.log(Level.INFO, "request received on server: " + msg +
+            serverLogger.log(Level.FINE, "request received on server: " + msg +
                     " path = " + msg);
             DefaultFullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1,
                     HttpResponseStatus.OK);
-            serverLogger.log(Level.INFO, "writing server response: " + response);
+            serverLogger.log(Level.FINE, "writing server response: " + response);
             ctx.writeAndFlush(response);
         }
     }

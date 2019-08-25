@@ -18,15 +18,12 @@ class RequestBuilderTest {
         URI uri = URI.create("http://localhost");
         URI uri2 = uri.resolve("/path");
         assertEquals("http://localhost/path", uri2.toString());
-
         uri = URI.create("http://localhost/path1?a=b");
         uri2 = uri.resolve("path2?c=d");
         assertEquals("http://localhost/path2?c=d", uri2.toString());
-
         URL url = URL.from("http://localhost");
         URL url2 = url.resolve("/path");
         assertEquals("http://localhost/path", url2.toString());
-
         url = URL.from("http://localhost/path1?a=b");
         url2 = url.resolve("path2?c=d");
         assertEquals("http://localhost/path2?c=d", url2.toString());
@@ -35,13 +32,13 @@ class RequestBuilderTest {
     @Test
     void testRelativeUri() {
         Request.Builder httpRequestBuilder = Request.get();
-        httpRequestBuilder.url("https://localhost").uri("/path");
+        httpRequestBuilder.url("https://localhost/path");
         assertEquals("/path", httpRequestBuilder.build().relative());
-        httpRequestBuilder.uri("/foobar");
+        httpRequestBuilder.url("https://localhost/foobar");
         assertEquals("/foobar", httpRequestBuilder.build().relative());
-        httpRequestBuilder.uri("/path1?a=b");
+        httpRequestBuilder.url("/path1?a=b");
         assertEquals("/path1?a=b", httpRequestBuilder.build().relative());
-        httpRequestBuilder.uri("/path2?c=d");
+        httpRequestBuilder.url("/path2?c=d");
         assertEquals("/path2?c=d", httpRequestBuilder.build().relative());
     }
 
@@ -98,7 +95,6 @@ class RequestBuilderTest {
         assertEquals("?%20a%20=%20b", request.relative());
         assertEquals("https://google.com? a = b", request.url().toString());
         assertEquals("https://google.com?%20a%20=%20b", request.url().toExternalForm());
-
         request = Request.get()
                 .url("https://google.com?%20a%20=%20b")
                 .build();

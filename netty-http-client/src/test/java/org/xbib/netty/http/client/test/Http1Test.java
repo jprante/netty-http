@@ -11,7 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-@ExtendWith(NettyHttpExtension.class)
+@ExtendWith(NettyHttpTestExtension.class)
 class Http1Test {
 
     private static final Logger logger = Logger.getLogger(Http1Test.class.getName());
@@ -22,7 +22,7 @@ class Http1Test {
                 .build();
         try {
             Request request = Request.get().url("http://xbib.org").build()
-                    .setResponseListener(resp -> logger.log(Level.INFO,
+                    .setResponseListener(resp -> logger.log(Level.FINE,
                             "got response: " + resp.getHeaders() +
                             resp.getBodyAsString(StandardCharsets.UTF_8) +
                             " status=" + resp.getStatus()));
@@ -38,12 +38,12 @@ class Http1Test {
                 .build();
         try {
             Request request1 = Request.get().url("http://xbib.org").build()
-                    .setResponseListener(resp -> logger.log(Level.INFO, "got response: " +
+                    .setResponseListener(resp -> logger.log(Level.FINE, "got response: " +
                             resp.getBodyAsString(StandardCharsets.UTF_8)));
             client.execute(request1).get();
 
             Request request2 = Request.get().url("http://google.com").setVersion("HTTP/1.1").build()
-                    .setResponseListener(resp -> logger.log(Level.INFO, "got response: " +
+                    .setResponseListener(resp -> logger.log(Level.FINE, "got response: " +
                             resp.getBodyAsString(StandardCharsets.UTF_8)));
             client.execute(request2).get();
         } finally {
@@ -59,12 +59,12 @@ class Http1Test {
             Request request1 = Request.builder(HttpMethod.GET)
                     .url("http://xbib.org").setVersion("HTTP/1.1")
                     .build()
-                    .setResponseListener(resp -> logger.log(Level.INFO, "got response: " +
+                    .setResponseListener(resp -> logger.log(Level.FINE, "got response: " +
                             resp.getHeaders() + " status=" +resp.getStatus()));
             Request request2 = Request.builder(HttpMethod.GET)
                     .url("http://xbib.org").setVersion("HTTP/1.1")
                     .build()
-                    .setResponseListener(resp -> logger.log(Level.INFO, "got response: " +
+                    .setResponseListener(resp -> logger.log(Level.FINE, "got response: " +
                             resp.getHeaders() + " status=" +resp.getStatus()));
 
             for (int i = 0; i < 10; i++) {

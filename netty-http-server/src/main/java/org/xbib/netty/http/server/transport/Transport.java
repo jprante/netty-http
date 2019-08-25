@@ -11,8 +11,6 @@ public interface Transport {
 
     AttributeKey<Transport> TRANSPORT_ATTRIBUTE_KEY = AttributeKey.valueOf("transport");
 
-    void requestReceived(ChannelHandlerContext ctx, FullHttpRequest fullHttpRequest) throws IOException;
-
     void requestReceived(ChannelHandlerContext ctx, FullHttpRequest fullHttpRequest, Integer sequenceId) throws IOException;
 
     void settingsReceived(ChannelHandlerContext ctx, Http2Settings http2Settings) throws Exception;

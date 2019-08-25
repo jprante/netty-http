@@ -4,11 +4,17 @@ import io.netty.channel.WriteBufferWaterMark;
 import io.netty.channel.epoll.Epoll;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.logging.LogLevel;
+import io.netty.handler.ssl.CipherSuiteFilter;
+import io.netty.handler.ssl.SslProvider;
 import org.xbib.netty.http.common.HttpAddress;
+import org.xbib.netty.http.common.security.SecurityUtil;
 
+import java.security.KeyStore;
+import java.security.Provider;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import javax.net.ssl.TrustManagerFactory;
 
 public class ServerConfig {
 
@@ -138,6 +144,31 @@ public class ServerConfig {
          */
         boolean INSTALL_HTTP_UPGRADE2 = false;
 
+        /**
+         * Default SSL provider.
+         */
+        SslProvider SSL_PROVIDER = SecurityUtil.Defaults.DEFAULT_SSL_PROVIDER;
+
+        /**
+         * Default SSL context provider (for JDK SSL only).
+         */
+        Provider SSL_CONTEXT_PROVIDER = null;
+
+        /**
+         * Transport layer security protocol versions.
+         */
+        String[] PROTOCOLS = new String[] { "TLSv1.3", "TLSv1.2" };
+
+        /**
+         * Default ciphers. We care about HTTP/2.
+         */
+        Iterable<String> CIPHERS = SecurityUtil.Defaults.DEFAULT_CIPHERS;
+
+        /**
+         * Default cipher suite filter.
+         */
+        CipherSuiteFilter CIPHER_SUITE_FILTER = SecurityUtil.Defaults.DEFAULT_CIPHER_SUITE_FILTER;
+
     }
 
     private HttpAddress httpAddress = Defaults.ADDRESS;
@@ -189,6 +220,20 @@ public class ServerConfig {
     private boolean installHttp2Upgrade = Defaults.INSTALL_HTTP_UPGRADE2;
 
     private final Map<String, Domain> domains;
+
+    private SslProvider sslProvider = Defaults.SSL_PROVIDER;
+
+    private Provider sslContextProvider = Defaults.SSL_CONTEXT_PROVIDER;
+
+    private String[] protocols = Defaults.PROTOCOLS;
+
+    private Iterable<String> ciphers = Defaults.CIPHERS;
+
+    private CipherSuiteFilter cipherSuiteFilter = Defaults.CIPHER_SUITE_FILTER;
+
+    private TrustManagerFactory trustManagerFactory = SecurityUtil.Defaults.DEFAULT_TRUST_MANAGER_FACTORY;
+
+    private KeyStore trustManagerKeyStore = null;
 
     public ServerConfig() {
         this.domains = new LinkedHashMap<>();
@@ -425,12 +470,83 @@ public class ServerConfig {
         return http2Settings;
     }
 
+    public ServerConfig setTrustManagerFactory(TrustManagerFactory trustManagerFactory) {
+        this.trustManagerFactory = trustManagerFactory;
+        return this;
+    }
+
+    public TrustManagerFactory getTrustManagerFactory() {
+        return trustManagerFactory;
+    }
+
+    public ServerConfig setTrustManagerKeyStore(KeyStore trustManagerKeyStore) {
+        this.trustManagerKeyStore = trustManagerKeyStore;
+        return this;
+    }
+
+    public KeyStore getTrustManagerKeyStore() {
+        return trustManagerKeyStore;
+    }
+
+    public ServerConfig setSslProvider(SslProvider sslProvider) {
+        this.sslProvider = sslProvider;
+        return this;
+    }
+
+    public SslProvider getSslProvider() {
+        return sslProvider;
+    }
+
+    public ServerConfig setJdkSslProvider() {
+        this.sslProvider = SslProvider.JDK;
+        return this;
+    }
+
+    public ServerConfig setOpenSSLSslProvider() {
+        this.sslProvider = SslProvider.OPENSSL;
+        return this;
+    }
+
+    public ServerConfig setSslContextProvider(Provider sslContextProvider) {
+        this.sslContextProvider = sslContextProvider;
+        return this;
+    }
+
+    public Provider getSslContextProvider() {
+        return sslContextProvider;
+    }
+
+    public ServerConfig setProtocols(String[] protocols) {
+        this.protocols = protocols;
+        return this;
+    }
+
+    public String[] getProtocols() {
+        return protocols;
+    }
+
+    public ServerConfig setCiphers(Iterable<String> ciphers) {
+        this.ciphers = ciphers;
+        return this;
+    }
+
+    public Iterable<String> getCiphers() {
+        return ciphers;
+    }
+
+    public ServerConfig setCipherSuiteFilter(CipherSuiteFilter cipherSuiteFilter) {
+        this.cipherSuiteFilter = cipherSuiteFilter;
+        return this;
+    }
+
+    public CipherSuiteFilter getCipherSuiteFilter() {
+        return cipherSuiteFilter;
+    }
+
     public ServerConfig putDomain(Domain domain) {
-        synchronized (domains) {
-            domains.put(domain.getName(), domain);
-            for (String alias : domain.getAliases()) {
-                domains.put(alias, domain);
-            }
+        domains.put(domain.getName(), domain);
+        for (String alias : domain.getAliases()) {
+            domains.put(alias, domain);
         }
         return this;
     }
@@ -445,11 +561,9 @@ public class ServerConfig {
     }
 
     public ServerConfig removeDomain(Domain domain) {
-        synchronized (domains) {
-            domains.remove(domain.getName());
-            for (String alias : domain.getAliases()) {
-                domains.remove(alias, domain);
-            }
+        domains.remove(domain.getName());
+        for (String alias : domain.getAliases()) {
+            domains.remove(alias, domain);
         }
         return this;
     }

@@ -19,32 +19,26 @@ public class HttpTransport extends BaseTransport {
     }
 
     @Override
-    public void requestReceived(ChannelHandlerContext ctx, FullHttpRequest fullHttpRequest) throws IOException {
-        requestReceived(ctx, fullHttpRequest, 0);
-    }
-
-    @Override
     public void requestReceived(ChannelHandlerContext ctx, FullHttpRequest fullHttpRequest, Integer sequenceId)
             throws IOException {
-        int requestId = requestCounter.incrementAndGet();
         Domain domain = server.getNamedServer(fullHttpRequest.headers().get(HttpHeaderNames.HOST));
-        if (domain == null) {
-            domain = server.getDefaultNamedServer();
-        }
-        HttpServerRequest serverRequest = new HttpServerRequest();
-        serverRequest.setChannelHandlerContext(ctx);
-        serverRequest.setRequest(fullHttpRequest);
-        serverRequest.setSequenceId(sequenceId);
-        serverRequest.setRequestId(requestId);
-        SslHandler sslHandler = ctx.channel().pipeline().get(SslHandler.class);
-        if (sslHandler != null) {
-            serverRequest.setSession(sslHandler.engine().getSession());
-        }
-        HttpServerResponse serverResponse = new HttpServerResponse(serverRequest);
-        if (acceptRequest(domain, serverRequest, serverResponse)) {
-            handle(domain, serverRequest, serverResponse);
-        } else {
-            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_ACCEPTABLE);
+        HttpServerRequest serverRequest = new HttpServerRequest(server, fullHttpRequest);
+        try {
+            serverRequest.setSequenceId(sequenceId);
+            serverRequest.setRequestId(server.getRequestCounter().incrementAndGet());
+            SslHandler sslHandler = ctx.channel().pipeline().get(SslHandler.class);
+            if (sslHandler != null) {
+                serverRequest.setSession(sslHandler.engine().getSession());
+            }
+            HttpServerResponse serverResponse = new HttpServerResponse(server, serverRequest, ctx);
+            if (acceptRequest(domain, serverRequest, serverResponse)) {
+                serverRequest.handleParameters();
+                domain.handle(serverRequest, serverResponse);
+            } else {
+                ServerResponse.write(serverResponse, HttpResponseStatus.NOT_ACCEPTABLE);
+            }
+        } finally {
+            serverRequest.release();
         }
     }
 

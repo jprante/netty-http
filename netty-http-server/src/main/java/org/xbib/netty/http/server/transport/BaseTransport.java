@@ -10,16 +10,12 @@ import org.xbib.netty.http.server.ServerRequest;
 import org.xbib.netty.http.server.ServerResponse;
 import org.xbib.netty.http.server.Domain;
 
-import java.io.IOException;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 abstract class BaseTransport implements Transport {
 
     private static final Logger logger = Logger.getLogger(BaseTransport.class.getName());
-
-    static final AtomicInteger requestCounter = new AtomicInteger();
 
     protected final Server server;
 
@@ -55,10 +51,7 @@ abstract class BaseTransport implements Transport {
             // return a continue response before reading body
             String expect = reqHeaders.get(HttpHeaderNames.EXPECT);
             if (expect != null) {
-                if ("100-continue".equalsIgnoreCase(expect)) {
-                    //ServerResponse tempResp = new ServerResponse(serverResponse);
-                    //tempResp.sendHeaders(100);
-                } else {
+                if (!"100-continue".equalsIgnoreCase(expect)) {
                     // RFC2616#14.20: if unknown expect, send 417
                     ServerResponse.write(serverResponse, HttpResponseStatus.EXPECTATION_FAILED);
                     return false;
@@ -70,18 +63,5 @@ abstract class BaseTransport implements Transport {
             return false;
         }
         return true;
-    }
-
-    /**
-     * Handles a request according to the request method.
-     * @param domain the named server
-     * @param serverRequest  the request
-     * @param serverResponse the response (into which the response is written)
-     * @throws IOException if and error occurs
-     */
-    static void handle(Domain domain, HttpServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
-        // create server URL and parse parameters from query string, path, and parse body, if exists
-        serverRequest.handleParameters();
-        domain.handle(serverRequest, serverResponse);
     }
 }
