@@ -111,7 +111,21 @@ public final class Server implements AutoCloseable {
         if (serverConfig.isDebug()) {
             bootstrap.handler(new LoggingHandler("bootstrap-server", serverConfig.getDebugLogLevel()));
         }
-        DomainNameMapping<SslContext> domainNameMapping = createDomainNameMapping();
+        if (serverConfig.getDefaultDomain() == null) {
+            throw new IllegalStateException("no default named server (with name '*') configured, unable to continue");
+        }
+        DomainNameMapping<SslContext> domainNameMapping = null;
+        if (serverConfig.getAddress().isSecure() && serverConfig.getDefaultDomain().getSslContext() != null) {
+            DomainNameMappingBuilder<SslContext> mappingBuilder =
+                    new DomainNameMappingBuilder<>(serverConfig.getDefaultDomain().getSslContext());
+            for (Domain domain : serverConfig.getDomains()) {
+                String name = domain.getName();
+                if (!"*".equals(name)) {
+                    mappingBuilder.add(name, domain.getSslContext());
+                }
+            }
+            domainNameMapping = mappingBuilder.build();
+        }
         if (serverConfig.getAddress().getVersion().majorVersion() == 1) {
             HttpChannelInitializer httpChannelInitializer = new HttpChannelInitializer(this,
                     serverConfig.getAddress(), domainNameMapping);
@@ -160,13 +174,14 @@ public final class Server implements AutoCloseable {
      * @throws IOException if channel future sync is interrupted
      */
     public ChannelFuture accept() throws IOException {
-        logger.log(Level.INFO, () -> "trying to bind to " + serverConfig.getAddress());
+        HttpAddress httpAddress = serverConfig.getAddress();
+        logger.log(Level.INFO, () -> "trying to bind to " + httpAddress);
         try {
-            this.channelFuture = bootstrap.bind(serverConfig.getAddress().getInetSocketAddress()).await().sync();
+            this.channelFuture = bootstrap.bind(httpAddress.getInetSocketAddress()).await().sync();
         } catch (InterruptedException e) {
             throw new IOException(e);
         }
-        logger.log(Level.INFO, () -> ServerName.getServerName() + " ready, listening on " + serverConfig.getAddress());
+        logger.log(Level.INFO, () -> ServerName.getServerName() + " ready, listening on " + httpAddress);
         return channelFuture;
     }
 
@@ -268,25 +283,6 @@ public final class Server implements AutoCloseable {
             }
         }
         return channelClass;
-    }
-
-    private DomainNameMapping<SslContext> createDomainNameMapping() {
-        if (serverConfig.getDefaultDomain() == null) {
-            throw new IllegalStateException("no default named server (with name '*') configured, unable to continue");
-        }
-        DomainNameMapping<SslContext> domainNameMapping = null;
-        if (serverConfig.getAddress().isSecure() && serverConfig.getDefaultDomain().getSslContext() != null) {
-            DomainNameMappingBuilder<SslContext> mappingBuilder =
-                    new DomainNameMappingBuilder<>(serverConfig.getDefaultDomain().getSslContext());
-            for (Domain domain : serverConfig.getDomains()) {
-                String name = domain.getName();
-                if (!"*".equals(name)) {
-                    mappingBuilder.add(name, domain.getSslContext());
-                }
-            }
-            domainNameMapping = mappingBuilder.build();
-        }
-        return domainNameMapping;
     }
 
     static class HttpServerParentThreadFactory implements ThreadFactory {
@@ -453,18 +449,23 @@ public final class Server implements AutoCloseable {
             return this;
         }
 
-        public Builder setEnablCcompression(boolean enablCcompression) {
-            this.serverConfig.setCompression(enablCcompression);
+        public Builder enableCompression(boolean enableCompression) {
+            this.serverConfig.setCompression(enableCompression);
             return this;
         }
 
-        public Builder setEnableDecompression(boolean enableDecompression) {
+        public Builder enableDeompression(boolean enableDecompression) {
             this.serverConfig.setDecompression(enableDecompression);
             return this;
         }
 
         public Builder setInstallHttp2Upgrade(boolean installHttp2Upgrade) {
             this.serverConfig.setInstallHttp2Upgrade(installHttp2Upgrade);
+            return this;
+        }
+
+        public Builder setTransportLayerSecurityProtocols(String[] protocols) {
+            this.serverConfig.setProtocols(protocols);
             return this;
         }
 

@@ -38,7 +38,6 @@ class SecureHttp1Test {
                                         .withContentType("text/plain")
                                         .write(request.getContent().retain()))
                 .build())
-                .enableDebug()
                 .build();
         Client client = Client.builder()
                 .trustInsecure()

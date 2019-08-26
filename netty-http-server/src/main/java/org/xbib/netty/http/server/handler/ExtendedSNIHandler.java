@@ -8,10 +8,15 @@ import io.netty.util.Mapping;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.ServerConfig;
 import java.net.InetSocketAddress;
+import java.util.Arrays;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLParameters;
 
 public class ExtendedSNIHandler extends SniHandler {
+
+    private static final Logger logger = Logger.getLogger(ExtendedSNIHandler.class.getName());
 
     private final ServerConfig serverConfig;
 
@@ -39,6 +44,7 @@ public class ExtendedSNIHandler extends SniHandler {
         SSLParameters params = engine.getSSLParameters();
         params.setEndpointIdentificationAlgorithm("HTTPS");
         engine.setSSLParameters(params);
+        logger.log(Level.FINE, () -> "set enabled TLS protocols in SSL engine: " + Arrays.asList(serverConfig.getProtocols()));
         engine.setEnabledProtocols(serverConfig.getProtocols());
         return sslHandler;
     }

@@ -17,6 +17,7 @@ public class NettyHttpTestExtension implements BeforeAllCallback {
     @Override
     public void beforeAll(ExtensionContext context) {
         if (Security.getProvider("BC") == null) {
+            // for insecure trust manager
             Security.addProvider(new BouncyCastleProvider());
         }
         System.setProperty("io.netty.noUnsafe", Boolean.toString(true));

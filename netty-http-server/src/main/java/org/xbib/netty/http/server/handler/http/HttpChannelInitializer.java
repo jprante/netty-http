@@ -107,7 +107,6 @@ public class HttpChannelInitializer extends ChannelInitializer<SocketChannel> {
 
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-            logger.log(Level.FINE, "channelRead: " + msg.getClass().getName());
             if (msg instanceof HttpPipelinedRequest) {
                 HttpPipelinedRequest httpPipelinedRequest = (HttpPipelinedRequest) msg;
                 if (httpPipelinedRequest.getRequest() instanceof FullHttpRequest) {

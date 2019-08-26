@@ -55,8 +55,7 @@ class SecureHttp2Test {
             String payload = 0 + "/" + 0;
             Request request = Request.get()
                     .setVersion("HTTP/2.0")
-                    .uri("/")
-                    //.url(server.getServerConfig().getAddress().base())
+                    .url(server.getServerConfig().getAddress().base())
                     .content(payload, "text/plain")
                     .build()
                     .setResponseListener(responseListener);
