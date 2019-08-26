@@ -155,6 +155,7 @@ public class Http2Transport extends BaseTransport {
             channelId = pos > 0 ? channelId.substring(0, pos) : channelId;
             Flow flow = channelFlowMap.get(channelId);
             if (flow == null) {
+                // should never happen since we keep the channelFlowMap around
                 if (logger.isLoggable(Level.WARNING)) {
                     logger.log(Level.WARNING, "flow is null? channelId = " + channelId);
                 }
@@ -162,11 +163,12 @@ public class Http2Transport extends BaseTransport {
             }
             Request request = requests.remove(getRequestKey(channelId, streamId));
             if (request == null) {
+                if (logger.isLoggable(Level.WARNING)) {
+                    logger.log(Level.WARNING, "request is null? channelId = " + channelId + " streamId = " + streamId);
+                }
+                // even if request is null, we may complete the flow with an exception
                 CompletableFuture<Boolean> promise = flow.get(streamId);
                 if (promise != null) {
-                    if (logger.isLoggable(Level.WARNING)) {
-                        logger.log(Level.WARNING, "request is null? channelId = " + channelId + " streamId = " + streamId);
-                    }
                     promise.completeExceptionally(new IllegalStateException("no request"));
                 }
             } else {

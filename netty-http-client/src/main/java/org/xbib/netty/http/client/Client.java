@@ -324,7 +324,6 @@ public final class Client implements AutoCloseable {
         for (Transport transport : transports) {
             close(transport);
         }
-        // how to wait for all responses for the pool?
         if (hasPooledConnections()) {
             pool.close();
         }
@@ -337,8 +336,13 @@ public final class Client implements AutoCloseable {
     }
 
     private void close(Transport transport) throws IOException {
-        transport.close();
-        transports.remove(transport);
+        try {
+            transport.close();
+        } catch (Exception e) {
+            throw new IOException(e);
+        } finally {
+            transports.remove(transport);
+        }
     }
 
     /**

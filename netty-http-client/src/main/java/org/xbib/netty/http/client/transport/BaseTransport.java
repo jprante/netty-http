@@ -98,6 +98,11 @@ abstract class BaseTransport implements Transport {
         if (!channels.isEmpty()) {
             get();
         }
+        for (Flow flow : channelFlowMap.values()) {
+            flow.close();
+        }
+        channels.clear();
+        requests.clear();
     }
 
     @Override

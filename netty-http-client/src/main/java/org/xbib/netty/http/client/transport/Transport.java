@@ -16,7 +16,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
-public interface Transport {
+public interface Transport extends AutoCloseable {
 
     AttributeKey<Transport> TRANSPORT_ATTRIBUTE_KEY = AttributeKey.valueOf("transport");
 
@@ -52,5 +52,4 @@ public interface Transport {
 
     SSLSession getSession();
 
-    void close() throws IOException;
 }

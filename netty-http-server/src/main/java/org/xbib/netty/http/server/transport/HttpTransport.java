@@ -22,7 +22,7 @@ public class HttpTransport extends BaseTransport {
     public void requestReceived(ChannelHandlerContext ctx, FullHttpRequest fullHttpRequest, Integer sequenceId)
             throws IOException {
         Domain domain = server.getNamedServer(fullHttpRequest.headers().get(HttpHeaderNames.HOST));
-        HttpServerRequest serverRequest = new HttpServerRequest(server, fullHttpRequest);
+        HttpServerRequest serverRequest = new HttpServerRequest(server, fullHttpRequest, ctx);
         try {
             serverRequest.setSequenceId(sequenceId);
             serverRequest.setRequestId(server.getRequestCounter().incrementAndGet());

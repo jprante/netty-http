@@ -17,6 +17,7 @@ import org.xbib.netty.http.server.endpoint.HttpEndpointDescriptor;
 
 import javax.net.ssl.SSLSession;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnmappableCharacterException;
@@ -25,7 +26,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The {@code HttpServerRequest} class encapsulates a single request. There must be a default constructor.
+ * The {@code HttpServerRequest} class encapsulates a single request.
+ * There must be a default constructor.
  */
 public class HttpServerRequest implements ServerRequest {
 
@@ -34,6 +36,8 @@ public class HttpServerRequest implements ServerRequest {
     private static final CharSequence APPLICATION_FORM_URL_ENCODED = "application/x-www-form-urlencoded";
 
     private final FullHttpRequest httpRequest;
+
+    private final ChannelHandlerContext ctx;
 
     private List<String> context;
 
@@ -55,8 +59,11 @@ public class HttpServerRequest implements ServerRequest {
 
     private SSLSession sslSession;
 
-    HttpServerRequest(Server server, FullHttpRequest fullHttpRequest) {
+    HttpServerRequest(Server server, FullHttpRequest fullHttpRequest,
+                      ChannelHandlerContext ctx) {
+        // server not required yet
         this.httpRequest = fullHttpRequest.retainedDuplicate();
+        this.ctx = ctx;
         this.httpEndpointDescriptor = new HttpEndpointDescriptor(this);
     }
 
@@ -178,6 +185,16 @@ public class HttpServerRequest implements ServerRequest {
     @Override
     public SSLSession getSession() {
         return sslSession;
+    }
+
+    @Override
+    public InetSocketAddress getLocalAddress() {
+        return (InetSocketAddress) ctx.channel().localAddress();
+    }
+
+    @Override
+    public InetSocketAddress getRemoteAddress() {
+        return (InetSocketAddress) ctx.channel().remoteAddress();
     }
 
     @Override

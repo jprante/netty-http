@@ -2,7 +2,6 @@ package org.xbib.netty.http.server;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
-import io.netty.channel.Channel;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 import org.xbib.net.URL;
@@ -11,6 +10,7 @@ import org.xbib.netty.http.server.endpoint.HttpEndpointDescriptor;
 
 import javax.net.ssl.SSLSession;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
 
@@ -46,10 +46,14 @@ public interface ServerRequest {
 
     Long getRequestId();
 
-    SSLSession getSession();
-
     ByteBuf getContent();
 
     ByteBufInputStream getInputStream();
+
+    SSLSession getSession();
+
+    InetSocketAddress getLocalAddress();
+
+    InetSocketAddress getRemoteAddress();
 
 }

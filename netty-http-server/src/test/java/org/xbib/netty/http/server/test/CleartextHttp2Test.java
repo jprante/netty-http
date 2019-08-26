@@ -127,7 +127,7 @@ class CleartextHttp2Test {
     @Test
     void testMultithreadPooledClearTextHttp2() throws Exception {
         int threads = 2;
-        int loop = 2000;
+        int loop = 1000;
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
         Domain domain = Domain.builder(httpAddress)
                 .singleEndpoint("/", (request, response) ->
@@ -197,7 +197,7 @@ class CleartextHttp2Test {
     @Test
     void testTwoPooledClearTextHttp2() throws Exception {
         int threads = 2;
-        int loop = 4000;
+        int loop = 1000;
         HttpAddress httpAddress1 = HttpAddress.http2("localhost", 8008);
         AtomicInteger counter1 = new AtomicInteger();
         Domain domain1 = Domain.builder(httpAddress1)
