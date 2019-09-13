@@ -55,5 +55,4 @@ public interface ServerRequest {
     InetSocketAddress getLocalAddress();
 
     InetSocketAddress getRemoteAddress();
-
 }

@@ -7,16 +7,27 @@ import java.io.IOException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.time.Instant;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class ClassLoaderService extends ResourceService {
+
+    private static final Logger logger = Logger.getLogger(ClassLoaderService.class.getName());
 
     private final Class<?> clazz;
 
     private final String prefix;
 
+    private final String indexFileName;
+
     public ClassLoaderService(Class<?> clazz, String prefix) {
+        this(clazz, prefix, "index.html");
+    }
+
+    public ClassLoaderService(Class<?> clazz, String prefix, String indexFileName) {
         this.clazz = clazz;
         this.prefix = prefix;
+        this.indexFileName = indexFileName;
     }
 
     @Override
@@ -50,11 +61,24 @@ public class ClassLoaderService extends ResourceService {
         private final long length;
 
         ClassLoaderResource(ServerRequest serverRequest) throws IOException {
-            this.resourcePath = serverRequest.getEffectiveRequestPath().substring(1);
-            this.url = clazz.getResource(prefix + "/" + resourcePath);
-            URLConnection urlConnection = url.openConnection();
-            this.lastModified = Instant.ofEpochMilli(urlConnection.getLastModified());
-            this.length = urlConnection.getContentLength();
+            String effectivePath = serverRequest.getEffectiveRequestPath();
+            this.resourcePath = effectivePath.startsWith("/") ? effectivePath.substring(1) : effectivePath;
+            String path = prefix.endsWith("/") ? prefix : prefix + "/";
+            path = resourcePath.startsWith("/") ? path + resourcePath.substring(1) : path + resourcePath;
+            this.url = clazz.getResource(path);
+            if (url != null) {
+                URLConnection urlConnection = url.openConnection();
+                this.lastModified = Instant.ofEpochMilli(urlConnection.getLastModified());
+                this.length = urlConnection.getContentLength();
+                if (logger.isLoggable(Level.FINER)) {
+                    logger.log(Level.FINER, "success: path=[" + path +
+                            "] -> url=" + url + " lastModified=" + lastModified + "length=" + length);
+                }
+            } else {
+                this.lastModified = Instant.now();
+                this.length = 0;
+                logger.log(Level.FINER, "fail: resource not found, url=" + url);
+            }
         }
 
         @Override
@@ -75,6 +99,16 @@ public class ClassLoaderService extends ResourceService {
         @Override
         public long getLength() {
             return length;
+        }
+
+        @Override
+        public boolean isDirectory() {
+            return resourcePath.endsWith("/");
+        }
+
+        @Override
+        public String indexFileName() {
+            return indexFileName;
         }
     }
 }

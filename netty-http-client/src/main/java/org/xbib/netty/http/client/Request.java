@@ -172,8 +172,8 @@ public class Request {
 
     @Override
     public String toString() {
-        return "Request[url='" + url +
-                "',version=" + httpVersion +
+        return "Request[url=" + url +
+                ",version=" + httpVersion +
                 ",method=" + httpMethod +
                 ",headers=" + headers.entries() +
                 ",content=" + (content != null && content.readableBytes() >= 16 ?

@@ -1,7 +1,6 @@
 package org.xbib.netty.http.server.endpoint;
 
-import io.netty.handler.codec.http.HttpResponseStatus;
-import org.xbib.netty.http.common.util.LimitedMap;
+import org.xbib.netty.http.common.util.LimitedConcurrentHashMap;
 import org.xbib.netty.http.server.ServerRequest;
 import org.xbib.netty.http.server.ServerResponse;
 import org.xbib.netty.http.server.annotation.Endpoint;
@@ -13,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -21,77 +21,58 @@ public class HttpEndpointResolver {
 
     private static final Logger logger = Logger.getLogger(HttpEndpointResolver.class.getName());
 
-    private final HttpEndpoint defaultEndpoint;
+    private static final int DEFAULT_LIMIT = 1024;
 
     private final List<HttpEndpoint> endpoints;
 
     private final EndpointDispatcher endpointDispatcher;
 
-    private final LimitedMap<HttpEndpointDescriptor, List<HttpEndpoint>> endpointDescriptors;
+    private final Map<HttpEndpointDescriptor, List<HttpEndpoint>> endpointDescriptors;
 
-    private HttpEndpointResolver(HttpEndpoint defaultEndpoint,
-                                 List<HttpEndpoint> endpoints,
+    private HttpEndpointResolver(List<HttpEndpoint> endpoints,
                                  EndpointDispatcher endpointDispatcher,
                                  int limit) {
-        this.defaultEndpoint = defaultEndpoint == null ? createDefaultEndpoint() : defaultEndpoint;
+        Objects.requireNonNull(endpointDispatcher);
         this.endpoints = endpoints;
         this.endpointDispatcher = endpointDispatcher;
-        this.endpointDescriptors = new LimitedMap<>(limit);
+        this.endpointDescriptors = new LimitedConcurrentHashMap<>(limit);
     }
 
-    public void handle(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
+    /**
+     * Find matching endpoints for a server request.
+     * @param serverRequest the server request
+     * @return a
+     */
+    public List<HttpEndpoint> matchingEndpointsFor(ServerRequest serverRequest) {
         HttpEndpointDescriptor httpEndpointDescriptor = serverRequest.getEndpointDescriptor();
         endpointDescriptors.putIfAbsent(httpEndpointDescriptor, endpoints.stream()
                 .filter(endpoint -> endpoint.matches(httpEndpointDescriptor))
                 .sorted(new HttpEndpoint.EndpointPathComparator(httpEndpointDescriptor.getPath()))
                 .collect(Collectors.toList()));
-        List<HttpEndpoint> matchingEndpoints = endpointDescriptors.get(httpEndpointDescriptor);
+        return endpointDescriptors.get(httpEndpointDescriptor);
+    }
+
+    public void handle(List<HttpEndpoint> matchingEndpoints,
+                       ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
+        Objects.requireNonNull(matchingEndpoints);
         if (logger.isLoggable(Level.FINE)) {
-            logger.log(Level.FINE, () -> "endpoint = " + httpEndpointDescriptor +
-                    " matching endpoints = " + matchingEndpoints);
+            logger.log(Level.FINE, () ->
+                    "endpoint = " + serverRequest.getEndpointDescriptor() +
+                            " matching endpoints = " + matchingEndpoints.size() + " --> " + matchingEndpoints);
         }
-        if (matchingEndpoints.isEmpty()) {
-            if (defaultEndpoint != null) {
-                defaultEndpoint.resolveUriTemplate(serverRequest);
-                defaultEndpoint.handle(serverRequest, serverResponse);
-                if (endpointDispatcher != null) {
-                    endpointDispatcher.dispatch(defaultEndpoint, serverRequest, serverResponse);
-                }
-            } else {
-                ServerResponse.write(serverResponse, HttpResponseStatus.NOT_IMPLEMENTED);
-            }
-        } else {
-            for (HttpEndpoint endpoint : matchingEndpoints) {
-                endpoint.resolveUriTemplate(serverRequest);
-                endpoint.handle(serverRequest, serverResponse);
-                if (serverResponse.getStatus() != null) {
-                    break;
-                }
-            }
-            if (endpointDispatcher != null) {
-                for (HttpEndpoint endpoint : matchingEndpoints) {
-                    endpointDispatcher.dispatch(endpoint, serverRequest, serverResponse);
-                    if (serverResponse.getStatus() != null) {
-                        break;
-                    }
-                }
+        for (HttpEndpoint endpoint : matchingEndpoints) {
+            endpoint.resolveUriTemplate(serverRequest);
+            endpoint.handle(serverRequest, serverResponse);
+            endpointDispatcher.dispatch(endpoint, serverRequest, serverResponse);
+            if (serverResponse.getStatus() != null) {
+                logger.log(Level.FINEST, () -> "endpoint " + endpoint + " status = " + serverResponse.getStatus());
+                break;
             }
         }
     }
 
     public Map<HttpEndpointDescriptor, List<HttpEndpoint>> getEndpointDescriptors() {
         return endpointDescriptors;
-    }
-
-    private HttpEndpoint createDefaultEndpoint() {
-        return HttpEndpoint.builder()
-                .setPath("/**")
-                .addMethod("GET")
-                .addMethod("HEAD")
-                .addFilter((req, resp) -> {
-                    ServerResponse.write(resp, HttpResponseStatus.NOT_FOUND,
-                            "application/octet-stream","no endpoint configured");
-                }).build();
     }
 
     public static Builder builder() {
@@ -104,29 +85,23 @@ public class HttpEndpointResolver {
 
         private String prefix;
 
-        private HttpEndpoint defaultEndpoint;
-
         private List<HttpEndpoint> endpoints;
 
         private EndpointDispatcher endpointDispatcher;
 
         Builder() {
-            this.limit = 1024;
+            this.limit = DEFAULT_LIMIT;
             this.endpoints = new ArrayList<>();
         }
 
         public Builder setLimit(int limit) {
-            this.limit = limit;
+            this.limit = limit > 0 ? limit < 1024 * DEFAULT_LIMIT ? limit : DEFAULT_LIMIT : DEFAULT_LIMIT;
             return this;
         }
 
         public Builder setPrefix(String prefix) {
+            Objects.requireNonNull(prefix);
             this.prefix = prefix;
-            return this;
-        }
-
-        public Builder setDefaultEndpoint(HttpEndpoint endpoint) {
-            this.defaultEndpoint = endpoint;
             return this;
         }
 
@@ -137,12 +112,19 @@ public class HttpEndpointResolver {
          * @return this builder
          */
         public Builder addEndpoint(HttpEndpoint endpoint) {
-            if (endpoint.getPrefix().equals("/") && prefix != null && !prefix.isEmpty()) {
-                HttpEndpoint thisEndpoint = HttpEndpoint.builder(endpoint).setPrefix(prefix).build();
-                logger.log(Level.FINE, "adding endpoint = " + thisEndpoint);
-                endpoints.add(thisEndpoint);
+            Objects.requireNonNull(endpoint);
+            if (prefix != null && !prefix.isEmpty()) {
+                HttpEndpoint prefixedEndpoint = HttpEndpoint.builder(endpoint)
+                        .setPrefix(prefix + endpoint.getPrefix())
+                        .build();
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.log(Level.FINE, () -> "prefix " + prefix + ": adding endpoint = " + prefixedEndpoint);
+                }
+                endpoints.add(prefixedEndpoint);
             } else {
-                logger.log(Level.FINE, "adding endpoint = " + endpoint);
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.log(Level.FINE, () -> "adding endpoint = " + endpoint);
+                }
                 endpoints.add(endpoint);
             }
             return this;
@@ -155,6 +137,7 @@ public class HttpEndpointResolver {
          * @return this builder
          */
         public Builder addEndpoint(Object classWithAnnotatedMethods) {
+            Objects.requireNonNull(classWithAnnotatedMethods);
             for (Class<?> clazz = classWithAnnotatedMethods.getClass(); clazz != null; clazz = clazz.getSuperclass()) {
                 for (Method method : clazz.getDeclaredMethods()) {
                     Endpoint endpoint = method.getAnnotation(Endpoint.class);
@@ -174,12 +157,13 @@ public class HttpEndpointResolver {
         }
 
         public Builder setDispatcher(EndpointDispatcher endpointDispatcher) {
+            Objects.requireNonNull(endpointDispatcher);
             this.endpointDispatcher = endpointDispatcher;
             return this;
         }
 
         public HttpEndpointResolver build() {
-            return new HttpEndpointResolver(defaultEndpoint, endpoints, endpointDispatcher, limit);
+            return new HttpEndpointResolver(endpoints, endpointDispatcher, limit);
         }
     }
 }

@@ -102,7 +102,7 @@ abstract class BaseTransport implements Transport {
             flow.close();
         }
         channels.clear();
-        requests.clear();
+        // do not clear requests
     }
 
     @Override

@@ -105,7 +105,7 @@ class SecureHttp2Test {
                     break;
                 }
             }
-            transport.get();
+            transport.get(60, TimeUnit.SECONDS);
         } finally {
             client.shutdownGracefully();
             server.shutdownGracefully();

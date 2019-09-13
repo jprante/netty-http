@@ -13,14 +13,15 @@ public class FileService extends ResourceService {
 
     private final Path prefix;
 
+    private final String indexFileName;
+
     public FileService(Path prefix) {
+        this(prefix, "index.html");
+    }
+
+    public FileService(Path prefix, String indexFileName) {
         this.prefix = prefix;
-        if (!Files.exists(prefix)) {
-            throw new IllegalArgumentException("prefix: " + prefix + " (does not exist)");
-        }
-        if (!Files.isDirectory(prefix)) {
-            throw new IllegalArgumentException("prefix: " + prefix + " (not a directory)");
-        }
+        this.indexFileName = indexFileName;
     }
 
     @Override
@@ -49,16 +50,26 @@ public class FileService extends ResourceService {
 
         private final URL url;
 
+        private final boolean isDirectory;
+
         private final Instant lastModified;
 
         private final long length;
 
         ChunkedFileResource(ServerRequest serverRequest) throws IOException {
-            this.resourcePath = serverRequest.getEffectiveRequestPath().substring(1);
+            String effectivePath = serverRequest.getEffectiveRequestPath();
+            this.resourcePath = effectivePath.startsWith("/") ? effectivePath.substring(1) : effectivePath;
             Path path = prefix.resolve(resourcePath);
             this.url = path.toUri().toURL();
-            this.lastModified = Files.getLastModifiedTime(path).toInstant();
-            this.length = Files.size(path);
+            boolean isExists = Files.exists(path);
+            this.isDirectory = Files.isDirectory(path);
+            if (isExists) {
+                this.lastModified = Files.getLastModifiedTime(path).toInstant();
+                this.length = Files.size(path);
+            } else {
+                this.lastModified = Instant.now();
+                this.length = 0;
+            }
         }
 
         @Override
@@ -69,6 +80,16 @@ public class FileService extends ResourceService {
         @Override
         public URL getURL() {
             return url;
+        }
+
+        @Override
+        public boolean isDirectory() {
+            return isDirectory;
+        }
+
+        @Override
+        public String indexFileName() {
+            return indexFileName;
         }
 
         @Override

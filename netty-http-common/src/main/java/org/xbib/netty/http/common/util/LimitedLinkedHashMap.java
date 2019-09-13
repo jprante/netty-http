@@ -3,11 +3,11 @@ package org.xbib.netty.http.common.util;
 import java.util.LinkedHashMap;
 
 @SuppressWarnings("serial")
-public class LimitedMap<K, V> extends LinkedHashMap<K, V> {
+public class LimitedLinkedHashMap<K, V> extends LinkedHashMap<K, V> {
 
     private final int limit;
 
-    public LimitedMap(int limit) {
+    public LimitedLinkedHashMap(int limit) {
         super(16, 0.75f, true);
         this.limit = limit;
     }

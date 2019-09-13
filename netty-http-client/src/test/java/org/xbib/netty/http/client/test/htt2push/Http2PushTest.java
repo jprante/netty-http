@@ -1,6 +1,7 @@
 package org.xbib.netty.http.client.test.htt2push;
 
 import io.netty.handler.codec.http.HttpMethod;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;
@@ -11,6 +12,7 @@ import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+@Disabled // /http2-push.io "connection refused"
 @ExtendWith(NettyHttpTestExtension.class)
 class Http2PushTest {
 

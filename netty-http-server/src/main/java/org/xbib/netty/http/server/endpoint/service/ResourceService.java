@@ -24,6 +24,7 @@ import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -50,6 +51,23 @@ public abstract class ResourceService implements Service {
     protected abstract boolean isRangeResponseEnabled();
 
     private void handleResource(ServerRequest serverRequest, ServerResponse serverResponse, Resource resource) {
+        if (resource.isDirectory()) {
+            if (!resource.getResourcePath().endsWith("/")) {
+                // external redirect to
+                serverResponse.withHeader(HttpHeaderNames.LOCATION, resource.getResourcePath() + "/");
+                ServerResponse.write(serverResponse, HttpResponseStatus.MOVED_PERMANENTLY);
+                return;
+            } else if (resource.indexFileName() != null) {
+                // external redirect to default index file in this directory
+                serverResponse.withHeader(HttpHeaderNames.LOCATION, resource.indexFileName());
+                ServerResponse.write(serverResponse, HttpResponseStatus.MOVED_PERMANENTLY);
+                return;
+            } else {
+                // send forbidden, we do not allow directory access
+                ServerResponse.write(serverResponse, HttpResponseStatus.FORBIDDEN);
+                return;
+            }
+        }
         HttpHeaders headers = serverRequest.getHeaders();
         String contentType = MimeTypeUtils.guessFromPath(resource.getResourcePath(), false);
         long maxAgeSeconds = 24 * 3600;
@@ -187,7 +205,9 @@ public abstract class ResourceService implements Service {
 
     private void send(URL url, String contentType,
                         ServerRequest serverRequest, ServerResponse serverResponse) {
-        if (serverRequest.getMethod() == HttpMethod.HEAD) {
+        if (url == null) {
+            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
+        } else if (serverRequest.getMethod() == HttpMethod.HEAD) {
             ServerResponse.write(serverResponse, HttpResponseStatus.OK, contentType);
         } else {
             if ("file".equals(url.getProtocol())) {
@@ -211,15 +231,19 @@ public abstract class ResourceService implements Service {
 
     private void send(URL url, HttpResponseStatus httpResponseStatus, String contentType,
                         ServerRequest serverRequest, ServerResponse serverResponse, long offset, long size) {
-        if (serverRequest.getMethod() == HttpMethod.HEAD) {
+        if (url == null) {
+            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
+        } else if (serverRequest.getMethod() == HttpMethod.HEAD) {
             ServerResponse.write(serverResponse, HttpResponseStatus.OK, contentType);
         } else {
             if ("file".equals(url.getProtocol())) {
+                Path path = null;
                 try {
-                    send((FileChannel) Files.newByteChannel(Paths.get(url.toURI())), httpResponseStatus,
+                    path = Paths.get(url.toURI());
+                    send((FileChannel) Files.newByteChannel(path), httpResponseStatus,
                             contentType, serverResponse, offset, size);
                 } catch (URISyntaxException | IOException e) {
-                    logger.log(Level.SEVERE, e.getMessage(), e);
+                    logger.log(Level.SEVERE, e.getMessage() + " path=" + path, e);
                     ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
                 }
             } else {
@@ -240,26 +264,46 @@ public abstract class ResourceService implements Service {
 
     private void send(FileChannel fileChannel, HttpResponseStatus httpResponseStatus, String contentType,
                       ServerResponse serverResponse, long offset, long size) throws IOException {
-        MappedByteBuffer mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, offset, size);
-        serverResponse.withStatus(httpResponseStatus)
-                .withContentType(contentType)
-                .write(Unpooled.wrappedBuffer(mappedByteBuffer));
+        if (fileChannel == null) {
+            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
+        } else {
+            MappedByteBuffer mappedByteBuffer = null;
+            try {
+                mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, offset, size);
+            } catch (IOException e) {
+                // resource is not a file that can be mapped
+                ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
+            }
+            if (mappedByteBuffer != null) {
+                serverResponse.withStatus(httpResponseStatus)
+                        .withContentType(contentType)
+                        .write(Unpooled.wrappedBuffer(mappedByteBuffer));
+            }
+        }
     }
 
     private void send(InputStream inputStream, HttpResponseStatus httpResponseStatus, String contentType,
                       ServerResponse serverResponse) throws IOException {
-        try (ReadableByteChannel channel = Channels.newChannel(inputStream)) {
-            serverResponse.withStatus(httpResponseStatus)
-                    .withContentType(contentType)
-                    .write(new ChunkedNioStream(channel));
+        if (inputStream == null) {
+            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
+        } else {
+            try (ReadableByteChannel channel = Channels.newChannel(inputStream)) {
+                serverResponse.withStatus(httpResponseStatus)
+                        .withContentType(contentType)
+                        .write(new ChunkedNioStream(channel));
+            }
         }
     }
 
     private void send(InputStream inputStream, HttpResponseStatus httpResponseStatus, String contentType,
                       ServerResponse serverResponse, long offset, long size) throws IOException {
-        serverResponse.withStatus(httpResponseStatus)
-                .withContentType(contentType)
-                .write(Unpooled.wrappedBuffer(readBuffer(inputStream, offset, size)));
+        if (inputStream == null) {
+            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
+        } else {
+            serverResponse.withStatus(httpResponseStatus)
+                    .withContentType(contentType)
+                    .write(Unpooled.wrappedBuffer(readBuffer(inputStream, offset, size)));
+        }
     }
 
     private static ByteBuffer readBuffer(URL url, long offset, long size) throws IOException, URISyntaxException {

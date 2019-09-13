@@ -12,4 +12,8 @@ public interface Resource {
     Instant getLastModified();
 
     long getLength();
+
+    boolean isDirectory();
+
+    String indexFileName();
 }

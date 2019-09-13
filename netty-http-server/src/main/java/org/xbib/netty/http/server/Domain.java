@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -99,10 +100,25 @@ public class Domain {
         return aliases;
     }
 
+    /**
+     * Handle server requests.
+     * @param serverRequest the server request
+     * @param serverResponse the server response
+     * @throws IOException if handling server request fails
+     */
     public void handle(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
-        if (httpEndpointResolvers != null && !httpEndpointResolvers.isEmpty()) {
+        if (httpEndpointResolvers != null) {
+            boolean found = false;
             for (HttpEndpointResolver httpEndpointResolver : httpEndpointResolvers) {
-                httpEndpointResolver.handle(serverRequest, serverResponse);
+                List<HttpEndpoint> matchingEndpoints = httpEndpointResolver.matchingEndpointsFor(serverRequest);
+                if (matchingEndpoints != null && !matchingEndpoints.isEmpty()) {
+                    httpEndpointResolver.handle(matchingEndpoints, serverRequest, serverResponse);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                ServerResponse.write(serverResponse, HttpResponseStatus.NOT_IMPLEMENTED);
             }
         } else {
             ServerResponse.write(serverResponse, HttpResponseStatus.NOT_IMPLEMENTED);
@@ -143,6 +159,8 @@ public class Domain {
         private String keyPassword;
 
         Builder(HttpAddress httpAddress, String serverName) {
+            Objects.requireNonNull(httpAddress);
+            Objects.requireNonNull(serverName);
             this.httpAddress = httpAddress;
             this.serverName = serverName;
             this.aliases = new LinkedHashSet<>();
@@ -154,31 +172,37 @@ public class Domain {
         }
 
         public Builder setTrustManagerFactory(TrustManagerFactory trustManagerFactory) {
+            Objects.requireNonNull(trustManagerFactory);
             this.trustManagerFactory = trustManagerFactory;
             return this;
         }
 
         public Builder setTrustManagerKeyStore(KeyStore trustManagerKeyStore) {
+            Objects.requireNonNull(trustManagerKeyStore);
             this.trustManagerKeyStore = trustManagerKeyStore;
             return this;
         }
 
         public Builder setSslContextProvider(Provider sslContextProvider) {
+            Objects.requireNonNull(sslContextProvider);
             this.sslContextProvider = sslContextProvider;
             return this;
         }
 
         public Builder setSslProvider(SslProvider sslProvider) {
+            Objects.requireNonNull(sslProvider);
             this.sslProvider = sslProvider;
             return this;
         }
 
         public Builder setCiphers(Iterable<String> ciphers) {
+            Objects.requireNonNull(ciphers);
             this.ciphers = ciphers;
             return this;
         }
 
         public Builder setCipherSuiteFilter(CipherSuiteFilter cipherSuiteFilter) {
+            Objects.requireNonNull(cipherSuiteFilter);
             this.cipherSuiteFilter = cipherSuiteFilter;
             return this;
         }
@@ -196,21 +220,26 @@ public class Domain {
         }
 
         public Builder setKeyCertChainInputStream(InputStream keyCertChainInputStream) {
+            Objects.requireNonNull(keyCertChainInputStream);
             this.keyCertChainInputStream = keyCertChainInputStream;
             return this;
         }
 
         public Builder setKeyInputStream(InputStream keyInputStream) {
+            Objects.requireNonNull(keyInputStream);
             this.keyInputStream = keyInputStream;
             return this;
         }
 
         public Builder setKeyPassword(String keyPassword) {
+            // null in keyPassword allowed, it means no password
             this.keyPassword = keyPassword;
             return this;
         }
 
         public Builder setKeyCert(InputStream keyCertChainInputStream, InputStream keyInputStream) {
+            Objects.requireNonNull(keyCertChainInputStream);
+            Objects.requireNonNull(keyInputStream);
             setKeyCertChainInputStream(keyCertChainInputStream);
             setKeyInputStream(keyInputStream);
             return this;
@@ -218,6 +247,9 @@ public class Domain {
 
         public Builder setKeyCert(InputStream keyCertChainInputStream, InputStream keyInputStream,
                                   String keyPassword) {
+            Objects.requireNonNull(keyCertChainInputStream);
+            Objects.requireNonNull(keyInputStream);
+            Objects.requireNonNull(keyPassword);
             setKeyCertChainInputStream(keyCertChainInputStream);
             setKeyInputStream(keyInputStream);
             setKeyPassword(keyPassword);
@@ -239,31 +271,56 @@ public class Domain {
          * @return this builder
          */
         public Builder addAlias(String alias) {
+            Objects.requireNonNull(alias);
             aliases.add(alias);
             return this;
         }
 
         public Builder addEndpointResolver(HttpEndpointResolver httpEndpointResolver) {
+            Objects.requireNonNull(httpEndpointResolver);
             this.httpEndpointResolvers.add(httpEndpointResolver);
             return this;
         }
 
         public Builder singleEndpoint(String path, Service service) {
+            Objects.requireNonNull(path);
+            Objects.requireNonNull(service);
             addEndpointResolver(HttpEndpointResolver.builder()
-                    .addEndpoint(HttpEndpoint.builder().setPath(path).addFilter(service).build()).build());
+                    .addEndpoint(HttpEndpoint.builder()
+                            .setPath(path)
+                            .build())
+                    .setDispatcher((endpoint, req, resp) -> service.handle(req, resp))
+                    .build());
             return this;
         }
 
         public Builder singleEndpoint(String prefix, String path, Service service) {
+            Objects.requireNonNull(prefix);
+            Objects.requireNonNull(path);
+            Objects.requireNonNull(service);
             addEndpointResolver(HttpEndpointResolver.builder()
-                    .addEndpoint(HttpEndpoint.builder().setPrefix(prefix).setPath(path).addFilter(service).build()).build());
+                    .addEndpoint(HttpEndpoint.builder()
+                            .setPrefix(prefix)
+                            .setPath(path)
+                            .build())
+                    .setDispatcher((endpoint, req, resp) -> service.handle(req, resp))
+                    .build());
             return this;
         }
 
-        public Builder singleEndpoint(String prefix, String path, Service service, String... methods) {
+        public Builder singleEndpoint(String prefix, String path, Service service,
+                                      String... methods) {
+            Objects.requireNonNull(prefix);
+            Objects.requireNonNull(path);
+            Objects.requireNonNull(service);
             addEndpointResolver(HttpEndpointResolver.builder()
-                    .addEndpoint(HttpEndpoint.builder().setPrefix(prefix).setPath(path).addFilter(service)
-                            .setMethods(Arrays.asList(methods)).build()).build());
+                    .addEndpoint(HttpEndpoint.builder()
+                            .setPrefix(prefix)
+                            .setPath(path)
+                            .setMethods(Arrays.asList(methods))
+                            .build())
+                    .setDispatcher((endpoint, req, resp) -> service.handle(req, resp))
+                    .build());
             return this;
         }
 

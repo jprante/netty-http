@@ -1,4 +1,4 @@
-package org.xbib.netty.http.server.test;
+package org.xbib.netty.http.server.test.endpoint;
 
 import io.netty.handler.codec.http.HttpVersion;
 import org.junit.jupiter.api.Disabled;
@@ -10,6 +10,7 @@ import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.Domain;
 import org.xbib.netty.http.server.endpoint.service.FileService;
+import org.xbib.netty.http.server.test.NettyHttpTestExtension;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -27,7 +28,6 @@ class SecureFileServiceTest {
 
     private static final Logger logger = Logger.getLogger(SecureFileServiceTest.class.getName());
 
-    @Disabled
     @Test
     void testSecureFileServerHttp1() throws Exception {
         Path vartmp = Paths.get("/var/tmp/");
@@ -39,12 +39,10 @@ class SecureFileServiceTest {
                 .build())
                 .setChildThreadCount(8)
                 .build();
-        //server.logDiagnostics(Level.INFO);
         Client client = Client.builder()
                 .setJdkSslProvider()
                 .trustInsecure()
                 .build();
-        //client.logDiagnostics(Level.INFO);
         final AtomicBoolean success = new AtomicBoolean(false);
         try {
             Files.write(vartmp.resolve("test.txt"), "Hello Jörg".getBytes(StandardCharsets.UTF_8));
@@ -57,14 +55,11 @@ class SecureFileServiceTest {
                         assertEquals("Hello Jörg", resp.getBodyAsString(StandardCharsets.UTF_8));
                         success.set(true);
                     });
-            logger.log(Level.INFO, request.toString());
             client.execute(request).get();
-            logger.log(Level.INFO, "request complete");
         } finally {
             server.shutdownGracefully();
             client.shutdownGracefully();
             Files.delete(vartmp.resolve("test.txt"));
-            logger.log(Level.INFO, "server and client shut down");
         }
         assertTrue(success.get());
     }
@@ -105,7 +100,6 @@ class SecureFileServiceTest {
             server.shutdownGracefully();
             client.shutdownGracefully();
             Files.delete(vartmp.resolve("test.txt"));
-            logger.log(Level.INFO, "server and client shut down");
         }
         assertTrue(success.get());
     }
@@ -134,20 +128,18 @@ class SecureFileServiceTest {
             server.accept();
             Request request = Request.get()
                     .setVersion(HttpVersion.HTTP_1_1)
-                    .url(server.getServerConfig().getAddress().base().resolve("/static/test.txt"))
+                    .url(server.getServerConfig().getAddress().base()
+                            .resolve("/static/test.txt"))
                     .build()
                     .setResponseListener(resp -> {
                         assertEquals("Hello Jörg", resp.getBodyAsString(StandardCharsets.UTF_8));
                         success.set(true);
                     });
-            logger.log(Level.INFO, request.toString());
             client.execute(request).get();
-            logger.log(Level.INFO, "request complete");
         } finally {
             server.shutdownGracefully();
             client.shutdownGracefully();
             Files.delete(vartmp.resolve("test.txt"));
-            logger.log(Level.INFO, "server and client shut down");
         }
         assertTrue(success.get());
     }

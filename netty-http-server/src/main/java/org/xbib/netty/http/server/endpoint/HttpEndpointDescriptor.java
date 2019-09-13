@@ -1,5 +1,6 @@
 package org.xbib.netty.http.server.endpoint;
 
+import org.xbib.netty.http.common.HttpMethod;
 import org.xbib.netty.http.server.transport.HttpServerRequest;
 
 import static io.netty.handler.codec.http.HttpHeaderNames.CONTENT_TYPE;
@@ -8,13 +9,13 @@ public class HttpEndpointDescriptor implements EndpointDescriptor, Comparable<Ht
 
     private final String path;
 
-    private final String method;
+    private final HttpMethod method;
 
     private final String contentType;
 
     public HttpEndpointDescriptor(HttpServerRequest serverRequest) {
         this.path = extractPath(serverRequest.getRequestURI());
-        this.method = serverRequest.getMethod().name();
+        this.method = Enum.valueOf(HttpMethod.class, serverRequest.getMethod().name());
         this.contentType = serverRequest.getHeaders().get(CONTENT_TYPE);
     }
 
@@ -22,7 +23,7 @@ public class HttpEndpointDescriptor implements EndpointDescriptor, Comparable<Ht
         return path;
     }
 
-    public String getMethod() {
+    public HttpMethod getMethod() {
         return method;
     }
 

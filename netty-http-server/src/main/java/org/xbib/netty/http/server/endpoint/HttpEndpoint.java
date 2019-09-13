@@ -4,33 +4,40 @@ import org.xbib.net.Pair;
 import org.xbib.net.QueryParameters;
 import org.xbib.net.path.PathMatcher;
 import org.xbib.net.path.PathNormalizer;
+import org.xbib.netty.http.common.HttpMethod;
 import org.xbib.netty.http.server.ServerRequest;
 import org.xbib.netty.http.server.ServerResponse;
 import org.xbib.netty.http.server.endpoint.service.Service;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 public class HttpEndpoint implements Endpoint<HttpEndpointDescriptor> {
 
-    private static final PathMatcher pathMatcher = new PathMatcher();
+    public static final EnumSet<HttpMethod> DEFAULT_METHODS =
+            EnumSet.of(HttpMethod.GET, HttpMethod.HEAD);
 
-    private static final List<String> DEFAULT_METHODS = Arrays.asList("GET", "HEAD");
+    private static final PathMatcher pathMatcher = new PathMatcher();
 
     private final String prefix;
 
     private final String path;
 
-    private final List<String> methods;
+    private final EnumSet<HttpMethod> methods;
 
     private final List<String> contentTypes;
 
     private final List<Service> filters;
 
-    private HttpEndpoint(String prefix, String path, List<String> methods, List<String> contentTypes, List<Service> filters) {
+    private HttpEndpoint(String prefix, String path,
+                         EnumSet<HttpMethod> methods,
+                         List<String> contentTypes,
+                         List<Service> filters) {
         this.prefix = PathNormalizer.normalize(prefix);
         this.path = PathNormalizer.normalize(path);
         this.methods = methods;
@@ -80,6 +87,7 @@ public class HttpEndpoint implements Endpoint<HttpEndpointDescriptor> {
         }
     }
 
+    @Override
     public void handle(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
         serverRequest.setContext(pathMatcher.tokenizePath(getPrefix()));
         for (Service service : filters) {
@@ -92,7 +100,7 @@ public class HttpEndpoint implements Endpoint<HttpEndpointDescriptor> {
 
     @Override
     public String toString() {
-        return "Endpoint[prefix=" + prefix + ",path=" + path + ",methods=" + methods + ",contentTypes=" + contentTypes + " --> " + filters +"]";
+        return "Endpoint[prefix=" + prefix + ",path=" + path + ",methods=" + methods + ",contentTypes=" + contentTypes + ",filters=" + filters +"]";
     }
 
     static class EndpointPathComparator implements Comparator<HttpEndpoint> {
@@ -115,7 +123,7 @@ public class HttpEndpoint implements Endpoint<HttpEndpointDescriptor> {
 
         private String path;
 
-        private List<String> methods;
+        private EnumSet<HttpMethod> methods;
 
         private List<String> contentTypes;
 
@@ -124,55 +132,62 @@ public class HttpEndpoint implements Endpoint<HttpEndpointDescriptor> {
         Builder() {
             this.prefix = "/";
             this.path = "/**";
-            this.methods = new ArrayList<>();
+            this.methods = DEFAULT_METHODS;
             this.contentTypes = new ArrayList<>();
             this.filters = new ArrayList<>();
         }
 
         public Builder setPrefix(String prefix) {
+            Objects.requireNonNull(prefix);
             this.prefix = prefix;
             return this;
         }
 
         public Builder setPath(String path) {
+            Objects.requireNonNull(path);
             this.path = path;
             return this;
         }
 
-        public Builder setMethods(List<String> methods) {
+        public Builder setMethods(EnumSet<HttpMethod> methods) {
+            Objects.requireNonNull(methods);
             this.methods = methods;
             return this;
         }
 
-        public Builder addMethod(String method) {
-            methods.add(method);
+        public Builder setMethods(List<String> methods) {
+            Objects.requireNonNull(methods);
+            this.methods = methods.stream()
+                    .map(HttpMethod::valueOf)
+                    .collect(Collectors.toCollection(() ->  EnumSet.noneOf(HttpMethod.class)));
             return this;
         }
 
         public Builder setContentTypes(List<String> contentTypes) {
+            Objects.requireNonNull(contentTypes);
             this.contentTypes = contentTypes;
             return this;
         }
 
         public Builder addContentType(String contentType) {
+            Objects.requireNonNull(contentType);
             this.contentTypes.add(contentType);
             return this;
         }
 
         public Builder setFilters(List<Service> filters) {
+            Objects.requireNonNull(filters);
             this.filters = filters;
             return this;
         }
 
         public Builder addFilter(Service filter) {
+            Objects.requireNonNull(filter);
             this.filters.add(filter);
             return this;
         }
 
         public HttpEndpoint build() {
-            if (methods.isEmpty()) {
-                methods = DEFAULT_METHODS;
-            }
             return new HttpEndpoint(prefix, path, methods, contentTypes, filters);
         }
     }

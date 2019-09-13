@@ -38,8 +38,6 @@ public class HttpServerResponse implements ServerResponse {
 
     private static final Logger logger = Logger.getLogger(HttpServerResponse.class.getName());
 
-    private static final ByteBuf EMPTY = Unpooled.buffer(0);
-
     private final Server server;
 
     private final ServerRequest serverRequest;
@@ -113,7 +111,7 @@ public class HttpServerResponse implements ServerResponse {
 
     @Override
     public void flush() {
-        write((ByteBuf) null);
+        write(Unpooled.buffer(0));
     }
 
     @Override
@@ -130,6 +128,7 @@ public class HttpServerResponse implements ServerResponse {
 
     @Override
     public void write(ByteBuf byteBuf) {
+        Objects.requireNonNull(byteBuf);
         if (httpResponseStatus == null) {
             httpResponseStatus = HttpResponseStatus.OK;
         }
@@ -139,9 +138,7 @@ public class HttpServerResponse implements ServerResponse {
         }
         if (httpResponseStatus.code() >= 200 && httpResponseStatus.code() != 204) {
             if (!headers.contains(HttpHeaderNames.CONTENT_LENGTH) && !headers.contains(HttpHeaderNames.TRANSFER_ENCODING)) {
-                if (byteBuf != null) {
-                    headers.add(HttpHeaderNames.CONTENT_LENGTH, Long.toString(byteBuf.readableBytes()));
-                }
+                headers.add(HttpHeaderNames.CONTENT_LENGTH, Long.toString(byteBuf.readableBytes()));
             }
         }
         if (serverRequest != null && "close".equalsIgnoreCase(serverRequest.getHeaders().get(HttpHeaderNames.CONNECTION)) &&
@@ -154,11 +151,7 @@ public class HttpServerResponse implements ServerResponse {
         headers.add(HttpHeaderNames.SERVER, ServerName.getServerName());
         if (ctx.channel().isWritable()) {
             FullHttpResponse fullHttpResponse;
-            if (byteBuf != null) {
-                fullHttpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, httpResponseStatus, byteBuf, headers, trailingHeaders);
-            } else {
-                fullHttpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, httpResponseStatus, EMPTY, headers, trailingHeaders);
-            }
+            fullHttpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, httpResponseStatus, byteBuf, headers, trailingHeaders);
             if (serverRequest != null && serverRequest.getSequenceId() != null) {
                 HttpPipelinedResponse httpPipelinedResponse = new HttpPipelinedResponse(fullHttpResponse,
                         ctx.channel().newPromise(), serverRequest.getSequenceId());

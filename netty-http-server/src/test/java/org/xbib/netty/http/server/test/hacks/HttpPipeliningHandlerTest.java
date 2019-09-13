@@ -19,7 +19,6 @@ import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,8 +48,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** flaky */
-@Disabled
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @ExtendWith(NettyHttpTestExtension.class)
 class HttpPipeliningHandlerTest {
@@ -72,7 +69,7 @@ class HttpPipeliningHandlerTest {
         EmbeddedChannel embeddedChannel = new EmbeddedChannel(new HttpPipeliningHandler(10000),
                 handler);
         for (int i = 0; i < 5; i++) {
-            embeddedChannel.writeInbound(createHttpRequest("/" + String.valueOf(i)));
+            embeddedChannel.writeInbound(createHttpRequest("/" + i));
         }
         for (String url : waitingRequests.keySet()) {
             finishRequest(url);
@@ -90,7 +87,7 @@ class HttpPipeliningHandlerTest {
         EmbeddedChannel embeddedChannel = new EmbeddedChannel(new HttpPipeliningHandler(10000),
                 handler);
         for (int i = 0; i < 5; i++) {
-            embeddedChannel.writeInbound(createHttpRequest("/" + String.valueOf(i)));
+            embeddedChannel.writeInbound(createHttpRequest("/" + i));
         }
         List<String> urls = new ArrayList<>(waitingRequests.keySet());
         Collections.shuffle(urls);

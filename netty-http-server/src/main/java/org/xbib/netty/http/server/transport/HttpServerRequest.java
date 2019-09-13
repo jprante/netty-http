@@ -61,7 +61,6 @@ public class HttpServerRequest implements ServerRequest {
 
     HttpServerRequest(Server server, FullHttpRequest fullHttpRequest,
                       ChannelHandlerContext ctx) {
-        // server not required yet
         this.httpRequest = fullHttpRequest.retainedDuplicate();
         this.ctx = ctx;
         this.httpEndpointDescriptor = new HttpEndpointDescriptor(this);
@@ -70,7 +69,9 @@ public class HttpServerRequest implements ServerRequest {
     void handleParameters() throws IOException {
         try {
             HttpParameters httpParameters = new HttpParameters();
-            this.url = URL.builder().path(httpRequest.uri()).build();
+            this.url = URL.builder()
+                    .path(httpRequest.uri()) // creates path, query params, fragment
+                    .build();
             QueryParameters queryParameters = url.getQueryParams();
             ByteBuf byteBuf = httpRequest.content();
             if (APPLICATION_FORM_URL_ENCODED.equals(HttpUtil.getMimeType(httpRequest)) && byteBuf != null) {
