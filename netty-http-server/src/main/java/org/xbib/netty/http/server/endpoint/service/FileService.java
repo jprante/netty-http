@@ -1,7 +1,8 @@
 package org.xbib.netty.http.server.endpoint.service;
 
-import org.xbib.netty.http.server.ServerRequest;
-import org.xbib.netty.http.server.ServerResponse;
+import org.xbib.netty.http.server.api.Resource;
+import org.xbib.netty.http.server.api.ServerRequest;
+import org.xbib.netty.http.server.api.ServerResponse;
 
 import java.io.IOException;
 import java.net.URL;
@@ -42,6 +43,11 @@ public class FileService extends ResourceService {
     @Override
     protected boolean isRangeResponseEnabled() {
         return true;
+    }
+
+    @Override
+    protected int getMaxAgeSeconds() {
+        return 24 * 3600;
     }
 
     class ChunkedFileResource implements Resource {
@@ -100,6 +106,15 @@ public class FileService extends ResourceService {
         @Override
         public long getLength() {
             return length;
+        }
+
+        @Override
+        public String toString() {
+            return "[FileResource:resourcePath=" + resourcePath +
+                    ",url=" + url +
+                    ",lastmodified=" + lastModified +
+                    ",length=" + length +
+                    ",isDirectory=" + isDirectory() + "]";
         }
     }
 }

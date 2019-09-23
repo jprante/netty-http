@@ -3,7 +3,6 @@ package org.xbib.netty.http.client;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.WriteBufferWaterMark;
@@ -25,12 +24,11 @@ import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
-import org.xbib.netty.http.client.handler.http.HttpChannelInitializer;
-import org.xbib.netty.http.client.handler.http2.Http2ChannelInitializer;
+import org.xbib.netty.http.client.api.HttpChannelInitializer;
+import org.xbib.netty.http.client.api.ProtocolProvider;
+import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.client.pool.BoundedChannelPool;
-import org.xbib.netty.http.client.transport.Http2Transport;
-import org.xbib.netty.http.client.transport.HttpTransport;
-import org.xbib.netty.http.client.transport.Transport;
+import org.xbib.netty.http.client.api.Transport;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.common.NetworkUtils;
@@ -44,6 +42,7 @@ import javax.net.ssl.SSLParameters;
 import javax.net.ssl.TrustManagerFactory;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.InvocationTargetException;
 import java.net.InetSocketAddress;
 import java.security.KeyStoreException;
 import java.security.Provider;
@@ -52,6 +51,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Queue;
+import java.util.ServiceLoader;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
@@ -96,6 +96,8 @@ public final class Client implements AutoCloseable {
 
     private final Queue<Transport> transports;
 
+    private final List<ProtocolProvider<HttpChannelInitializer, Transport>> protocolProviders;
+
     private BoundedChannelPool<HttpAddress> pool;
 
     public Client() {
@@ -106,10 +108,16 @@ public final class Client implements AutoCloseable {
         this(clientConfig, null, null, null);
     }
 
+    @SuppressWarnings("unchecked")
     public Client(ClientConfig clientConfig, ByteBufAllocator byteBufAllocator,
                   EventLoopGroup eventLoopGroup, Class<? extends SocketChannel> socketChannelClass) {
         Objects.requireNonNull(clientConfig);
         this.clientConfig = clientConfig;
+        this.protocolProviders = new ArrayList<>();
+        for (ProtocolProvider<HttpChannelInitializer, Transport> provider : ServiceLoader.load(ProtocolProvider.class)) {
+            protocolProviders.add(provider);
+            logger.log(Level.INFO, "protocol provider up: " + provider.transportClass() );
+        }
         initializeTrustManagerFactory(clientConfig);
         this.byteBufAllocator = byteBufAllocator != null ?
                 byteBufAllocator : ByteBufAllocator.DEFAULT;
@@ -162,6 +170,10 @@ public final class Client implements AutoCloseable {
         return new Builder();
     }
 
+    public List<ProtocolProvider<HttpChannelInitializer, Transport>> getProtocolProviders() {
+        return protocolProviders;
+    }
+
     public ClientConfig getClientConfig() {
         return clientConfig;
     }
@@ -200,18 +212,36 @@ public final class Client implements AutoCloseable {
     }
 
     public Transport newTransport(HttpAddress httpAddress) {
-        Transport transport;
+        Transport transport = null;
         if (httpAddress != null) {
-            if (httpAddress.getVersion().majorVersion() == 1) {
-                transport = new HttpTransport(this, httpAddress);
-            } else {
-                transport = new Http2Transport(this, httpAddress);
+            for (ProtocolProvider<HttpChannelInitializer, Transport> protocolProvider : protocolProviders) {
+                if (protocolProvider.supportsMajorVersion(httpAddress.getVersion().majorVersion())) {
+                    try {
+                        transport = protocolProvider.transportClass()
+                                .getConstructor(Client.class, HttpAddress.class).newInstance(this, httpAddress);
+                        break;
+                    } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+                        throw new IllegalStateException();
+                    }
+                }
+            }
+            if (transport == null) {
+                throw new UnsupportedOperationException("no protocol support for " + httpAddress);
             }
         } else if (hasPooledConnections()) {
-            if (pool.getVersion().majorVersion() == 1) {
-                transport = new HttpTransport(this, null);
-            } else {
-                transport = new Http2Transport(this, null);
+            for (ProtocolProvider<HttpChannelInitializer, Transport> protocolProvider : protocolProviders) {
+                if (protocolProvider.supportsMajorVersion(pool.getVersion().majorVersion())) {
+                    try {
+                        transport = protocolProvider.transportClass()
+                                .getConstructor(Client.class, HttpAddress.class).newInstance(this, null);
+                        break;
+                    } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+                        throw new IllegalStateException();
+                    }
+                }
+            }
+            if (transport == null) {
+                throw new UnsupportedOperationException("no pool protocol support for " + pool.getVersion().majorVersion());
             }
         } else {
             throw new IllegalStateException("no address given to connect to");
@@ -226,13 +256,10 @@ public final class Client implements AutoCloseable {
             HttpVersion httpVersion = httpAddress.getVersion();
             SslContext sslContext = newSslContext(clientConfig, httpAddress.getVersion());
             SslHandlerFactory sslHandlerFactory = new SslHandlerFactory(sslContext, clientConfig, httpAddress, byteBufAllocator);
-            ChannelInitializer<Channel> initializer;
-            if (httpVersion.majorVersion() == 1) {
-                initializer = new HttpChannelInitializer(clientConfig, httpAddress, sslHandlerFactory,
-                        new Http2ChannelInitializer(clientConfig, httpAddress, sslHandlerFactory));
-            } else {
-                initializer = new Http2ChannelInitializer(clientConfig, httpAddress, sslHandlerFactory);
-            }
+            HttpChannelInitializer initializerTwo =
+                    findChannelInitializer(2, httpAddress, sslHandlerFactory, null);
+            HttpChannelInitializer initializer =
+                    findChannelInitializer(httpVersion.majorVersion(), httpAddress, sslHandlerFactory, initializerTwo);
             try {
                 channel = bootstrap.handler(initializer)
                         .connect(httpAddress.getInetSocketAddress()).sync().await().channel();
@@ -273,6 +300,15 @@ public final class Client implements AutoCloseable {
                 .execute(request);
     }
 
+    /**
+     * Execute a request and return a {@link CompletableFuture}.
+     *
+     * @param request the request
+     * @param supplier the function for the response
+     * @param <T> the result of the function for the response
+     * @return the completable future
+     * @throws IOException if the request fails to be executed.
+     */
     public <T> CompletableFuture<T> execute(Request request,
                                             Function<HttpResponse, T> supplier) throws IOException {
         return newTransport(HttpAddress.of(request.url(), request.httpVersion()))
@@ -294,7 +330,7 @@ public final class Client implements AutoCloseable {
     }
 
     /**
-     * Retry request by following a back-off strategy.
+     * Retry request.
      *
      * @param transport the transport to retry
      * @param request the request to retry
@@ -345,6 +381,24 @@ public final class Client implements AutoCloseable {
         }
     }
 
+    private HttpChannelInitializer findChannelInitializer(int majorVersion,
+                                                          HttpAddress httpAddress,
+                                                          SslHandlerFactory sslHandlerFactory,
+                                                          HttpChannelInitializer helper) {
+        for (ProtocolProvider<HttpChannelInitializer, Transport> protocolProvider : protocolProviders) {
+            if (protocolProvider.supportsMajorVersion(majorVersion)) {
+                try {
+                    return protocolProvider.initializerClass()
+                            .getConstructor(ClientConfig.class, HttpAddress.class, SslHandlerFactory.class, HttpChannelInitializer.class)
+                            .newInstance(clientConfig, httpAddress, sslHandlerFactory, helper);
+                } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+                    throw new IllegalStateException();
+                }
+            }
+        }
+        throw new IllegalStateException("no channel initializer found for major version " + majorVersion);
+    }
+
     /**
      * Initialize trust manager factory once per client lifecycle.
      * @param clientConfig the client config
@@ -360,40 +414,8 @@ public final class Client implements AutoCloseable {
         }
     }
 
-    private static SslHandler newSslHandler(SslContext sslContext,
-                                            ClientConfig clientConfig, ByteBufAllocator allocator, HttpAddress httpAddress) {
-        InetSocketAddress peer = httpAddress.getInetSocketAddress();
-        SslHandler sslHandler = sslContext.newHandler(allocator, peer.getHostName(), peer.getPort());
-        SSLEngine engine = sslHandler.engine();
-        List<String> serverNames = clientConfig.getServerNamesForIdentification();
-        if (serverNames.isEmpty()) {
-            serverNames = Collections.singletonList(peer.getHostName());
-        }
-        SSLParameters params = engine.getSSLParameters();
-        // use sslContext.newHandler(allocator, peerHost, peerPort) when using params.setEndpointIdentificationAlgorithm
-        params.setEndpointIdentificationAlgorithm("HTTPS");
-        List<SNIServerName> sniServerNames = new ArrayList<>();
-        for (String serverName : serverNames) {
-            sniServerNames.add(new SNIHostName(serverName));
-        }
-        params.setServerNames(sniServerNames);
-        engine.setSSLParameters(params);
-        switch (clientConfig.getClientAuthMode()) {
-            case NEED:
-                engine.setNeedClientAuth(true);
-                break;
-            case WANT:
-                engine.setWantClientAuth(true);
-                break;
-            default:
-                break;
-        }
-        engine.setEnabledProtocols(clientConfig.getProtocols());
-        return sslHandler;
-    }
-
     private static SslContext newSslContext(ClientConfig clientConfig, HttpVersion httpVersion) throws SSLException {
-        // Conscrypt?
+        // Conscrypt support?
         SslContextBuilder sslContextBuilder = SslContextBuilder.forClient()
                 .sslProvider(clientConfig.getSslProvider())
                 .ciphers(clientConfig.getCiphers(), clientConfig.getCipherSuiteFilter())
@@ -449,16 +471,11 @@ public final class Client implements AutoCloseable {
             SslContext sslContext = newSslContext(clientConfig, httpAddress.getVersion());
             SslHandlerFactory sslHandlerFactory = new SslHandlerFactory(sslContext,
                     clientConfig, httpAddress, byteBufAllocator);
-            Http2ChannelInitializer http2ChannelInitializer =
-                    new Http2ChannelInitializer(clientConfig, httpAddress, sslHandlerFactory);
-            if (httpVersion.majorVersion() == 1) {
-                HttpChannelInitializer initializer =
-                        new HttpChannelInitializer(clientConfig, httpAddress,
-                                sslHandlerFactory, http2ChannelInitializer);
-                initializer.initChannel(channel);
-            } else {
-                http2ChannelInitializer.initChannel(channel);
-            }
+            HttpChannelInitializer initializerTwo =
+                    findChannelInitializer(2, httpAddress, sslHandlerFactory, null);
+            HttpChannelInitializer initializer =
+                    findChannelInitializer(httpVersion.majorVersion(), httpAddress, sslHandlerFactory, initializerTwo);
+            initializer.initChannel(channel);
         }
     }
 
@@ -481,7 +498,34 @@ public final class Client implements AutoCloseable {
         }
 
         public SslHandler create() {
-            return newSslHandler(sslContext, clientConfig, allocator, httpAddress);
+            InetSocketAddress peer = httpAddress.getInetSocketAddress();
+            SslHandler sslHandler = sslContext.newHandler(allocator, peer.getHostName(), peer.getPort());
+            SSLEngine engine = sslHandler.engine();
+            List<String> serverNames = clientConfig.getServerNamesForIdentification();
+            if (serverNames.isEmpty()) {
+                serverNames = Collections.singletonList(peer.getHostName());
+            }
+            SSLParameters params = engine.getSSLParameters();
+            // use sslContext.newHandler(allocator, peerHost, peerPort) when using params.setEndpointIdentificationAlgorithm
+            params.setEndpointIdentificationAlgorithm("HTTPS");
+            List<SNIServerName> sniServerNames = new ArrayList<>();
+            for (String serverName : serverNames) {
+                sniServerNames.add(new SNIHostName(serverName));
+            }
+            params.setServerNames(sniServerNames);
+            engine.setSSLParameters(params);
+            switch (clientConfig.getClientAuthMode()) {
+                case NEED:
+                    engine.setNeedClientAuth(true);
+                    break;
+                case WANT:
+                    engine.setWantClientAuth(true);
+                    break;
+                default:
+                    break;
+            }
+            engine.setEnabledProtocols(clientConfig.getProtocols());
+            return sslHandler;
         }
     }
 

@@ -168,7 +168,7 @@ class HttpPipeliningHandlerTest {
 
     private class WorkEmulatorHandler extends SimpleChannelInboundHandler<HttpPipelinedRequest> {
 
-        private final ExecutorService executorService = Executors.newFixedThreadPool(8);
+        private final ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, HttpPipelinedRequest pipelinedRequest) {

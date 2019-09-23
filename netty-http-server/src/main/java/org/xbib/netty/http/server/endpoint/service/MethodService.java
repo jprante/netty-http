@@ -1,18 +1,18 @@
 package org.xbib.netty.http.server.endpoint.service;
 
-import org.xbib.netty.http.server.ServerRequest;
-import org.xbib.netty.http.server.ServerResponse;
+import org.xbib.netty.http.server.api.Filter;
+import org.xbib.netty.http.server.api.ServerRequest;
+import org.xbib.netty.http.server.api.ServerResponse;
 
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 /**
  * The {@code MethodHandler} invokes g a handler method on a specified object.
  * The method must have the same signature and contract as
- * {@link Service#handle}, but can have an arbitrary name.
+ * {@link Filter#handle}, but can have an arbitrary name.
  */
-public class MethodService implements Service {
+public class MethodService implements Filter {
 
     private final Method m;
 

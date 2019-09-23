@@ -5,7 +5,7 @@ import io.netty.handler.codec.http.HttpVersion;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;
-import org.xbib.netty.http.client.Request;
+import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.Domain;
@@ -42,7 +42,6 @@ class ClassloaderServiceTest {
             Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base()
                             .resolve("/classloader/test.txt"))
-                    .build()
                     .setResponseListener(resp -> {
                         if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
                             assertEquals("Hello Jörg", resp.getBodyAsString(StandardCharsets.UTF_8));
@@ -50,7 +49,8 @@ class ClassloaderServiceTest {
                         } else {
                             logger.log(Level.WARNING, resp.getStatus().getMessage());
                         }
-                    });
+                    })
+                    .build();
             for (int i = 0; i < max; i++) {
                 client.execute(request).get();
             }
@@ -72,6 +72,7 @@ class ClassloaderServiceTest {
         Server server = Server.builder(domain)
                 .build();
         Client client = Client.builder()
+                .enableDebug()
                 .build();
         int max = 1;
         final AtomicInteger count = new AtomicInteger(0);
@@ -80,14 +81,14 @@ class ClassloaderServiceTest {
             Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base()
                             .resolve("/classloader"))
-                    .build()
                     .setResponseListener(resp -> {
-                        if (resp.getStatus().getCode() == HttpResponseStatus.NOT_FOUND.code()) {
+                        if (resp.getStatus().getCode() == HttpResponseStatus.FORBIDDEN.code()) {
                             count.incrementAndGet();
                         } else {
                             logger.log(Level.WARNING, resp.getStatus().getMessage());
                         }
-                    });
+                    })
+                    .build();
             for (int i = 0; i < max; i++) {
                 client.execute(request).get();
             }

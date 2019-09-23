@@ -8,9 +8,10 @@ import org.xbib.net.PercentDecoder;
 import org.xbib.net.URL;
 import org.xbib.net.URLSyntaxException;
 import org.xbib.netty.http.client.Client;
+import org.xbib.netty.http.client.api.Transport;
 import org.xbib.netty.http.common.HttpAddress;
-import org.xbib.netty.http.client.Request;
-import org.xbib.netty.http.client.retry.BackOff;
+import org.xbib.netty.http.client.api.Request;
+import org.xbib.netty.http.client.api.BackOff;
 import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.common.cookie.Cookie;
 import org.xbib.netty.http.common.cookie.CookieBox;
@@ -35,7 +36,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
-abstract class BaseTransport implements Transport {
+public abstract class BaseTransport implements Transport {
 
     private static final Logger logger = Logger.getLogger(BaseTransport.class.getName());
 
@@ -51,7 +52,7 @@ abstract class BaseTransport implements Transport {
 
     private SSLSession sslSession;
 
-    final Map<String, Flow> channelFlowMap;
+    final Map<String, Flow> flowMap;
 
     final SortedMap<String, Request> requests;
 
@@ -61,7 +62,7 @@ abstract class BaseTransport implements Transport {
         this.client = client;
         this.httpAddress = httpAddress;
         this.channels = new ConcurrentHashMap<>();
-        this.channelFlowMap = new ConcurrentHashMap<>();
+        this.flowMap = new ConcurrentHashMap<>();
         this.requests = new ConcurrentSkipListMap<>();
     }
 
@@ -71,7 +72,8 @@ abstract class BaseTransport implements Transport {
     }
 
     /**
-     * Experimental method for executing in a wrapping completable future.
+     * Method for executing in a wrapping completable future.
+     *
      * @param request request
      * @param supplier supplier
      * @param <T> supplier result
@@ -98,7 +100,7 @@ abstract class BaseTransport implements Transport {
         if (!channels.isEmpty()) {
             get();
         }
-        for (Flow flow : channelFlowMap.values()) {
+        for (Flow flow : flowMap.values()) {
             flow.close();
         }
         channels.clear();
@@ -128,7 +130,7 @@ abstract class BaseTransport implements Transport {
         }
         logger.log(Level.SEVERE, "failing: " + throwable.getMessage(), throwable);
         this.throwable = throwable;
-        for (Flow flow : channelFlowMap.values()) {
+        for (Flow flow : flowMap.values()) {
             flow.fail(throwable);
         }
     }
@@ -143,14 +145,15 @@ abstract class BaseTransport implements Transport {
         if (channels.isEmpty()) {
             return this;
         }
-        for (Map.Entry<String, Flow> entry : channelFlowMap.entrySet()) {
+        for (Map.Entry<String, Flow> entry : flowMap.entrySet()) {
             Flow flow = entry.getValue();
             if (!flow.isClosed()) {
                 for (Integer key : flow.keys()) {
+                    String requestKey = getRequestKey(entry.getKey(), key);
                     try {
                         flow.get(key).get(value, timeUnit);
+                        completeRequest(requestKey);
                     } catch (Exception e) {
-                        String requestKey = getRequestKey(entry.getKey(), key);
                         if (requestKey != null) {
                             Request request = requests.get(requestKey);
                             if (request != null && request.getCompletableFuture() != null) {
@@ -180,7 +183,7 @@ abstract class BaseTransport implements Transport {
         if (channels.isEmpty()) {
             return;
         }
-        for (Map.Entry<String, Flow> entry : channelFlowMap.entrySet()) {
+        for (Map.Entry<String, Flow> entry : flowMap.entrySet()) {
             Flow flow = entry.getValue();
             for (Integer key : flow.keys()) {
                 try {
@@ -205,7 +208,7 @@ abstract class BaseTransport implements Transport {
                 logger.log(Level.WARNING, e.getMessage(), e);
             }
         });
-        channelFlowMap.clear();
+        flowMap.clear();
         channels.clear();
         requests.clear();
     }
@@ -280,18 +283,13 @@ abstract class BaseTransport implements Transport {
                             logger.log(Level.FINE, "found redirect location: " + location);
                             URL redirUrl = URL.base(request.url()).resolve(location);
                             HttpMethod method = httpResponse.getStatus().getCode() == 303 ? HttpMethod.GET : request.httpMethod();
-                            Request.Builder newHttpRequestBuilder = Request.builder(method)
-                                    .url(redirUrl)
-                                    .setVersion(request.httpVersion())
-                                    .setHeaders(request.headers())
-                                    .content(request.content());
+                            Request.Builder newHttpRequestBuilder = Request.builder(method, request)
+                                    .url(redirUrl);
                             request.url().getQueryParams().forEach(pair ->
                                 newHttpRequestBuilder.addParameter(pair.getFirst(), pair.getSecond())
                             );
                             request.cookies().forEach(newHttpRequestBuilder::addCookie);
                             Request newHttpRequest = newHttpRequestBuilder.build();
-                            newHttpRequest.setResponseListener(request.getResponseListener());
-                            newHttpRequest.setCookieListener(request.getCookieListener());
                             StringBuilder hostAndPort = new StringBuilder();
                             hostAndPort.append(redirUrl.getHost());
                             if (redirUrl.getPort() != null) {
@@ -324,7 +322,8 @@ abstract class BaseTransport implements Transport {
             return null;
         }
         if (request.isBackOff()) {
-            BackOff backOff = request.getBackOff() != null ? request.getBackOff() :
+            BackOff backOff = request.getBackOff() != null ?
+                    request.getBackOff() :
                     client.getClientConfig().getBackOff();
             int status = httpResponse.getStatus ().getCode();
             switch (status) {
@@ -354,6 +353,24 @@ abstract class BaseTransport implements Transport {
             }
         }
         return null;
+    }
+
+    private void completeRequest(String requestKey) {
+        if (requestKey != null) {
+            Request request = requests.get(requestKey);
+            if (request != null && request.getCompletableFuture() != null) {
+                request.getCompletableFuture().complete(request);
+            }
+        }
+    }
+
+    private void completeRequestExceptionally(String requestKey, Throwable throwable) {
+        if (requestKey != null) {
+            Request request = requests.get(requestKey);
+            if (request != null && request.getCompletableFuture() != null) {
+                request.getCompletableFuture().completeExceptionally(throwable);
+            }
+        }
     }
 
     @Override

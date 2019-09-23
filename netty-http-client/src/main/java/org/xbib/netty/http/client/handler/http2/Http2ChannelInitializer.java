@@ -5,9 +5,6 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
-import io.netty.handler.codec.DelimiterBasedFrameDecoder;
-import io.netty.handler.codec.Delimiters;
-import io.netty.handler.codec.http.HttpContentDecompressor;
 import io.netty.handler.codec.http2.DefaultHttp2SettingsFrame;
 import io.netty.handler.codec.http2.Http2ConnectionPrefaceAndSettingsFrameWrittenEvent;
 import io.netty.handler.codec.http2.Http2FrameLogger;
@@ -17,14 +14,15 @@ import io.netty.handler.codec.http2.Http2MultiplexCodecBuilder;
 import io.netty.handler.logging.LogLevel;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.ClientConfig;
+import org.xbib.netty.http.client.api.HttpChannelInitializer;
 import org.xbib.netty.http.client.handler.http.TrafficLoggingHandler;
-import org.xbib.netty.http.client.transport.Transport;
+import org.xbib.netty.http.client.api.Transport;
 import org.xbib.netty.http.common.HttpAddress;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
+public class Http2ChannelInitializer extends ChannelInitializer<Channel> implements HttpChannelInitializer {
 
     private static final Logger logger = Logger.getLogger(Http2ChannelInitializer.class.getName());
 
@@ -35,8 +33,9 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
     private final Client.SslHandlerFactory sslHandlerFactory;
 
     public Http2ChannelInitializer(ClientConfig clientConfig,
-                            HttpAddress httpAddress,
-                                   Client.SslHandlerFactory sslHandlerFactory) {
+                                   HttpAddress httpAddress,
+                                   Client.SslHandlerFactory sslHandlerFactory,
+                                   HttpChannelInitializer unusedInitializer) {
         this.clientConfig = clientConfig;
         this.httpAddress = httpAddress;
         this.sslHandlerFactory = sslHandlerFactory;

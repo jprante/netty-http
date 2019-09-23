@@ -4,7 +4,7 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.FullHttpResponse;
-import org.xbib.netty.http.client.transport.Transport;
+import org.xbib.netty.http.client.api.Transport;
 
 @ChannelHandler.Sharable
 public class HttpResponseHandler extends SimpleChannelInboundHandler<FullHttpResponse> {

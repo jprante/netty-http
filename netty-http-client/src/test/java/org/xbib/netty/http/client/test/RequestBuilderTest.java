@@ -3,7 +3,7 @@ package org.xbib.netty.http.client.test;
 import io.netty.handler.codec.http.HttpMethod;
 import org.junit.jupiter.api.Test;
 import org.xbib.net.URL;
-import org.xbib.netty.http.client.Request;
+import org.xbib.netty.http.client.api.Request;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;

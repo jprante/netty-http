@@ -20,16 +20,25 @@ import io.netty.util.DomainNameMapping;
 import io.netty.util.DomainNameMappingBuilder;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.NetworkUtils;
-import org.xbib.netty.http.server.handler.http.HttpChannelInitializer;
-import org.xbib.netty.http.server.handler.http2.Http2ChannelInitializer;
+import org.xbib.netty.http.server.api.HttpChannelInitializer;
+import org.xbib.netty.http.server.api.ProtocolProvider;
+import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.common.security.SecurityUtil;
-import org.xbib.netty.http.server.transport.HttpTransport;
-import org.xbib.netty.http.server.transport.Http2Transport;
-import org.xbib.netty.http.server.transport.Transport;
+import org.xbib.netty.http.server.transport.HttpServerRequest;
+import org.xbib.netty.http.server.api.Transport;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
+import java.util.ServiceLoader;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -68,31 +77,48 @@ public final class Server implements AutoCloseable {
 
     private final EventLoopGroup childEventLoopGroup;
 
+    /**
+     * A thread pool for executing blocking tasks.
+     */
+    private final BlockingThreadPoolExecutor executor;
+
     private final Class<? extends ServerSocketChannel> socketChannelClass;
 
     private final ServerBootstrap bootstrap;
 
     private ChannelFuture channelFuture;
 
+    private final List<ProtocolProvider<HttpChannelInitializer, Transport>> protocolProviders;
+
     /**
-     * Create a new HTTP server. Use {@link #builder(HttpAddress)} to build HTTP client instance.
+     * Create a new HTTP server.
+     * Use {@link #builder(HttpAddress)} to build HTTP instance.
+     *
      * @param serverConfig server configuration
      * @param byteBufAllocator byte buf allocator
      * @param parentEventLoopGroup parent event loop group
      * @param childEventLoopGroup child event loop group
      * @param socketChannelClass socket channel class
      */
+    @SuppressWarnings("unchecked")
     private Server(ServerConfig serverConfig,
-                  ByteBufAllocator byteBufAllocator,
-                  EventLoopGroup parentEventLoopGroup,
-                  EventLoopGroup childEventLoopGroup,
-                  Class<? extends ServerSocketChannel> socketChannelClass) {
+                   ByteBufAllocator byteBufAllocator,
+                   EventLoopGroup parentEventLoopGroup,
+                   EventLoopGroup childEventLoopGroup,
+                   Class<? extends ServerSocketChannel> socketChannelClass,
+                   BlockingThreadPoolExecutor executor) {
         Objects.requireNonNull(serverConfig);
         this.serverConfig = serverConfig;
         this.byteBufAllocator = byteBufAllocator != null ? byteBufAllocator : ByteBufAllocator.DEFAULT;
         this.parentEventLoopGroup = createParentEventLoopGroup(serverConfig, parentEventLoopGroup);
         this.childEventLoopGroup = createChildEventLoopGroup(serverConfig, childEventLoopGroup);
         this.socketChannelClass = createSocketChannelClass(serverConfig, socketChannelClass);
+        this.executor = executor;
+        this.protocolProviders =new ArrayList<>();
+        for (ProtocolProvider<HttpChannelInitializer, Transport> provider : ServiceLoader.load(ProtocolProvider.class)) {
+            protocolProviders.add(provider);
+            logger.log(Level.INFO, "protocol provider up: " + provider.transportClass() );
+        }
         this.bootstrap = new ServerBootstrap()
                 .group(this.parentEventLoopGroup, this.childEventLoopGroup)
                 .channel(this.socketChannelClass)
@@ -108,8 +134,8 @@ public final class Server implements AutoCloseable {
                 .childOption(ChannelOption.SO_RCVBUF, serverConfig.getTcpReceiveBufferSize())
                 .childOption(ChannelOption.CONNECT_TIMEOUT_MILLIS, serverConfig.getConnectTimeoutMillis())
                 .childOption(ChannelOption.WRITE_BUFFER_WATER_MARK, serverConfig.getWriteBufferWaterMark());
-        if (serverConfig.isDebug()) {
-            bootstrap.handler(new LoggingHandler("bootstrap-server", serverConfig.getDebugLogLevel()));
+        if (serverConfig.isTrafficDebug()) {
+            bootstrap.handler(new LoggingHandler("bootstrap-server", serverConfig.getTrafficDebugLogLevel()));
         }
         if (serverConfig.getDefaultDomain() == null) {
             throw new IllegalStateException("no default named server (with name '*') configured, unable to continue");
@@ -126,15 +152,8 @@ public final class Server implements AutoCloseable {
             }
             domainNameMapping = mappingBuilder.build();
         }
-        if (serverConfig.getAddress().getVersion().majorVersion() == 1) {
-            HttpChannelInitializer httpChannelInitializer = new HttpChannelInitializer(this,
-                    serverConfig.getAddress(), domainNameMapping);
-            bootstrap.childHandler(httpChannelInitializer);
-        } else {
-            Http2ChannelInitializer http2ChannelInitializer = new Http2ChannelInitializer(this,
-                    serverConfig.getAddress(), domainNameMapping);
-            bootstrap.childHandler(http2ChannelInitializer);
-        }
+        bootstrap.childHandler(findChannelInitializer(serverConfig.getAddress().getVersion().majorVersion(),
+                serverConfig.getAddress(), domainNameMapping));
     }
 
     public static Builder builder() {
@@ -154,21 +173,6 @@ public final class Server implements AutoCloseable {
     }
 
     /**
-     * Returns the named server with the given name.
-     *
-     * @param name the name of the virtual host to return or null for the
-     *             default domain
-     * @return the virtual host with the given name or the default domain
-     */
-    public Domain getNamedServer(String name) {
-        Domain domain = serverConfig.getDomain(name);
-        if (domain == null) {
-            domain = serverConfig.getDefaultDomain();
-        }
-        return domain;
-    }
-
-    /**
      * Start accepting incoming connections.
      * @return the channel future
      * @throws IOException if channel future sync is interrupted
@@ -183,6 +187,46 @@ public final class Server implements AutoCloseable {
         }
         logger.log(Level.INFO, () -> ServerName.getServerName() + " ready, listening on " + httpAddress);
         return channelFuture;
+    }
+
+    /**
+     * Returns the named server with the given name.
+     *
+     * @param name the name of the virtual host to return or null for the
+     *             default domain
+     * @return the virtual host with the given name or the default domain
+     */
+    public Domain getNamedServer(String name) {
+        Domain domain = serverConfig.getDomain(name);
+        if (domain == null) {
+            domain = serverConfig.getDefaultDomain();
+        }
+        return domain;
+    }
+
+    public void handle(Domain domain, HttpServerRequest serverRequest, ServerResponse serverResponse)
+            throws IOException {
+        if (executor != null) {
+            executor.submit(() -> {
+                try {
+                    domain.handle(serverRequest, serverResponse);
+                } catch (IOException e) {
+                    executor.afterExecute(null, e);
+                } finally {
+                    serverRequest.release();
+                }
+            });
+        } else {
+            try {
+                domain.handle(serverRequest, serverResponse);
+            } finally {
+                serverRequest.release();
+            }
+        }
+    }
+
+    public BlockingThreadPoolExecutor getExecutor() {
+        return executor;
     }
 
     public void logDiagnostics(Level level) {
@@ -209,7 +253,18 @@ public final class Server implements AutoCloseable {
     }
 
     public Transport newTransport(HttpVersion httpVersion) {
-        return httpVersion.majorVersion() == 1 ? new HttpTransport(this) : new Http2Transport(this);
+        for (ProtocolProvider<HttpChannelInitializer, Transport> protocolProvider : protocolProviders) {
+            if (protocolProvider.supportsMajorVersion(httpVersion.majorVersion())) {
+                try {
+                    return protocolProvider.transportClass()
+                            .getConstructor(Server.class)
+                            .newInstance(this);
+                } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+                    throw new IllegalStateException();
+                }
+            }
+        }
+        throw new IllegalStateException("no channel initializer found for major version " + httpVersion.majorVersion());
     }
 
     @Override
@@ -236,7 +291,7 @@ public final class Server implements AutoCloseable {
         }
         parentEventLoopGroup.shutdownGracefully(1L, amount, timeUnit);
         try {
-            childEventLoopGroup.awaitTermination(amount, timeUnit);
+            parentEventLoopGroup.awaitTermination(amount, timeUnit);
         } catch (InterruptedException e) {
             throw new IOException(e);
         }
@@ -248,6 +303,23 @@ public final class Server implements AutoCloseable {
         } catch (InterruptedException e) {
             throw new IOException(e);
         }
+    }
+
+    private HttpChannelInitializer findChannelInitializer(int majorVersion,
+                                                          HttpAddress httpAddress,
+                                                          DomainNameMapping<SslContext> domainNameMapping) {
+        for (ProtocolProvider<HttpChannelInitializer, Transport> protocolProvider : protocolProviders) {
+            if (protocolProvider.supportsMajorVersion(majorVersion)) {
+                try {
+                    return protocolProvider.initializerClass()
+                            .getConstructor(Server.class, HttpAddress.class, DomainNameMapping.class)
+                            .newInstance(this, httpAddress, domainNameMapping);
+                } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+                    throw new IllegalStateException();
+                }
+            }
+        }
+        throw new IllegalStateException("no channel initializer found for major version " + majorVersion);
     }
 
     private static EventLoopGroup createParentEventLoopGroup(ServerConfig serverConfig,
@@ -309,6 +381,58 @@ public final class Server implements AutoCloseable {
         }
     }
 
+    static class BlockingThreadFactory implements ThreadFactory {
+
+        private int number = 0;
+
+        @Override
+        public Thread newThread(Runnable runnable) {
+            Thread thread = new Thread(runnable, "org-xbib-netty-http-server-pool-" + (number++));
+            thread.setDaemon(true);
+            return thread;
+        }
+    };
+
+    public static class BlockingThreadPoolExecutor extends ThreadPoolExecutor {
+
+        private final Logger logger = Logger.getLogger(BlockingThreadPoolExecutor.class.getName());
+
+        BlockingThreadPoolExecutor(int nThreads, int maxQueue, ThreadFactory threadFactory) {
+            super(nThreads, nThreads,
+                    0L, TimeUnit.MILLISECONDS,
+                    new ArrayBlockingQueue<>(maxQueue), threadFactory);
+        }
+
+        /*
+         * Examine Throwable or Error of a thread after execution just to log them.
+         */
+        @Override
+        protected void afterExecute(Runnable runnable, Throwable terminationCause) {
+            super.afterExecute(runnable, terminationCause);
+            Throwable throwable = terminationCause;
+            if (throwable == null && runnable instanceof Future<?>) {
+                try {
+                    Future<?> future = (Future<?>) runnable;
+                    if (future.isDone()) {
+                        future.get();
+                    }
+                } catch (CancellationException ce) {
+                    logger.log(Level.FINEST, ce.getMessage(), ce);
+                    throwable = ce;
+                } catch (ExecutionException ee) {
+                    logger.log(Level.FINEST, ee.getMessage(), ee);
+                    throwable = ee.getCause();
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    logger.log(Level.FINEST, ie.getMessage(), ie);
+                }
+            }
+            if (throwable != null) {
+                logger.log(Level.SEVERE, throwable.getMessage(), throwable);
+            }
+        }
+    }
+
     /**
      * HTTP server builder.
      */
@@ -331,7 +455,7 @@ public final class Server implements AutoCloseable {
         private Builder(Domain defaultDomain) {
             this.serverConfig = new ServerConfig();
             this.serverConfig.setAddress(defaultDomain.getHttpAddress());
-            addServer(defaultDomain);
+            addDomain(defaultDomain);
         }
 
         public Builder enableDebug() {
@@ -369,6 +493,16 @@ public final class Server implements AutoCloseable {
             return this;
         }
 
+        public Builder setReadTimeoutMillis(int readTimeoutMillis) {
+            this.serverConfig.setReadTimeoutMillis(readTimeoutMillis);
+            return this;
+        }
+
+        public Builder setIdleTimeoutMillis(int idleTimeoutMillis) {
+            this.serverConfig.setIdleTimeoutMillis(idleTimeoutMillis);
+            return this;
+        }
+
         public Builder setParentThreadCount(int parentThreadCount) {
             this.serverConfig.setParentThreadCount(parentThreadCount);
             return this;
@@ -376,6 +510,16 @@ public final class Server implements AutoCloseable {
 
         public Builder setChildThreadCount(int childThreadCount) {
             this.serverConfig.setChildThreadCount(childThreadCount);
+            return this;
+        }
+
+        public Builder setBlockingThreadCount(int blockingThreadCount) {
+            this.serverConfig.setBlockingThreadCount(blockingThreadCount);
+            return this;
+        }
+
+        public Builder setBlockingQueueCount(int blockingQueueCount) {
+            this.serverConfig.setBlockingQueueCount(blockingQueueCount);
             return this;
         }
 
@@ -429,21 +573,6 @@ public final class Server implements AutoCloseable {
             return this;
         }
 
-        public Builder setReadTimeoutMillis(int readTimeoutMillis) {
-            this.serverConfig.setReadTimeoutMillis(readTimeoutMillis);
-            return this;
-        }
-
-        public Builder setConnectionTimeoutMillis(int connectionTimeoutMillis) {
-            this.serverConfig.setConnectTimeoutMillis(connectionTimeoutMillis);
-            return this;
-        }
-
-        public Builder setIdleTimeoutMillis(int idleTimeoutMillis) {
-            this.serverConfig.setIdleTimeoutMillis(idleTimeoutMillis);
-            return this;
-        }
-
         public Builder setWriteBufferWaterMark(WriteBufferWaterMark writeBufferWaterMark) {
             this.serverConfig.setWriteBufferWaterMark(writeBufferWaterMark);
             return this;
@@ -454,7 +583,7 @@ public final class Server implements AutoCloseable {
             return this;
         }
 
-        public Builder enableDeompression(boolean enableDecompression) {
+        public Builder enableDecompression(boolean enableDecompression) {
             this.serverConfig.setDecompression(enableDecompression);
             return this;
         }
@@ -469,14 +598,24 @@ public final class Server implements AutoCloseable {
             return this;
         }
 
-        public Builder addServer(Domain domain) {
+        public Builder addDomain(Domain domain) {
             this.serverConfig.putDomain(domain);
             logger.log(Level.FINE, "adding named server: " + domain);
             return this;
         }
 
         public Server build() {
-            return new Server(serverConfig, byteBufAllocator, parentEventLoopGroup, childEventLoopGroup, socketChannelClass);
+            int maxThreads = serverConfig.getBlockingThreadCount();
+            int maxQueue = serverConfig.getBlockingQueueCount();
+            BlockingThreadPoolExecutor executor = null;
+            if (maxThreads > 0 && maxQueue > 0) {
+                executor = new BlockingThreadPoolExecutor(maxThreads, maxQueue, new BlockingThreadFactory());
+                executor.setRejectedExecutionHandler((runnable, threadPoolExecutor) ->
+                        logger.log(Level.SEVERE, "rejected: " + runnable));
+            }
+            return new Server(serverConfig, byteBufAllocator,
+                    parentEventLoopGroup, childEventLoopGroup, socketChannelClass,
+                    executor);
         }
     }
 }

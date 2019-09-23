@@ -86,7 +86,7 @@ public final class ServerCookieEncoder extends CookieEncoder {
             Instant expires = Instant.ofEpochMilli(cookie.maxAge() * 1000 + System.currentTimeMillis());
             buf.append(CookieHeaderNames.EXPIRES);
             buf.append(CookieUtil.EQUALS);
-            buf.append(DateTimeUtil.formatMillis(expires.toEpochMilli()));
+            buf.append(DateTimeUtil.formatRfc1123(expires.toEpochMilli()));
             buf.append(CookieUtil.SEMICOLON);
             buf.append(CookieUtil.SP);
         }

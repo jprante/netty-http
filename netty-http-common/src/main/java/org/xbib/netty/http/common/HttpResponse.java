@@ -2,6 +2,7 @@ package org.xbib.netty.http.common;
 
 import io.netty.buffer.ByteBuf;
 
+import org.xbib.netty.http.common.cookie.CookieBox;
 import java.io.InputStream;
 import java.nio.charset.Charset;
 
@@ -12,6 +13,8 @@ public interface HttpResponse {
     HttpStatus getStatus();
 
     HttpHeaders getHeaders();
+
+    CookieBox getCookies();
 
     ByteBuf getBody();
 

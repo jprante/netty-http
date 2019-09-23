@@ -1,15 +1,17 @@
 package org.xbib.netty.http.server.endpoint;
 
 import org.xbib.netty.http.common.util.LimitedConcurrentHashMap;
-import org.xbib.netty.http.server.ServerRequest;
-import org.xbib.netty.http.server.ServerResponse;
-import org.xbib.netty.http.server.annotation.Endpoint;
+import org.xbib.netty.http.server.api.EndpointDispatcher;
+import org.xbib.netty.http.server.api.ServerRequest;
+import org.xbib.netty.http.server.api.ServerResponse;
+import org.xbib.netty.http.server.api.annotation.Endpoint;
 import org.xbib.netty.http.server.endpoint.service.MethodService;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -25,12 +27,12 @@ public class HttpEndpointResolver {
 
     private final List<HttpEndpoint> endpoints;
 
-    private final EndpointDispatcher endpointDispatcher;
+    private final EndpointDispatcher<HttpEndpoint> endpointDispatcher;
 
     private final Map<HttpEndpointDescriptor, List<HttpEndpoint>> endpointDescriptors;
 
     private HttpEndpointResolver(List<HttpEndpoint> endpoints,
-                                 EndpointDispatcher endpointDispatcher,
+                                 EndpointDispatcher<HttpEndpoint> endpointDispatcher,
                                  int limit) {
         Objects.requireNonNull(endpointDispatcher);
         this.endpoints = endpoints;
@@ -44,10 +46,10 @@ public class HttpEndpointResolver {
      * @return a
      */
     public List<HttpEndpoint> matchingEndpointsFor(ServerRequest serverRequest) {
-        HttpEndpointDescriptor httpEndpointDescriptor = serverRequest.getEndpointDescriptor();
+        HttpEndpointDescriptor httpEndpointDescriptor = new HttpEndpointDescriptor(serverRequest);
         endpointDescriptors.putIfAbsent(httpEndpointDescriptor, endpoints.stream()
                 .filter(endpoint -> endpoint.matches(httpEndpointDescriptor))
-                .sorted(new HttpEndpoint.EndpointPathComparator(httpEndpointDescriptor.getPath()))
+                .sorted(new HttpEndpoint.EndpointPathComparator(httpEndpointDescriptor.getSortKey()))
                 .collect(Collectors.toList()));
         return endpointDescriptors.get(httpEndpointDescriptor);
     }
@@ -57,15 +59,18 @@ public class HttpEndpointResolver {
         Objects.requireNonNull(matchingEndpoints);
         if (logger.isLoggable(Level.FINE)) {
             logger.log(Level.FINE, () ->
-                    "endpoint = " + serverRequest.getEndpointDescriptor() +
-                            " matching endpoints = " + matchingEndpoints.size() + " --> " + matchingEndpoints);
+                    "matching endpoints = " + matchingEndpoints.size() + " --> " + matchingEndpoints);
         }
         for (HttpEndpoint endpoint : matchingEndpoints) {
+            if (logger.isLoggable(Level.FINE)) {
+                logger.log(Level.FINE, () -> "executing endpoint = " + endpoint);
+            }
             endpoint.resolveUriTemplate(serverRequest);
-            endpoint.handle(serverRequest, serverResponse);
+            endpoint.before(serverRequest, serverResponse);
             endpointDispatcher.dispatch(endpoint, serverRequest, serverResponse);
+            endpoint.after(serverRequest, serverResponse);
             if (serverResponse.getStatus() != null) {
-                logger.log(Level.FINEST, () -> "endpoint " + endpoint + " status = " + serverResponse.getStatus());
+                logger.log(Level.FINEST, () -> "endpoint " + endpoint + " break, status = " + serverResponse.getStatus());
                 break;
             }
         }
@@ -87,7 +92,7 @@ public class HttpEndpointResolver {
 
         private List<HttpEndpoint> endpoints;
 
-        private EndpointDispatcher endpointDispatcher;
+        private EndpointDispatcher<HttpEndpoint> endpointDispatcher;
 
         Builder() {
             this.limit = DEFAULT_LIMIT;
@@ -148,7 +153,7 @@ public class HttpEndpointResolver {
                                 .setPath(endpoint.path())
                                 .setMethods(Arrays.asList(endpoint.methods()))
                                 .setContentTypes(Arrays.asList(endpoint.contentTypes()))
-                                .addFilter(methodService)
+                                .setBefore(Collections.singletonList(methodService))
                                 .build());
                     }
                 }
@@ -156,7 +161,7 @@ public class HttpEndpointResolver {
             return this;
         }
 
-        public Builder setDispatcher(EndpointDispatcher endpointDispatcher) {
+        public Builder setDispatcher(EndpointDispatcher<HttpEndpoint> endpointDispatcher) {
             Objects.requireNonNull(endpointDispatcher);
             this.endpointDispatcher = endpointDispatcher;
             return this;

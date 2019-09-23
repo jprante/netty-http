@@ -3,7 +3,7 @@ package org.xbib.netty.http.client.test.akamai;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;
-import org.xbib.netty.http.client.Request;
+import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.client.test.NettyHttpTestExtension;
 
 import java.io.IOException;
@@ -38,11 +38,11 @@ public class AkamaiTest {
                     .url("https://http2.akamai.com/demo/h2_demo_frame.html")
                     //.url("https://http2.akamai.com/")
                     .setVersion("HTTP/2.0")
-                    .build()
                     .setResponseListener(resp -> {
                         logger.log(Level.INFO, "status = " + resp.getStatus().getCode() +
                                 resp.getHeaders() + " " + resp.getBodyAsString(StandardCharsets.UTF_8));
-                    });
+                    })
+                    .build();
             client.execute(request).get();
         } finally {
             client.shutdownGracefully();

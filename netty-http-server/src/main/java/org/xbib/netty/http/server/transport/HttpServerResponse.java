@@ -21,8 +21,8 @@ import io.netty.handler.stream.ChunkedInput;
 import org.xbib.netty.http.common.cookie.Cookie;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.ServerName;
-import org.xbib.netty.http.server.ServerRequest;
-import org.xbib.netty.http.server.ServerResponse;
+import org.xbib.netty.http.server.api.ServerRequest;
+import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.cookie.ServerCookieEncoder;
 import org.xbib.netty.http.server.handler.http.HttpPipelinedResponse;
 

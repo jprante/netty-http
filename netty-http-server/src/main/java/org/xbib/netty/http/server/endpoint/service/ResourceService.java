@@ -7,8 +7,10 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.stream.ChunkedNioStream;
 import org.xbib.netty.http.common.util.DateTimeUtil;
-import org.xbib.netty.http.server.ServerRequest;
-import org.xbib.netty.http.server.ServerResponse;
+import org.xbib.netty.http.server.api.Filter;
+import org.xbib.netty.http.server.api.Resource;
+import org.xbib.netty.http.server.api.ServerRequest;
+import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.util.MimeTypeUtils;
 
 import java.io.IOException;
@@ -33,13 +35,13 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public abstract class ResourceService implements Service {
+public abstract class ResourceService implements Filter {
 
     private static final Logger logger = Logger.getLogger(ResourceService.class.getName());
 
     @Override
     public void handle(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
-        handleResource(serverRequest, serverResponse, createResource(serverRequest, serverResponse));
+        handleCachedResource(serverRequest, serverResponse, createResource(serverRequest, serverResponse));
     }
 
     protected abstract Resource createResource(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException;
@@ -50,9 +52,12 @@ public abstract class ResourceService implements Service {
 
     protected abstract boolean isRangeResponseEnabled();
 
-    private void handleResource(ServerRequest serverRequest, ServerResponse serverResponse, Resource resource) {
+    protected abstract int getMaxAgeSeconds();
+
+    private void handleCachedResource(ServerRequest serverRequest, ServerResponse serverResponse, Resource resource) {
+        logger.log(Level.FINE, "resource = " + resource);
         if (resource.isDirectory()) {
-            if (!resource.getResourcePath().endsWith("/")) {
+            if (!resource.getResourcePath().isEmpty() && !resource.getResourcePath().endsWith("/")) {
                 // external redirect to
                 serverResponse.withHeader(HttpHeaderNames.LOCATION, resource.getResourcePath() + "/");
                 ServerResponse.write(serverResponse, HttpResponseStatus.MOVED_PERMANENTLY);
@@ -68,18 +73,22 @@ public abstract class ResourceService implements Service {
                 return;
             }
         }
+        // if resource is length of 0, there is nothing to send. Do not send any content, just flush the status
+        if (resource.getLength() == 0) {
+            serverResponse.flush();
+            return;
+        }
         HttpHeaders headers = serverRequest.getHeaders();
         String contentType = MimeTypeUtils.guessFromPath(resource.getResourcePath(), false);
-        long maxAgeSeconds = 24 * 3600;
-        long expirationMillis = System.currentTimeMillis() + 1000 * maxAgeSeconds;
+        long expirationMillis = System.currentTimeMillis() + 1000 * getMaxAgeSeconds();
         if (isCacheResponseEnabled()) {
-            serverResponse.withHeader(HttpHeaderNames.EXPIRES, DateTimeUtil.formatMillis(expirationMillis))
-                    .withHeader(HttpHeaderNames.CACHE_CONTROL, "public, max-age=" + maxAgeSeconds);
+            serverResponse.withHeader(HttpHeaderNames.EXPIRES, DateTimeUtil.formatRfc1123(expirationMillis))
+                    .withHeader(HttpHeaderNames.CACHE_CONTROL, "public, max-age=" + getMaxAgeSeconds());
         }
         boolean sent = false;
         if (isETagResponseEnabled()) {
             Instant lastModifiedInstant = resource.getLastModified();
-            String eTag = resource.getResourcePath().hashCode() + "/" + lastModifiedInstant.toEpochMilli() + "/" + resource.getLength();
+            String eTag = Long.toHexString(resource.getResourcePath().hashCode() + lastModifiedInstant.toEpochMilli() + resource.getLength());
             Instant ifUnmodifiedSinceInstant = DateTimeUtil.parseDate(headers.get(HttpHeaderNames.IF_UNMODIFIED_SINCE));
             if (ifUnmodifiedSinceInstant != null &&
                     ifUnmodifiedSinceInstant.plusMillis(1000L).isAfter(lastModifiedInstant)) {
@@ -94,7 +103,7 @@ public abstract class ResourceService implements Service {
             String ifNoneMatch = headers.get(HttpHeaderNames.IF_NONE_MATCH);
             if (ifNoneMatch != null && matches(ifNoneMatch, eTag)) {
                 serverResponse.withHeader(HttpHeaderNames.ETAG, eTag)
-                        .withHeader(HttpHeaderNames.EXPIRES, DateTimeUtil.formatMillis(expirationMillis));
+                        .withHeader(HttpHeaderNames.EXPIRES, DateTimeUtil.formatRfc1123(expirationMillis));
                 ServerResponse.write(serverResponse, HttpResponseStatus.NOT_MODIFIED);
                 return;
             }
@@ -102,12 +111,12 @@ public abstract class ResourceService implements Service {
             if (ifModifiedSinceInstant != null &&
                     ifModifiedSinceInstant.plusMillis(1000L).isAfter(lastModifiedInstant)) {
                 serverResponse.withHeader(HttpHeaderNames.ETAG, eTag)
-                        .withHeader(HttpHeaderNames.EXPIRES, DateTimeUtil.formatMillis(expirationMillis));
+                        .withHeader(HttpHeaderNames.EXPIRES, DateTimeUtil.formatRfc1123(expirationMillis));
                 ServerResponse.write(serverResponse, HttpResponseStatus.NOT_MODIFIED);
                 return;
             }
             serverResponse.withHeader(HttpHeaderNames.ETAG, eTag)
-                    .withHeader(HttpHeaderNames.LAST_MODIFIED, DateTimeUtil.formatInstant(lastModifiedInstant));
+                    .withHeader(HttpHeaderNames.LAST_MODIFIED, DateTimeUtil.formatRfc1123(lastModifiedInstant));
             if (isRangeResponseEnabled()) {
                 performRangeResponse(serverRequest, serverResponse, resource, contentType, eTag, headers);
                 sent = true;
@@ -263,7 +272,7 @@ public abstract class ResourceService implements Service {
     }
 
     private void send(FileChannel fileChannel, HttpResponseStatus httpResponseStatus, String contentType,
-                      ServerResponse serverResponse, long offset, long size) throws IOException {
+                      ServerResponse serverResponse, long offset, long size) {
         if (fileChannel == null) {
             ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
         } else {

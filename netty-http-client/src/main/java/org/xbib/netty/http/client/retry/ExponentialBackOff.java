@@ -1,5 +1,7 @@
 package org.xbib.netty.http.client.retry;
 
+import org.xbib.netty.http.client.api.BackOff;
+
 /**
  * Implementation of {@link BackOff} that increases the back off period for each retry attempt using
  * a randomization function that grows exponentially.

@@ -1,7 +1,7 @@
 package org.xbib.netty.http.client.test.retry;
 
 import org.junit.jupiter.api.Test;
-import org.xbib.netty.http.client.retry.BackOff;
+import org.xbib.netty.http.client.api.BackOff;
 import org.xbib.netty.http.client.retry.ExponentialBackOff;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

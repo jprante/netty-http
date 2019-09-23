@@ -21,16 +21,12 @@ public class DateTimeUtil {
     private DateTimeUtil() {
     }
 
-    public static String formatInstant(Instant instant) {
+    public static String formatRfc1123(Instant instant) {
         return DateTimeFormatter.RFC_1123_DATE_TIME.format(ZonedDateTime.ofInstant(instant, ZoneOffset.UTC));
     }
 
-    public static String formatMillis(long millis) {
-        return formatInstant(Instant.ofEpochMilli(millis));
-    }
-
-    public static String formatSeconds(long seconds) {
-        return formatInstant(Instant.now().plusSeconds(seconds));
+    public static String formatRfc1123(long millis) {
+        return formatRfc1123(Instant.ofEpochMilli(millis));
     }
 
     // RFC 2616 allows RFC 1123, RFC 1036, ASCII time

@@ -1,11 +1,14 @@
 package org.xbib.netty.http.common;
 
+import io.netty.handler.codec.http.HttpHeaderValues;
 import org.xbib.net.PercentDecoder;
 import org.xbib.net.PercentEncoder;
 import org.xbib.net.PercentEncoders;
 import org.xbib.netty.http.common.util.LimitedSet;
 import org.xbib.netty.http.common.util.LimitedTreeMap;
 
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
 import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnmappableCharacterException;
@@ -34,8 +37,6 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
 
     private static final String AMPERSAND = "&";
 
-    private static final String APPLICATION_X_WWW_FORM_URLENCODED = "application/x-www-form-urlencoded";
-
     private final int maxParam;
 
     private final int sizeLimit;
@@ -48,24 +49,30 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
 
     private final PercentDecoder percentDecoder;
 
-    private final String contentType;
+    private final CharSequence contentType;
+
+    private final Charset charset;
 
     public HttpParameters() {
-        this(1024, 1024, 65536, APPLICATION_X_WWW_FORM_URLENCODED);
+        this(1024, 1024, 65536,
+                HttpHeaderValues.APPLICATION_X_WWW_FORM_URLENCODED, StandardCharsets.UTF_8);
     }
 
     public HttpParameters(String contentType) {
-        this(1024, 1024, 65536, contentType);
+        this(1024, 1024, 65536,
+                contentType, StandardCharsets.UTF_8);
     }
 
-    public HttpParameters(int maxParam, int sizeLimit, int elementSizeLimit, String contentType) {
+    public HttpParameters(int maxParam, int sizeLimit, int elementSizeLimit,
+                          CharSequence contentType, Charset charset) {
         this.maxParam = maxParam;
         this.sizeLimit = sizeLimit;
         this.elementSizeLimit = elementSizeLimit;
         this.map = new LimitedTreeMap<>(maxParam);
-        this.percentEncoder = PercentEncoders.getQueryEncoder(StandardCharsets.UTF_8);
+        this.percentEncoder = PercentEncoders.getQueryEncoder(charset);
         this.percentDecoder = new PercentDecoder();
         this.contentType = contentType;
+        this.charset = charset;
     }
 
     @Override
@@ -139,8 +146,7 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
         return map.entrySet();
     }
 
-    public SortedSet<String> put(String key, SortedSet<String> values, boolean percentEncode)
-            throws MalformedInputException, UnmappableCharacterException {
+    public SortedSet<String> put(String key, SortedSet<String> values, boolean percentEncode) {
         if (percentEncode) {
             remove(key);
             for (String v : values) {
@@ -158,11 +164,8 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
      * @param key the parameter name
      * @param value the parameter value
      * @return the value
-     * @throws MalformedInputException if input is malformed
-     * @throws UnmappableCharacterException if characters are unmappable
      */
-    public String add(String key, String value)
-            throws MalformedInputException, UnmappableCharacterException {
+    public String add(String key, String value) {
         return add(key, value, false);
     }
 
@@ -175,21 +178,23 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
      * @param percentEncode whether key and value should be percent encoded before being
      *        inserted into the map
      * @return the value
-     * @throws MalformedInputException if input is malformed
-     * @throws UnmappableCharacterException if characters are unmappable
      */
-    public String add(String key, String value, boolean percentEncode)
-            throws MalformedInputException, UnmappableCharacterException {
-        String k  = percentEncode ? percentEncoder.encode(key) : key;
-        SortedSet<String> values = map.get(k);
-        if (values == null) {
-            values = new LimitedSet<>(sizeLimit, elementSizeLimit);
-            map.put(k, values);
-        }
+    public String add(String key, String value, boolean percentEncode) {
         String v = null;
-        if (value != null) {
-            v = percentEncode ? percentEncoder.encode(value) : value;
-            values.add(v);
+        try {
+            String k = percentEncode ? percentEncoder.encode(key) : key;
+            SortedSet<String> values = map.get(k);
+            if (values == null) {
+                values = new LimitedSet<>(sizeLimit, elementSizeLimit);
+                map.put(k, values);
+            }
+
+            if (value != null) {
+                v = percentEncode ? percentEncoder.encode(value) : value;
+                values.add(v);
+            }
+        } catch (CharacterCodingException e) {
+            throw new IllegalArgumentException(e);
         }
         return v;
     }
@@ -201,11 +206,8 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
      * @param key the parameter name
      * @param nullString can be anything, but probably... null?
      * @return null
-     * @throws MalformedInputException if input is malformed
-     * @throws UnmappableCharacterException if characters are unmappable
      */
-    public String addNull(String key, String nullString)
-            throws MalformedInputException, UnmappableCharacterException {
+    public String addNull(String key, String nullString) {
         return add(key, nullString);
     }
 
@@ -220,8 +222,7 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
         }
     }
 
-    public void addAll(String[] keyValuePairs, boolean percentEncode)
-            throws MalformedInputException, UnmappableCharacterException {
+    public void addAll(String[] keyValuePairs, boolean percentEncode) {
         for (int i = 0; i < keyValuePairs.length - 1; i += 2) {
             add(keyValuePairs[i], keyValuePairs[i + 1], percentEncode);
         }
@@ -274,7 +275,7 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
         return percentDecoder.decode(value);
     }
 
-    public String getContentType() {
+    public CharSequence getContentType() {
         return contentType;
     }
 
@@ -340,7 +341,8 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
     }
 
     public HttpParameters getOAuthParameters() {
-        HttpParameters oauthParams = new HttpParameters(maxParam, sizeLimit, elementSizeLimit, contentType);
+        HttpParameters oauthParams =
+                new HttpParameters(maxParam, sizeLimit, elementSizeLimit, contentType, StandardCharsets.UTF_8);
         entrySet().stream().filter(entry -> entry.getKey().startsWith("oauth_") || entry.getKey().startsWith("x_oauth_"))
                 .forEach(entry -> oauthParams.put(entry.getKey(), entry.getValue()));
         return oauthParams;

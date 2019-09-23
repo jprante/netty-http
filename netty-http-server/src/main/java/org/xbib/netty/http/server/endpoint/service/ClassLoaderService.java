@@ -1,7 +1,8 @@
 package org.xbib.netty.http.server.endpoint.service;
 
-import org.xbib.netty.http.server.ServerRequest;
-import org.xbib.netty.http.server.ServerResponse;
+import org.xbib.netty.http.server.api.Resource;
+import org.xbib.netty.http.server.api.ServerRequest;
+import org.xbib.netty.http.server.api.ServerResponse;
 
 import java.io.IOException;
 import java.net.URL;
@@ -18,16 +19,9 @@ public class ClassLoaderService extends ResourceService {
 
     private final String prefix;
 
-    private final String indexFileName;
-
     public ClassLoaderService(Class<?> clazz, String prefix) {
-        this(clazz, prefix, "index.html");
-    }
-
-    public ClassLoaderService(Class<?> clazz, String prefix, String indexFileName) {
         this.clazz = clazz;
         this.prefix = prefix;
-        this.indexFileName = indexFileName;
     }
 
     @Override
@@ -48,6 +42,11 @@ public class ClassLoaderService extends ResourceService {
     @Override
     protected boolean isRangeResponseEnabled() {
         return true;
+    }
+
+    @Override
+    protected int getMaxAgeSeconds() {
+        return 24 * 3600;
     }
 
     class ClassLoaderResource implements Resource {
@@ -103,12 +102,21 @@ public class ClassLoaderService extends ResourceService {
 
         @Override
         public boolean isDirectory() {
-            return resourcePath.endsWith("/");
+            return resourcePath.isEmpty() || resourcePath.endsWith("/");
         }
 
         @Override
         public String indexFileName() {
-            return indexFileName;
+            return null;
+        }
+
+        @Override
+        public String toString() {
+            return "[ClassLoaderResource:resourcePath=" + resourcePath +
+                    ",url=" + url +
+                    ",lastmodified=" + lastModified +
+                    ",length=" + length +
+                    ",isDirectory=" + isDirectory() + "]";
         }
     }
 }

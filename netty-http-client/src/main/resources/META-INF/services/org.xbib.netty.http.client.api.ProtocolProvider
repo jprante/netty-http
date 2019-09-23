@@ -1,0 +1,2 @@
+org.xbib.netty.http.client.Http1Provider
+org.xbib.netty.http.client.Http2Provider

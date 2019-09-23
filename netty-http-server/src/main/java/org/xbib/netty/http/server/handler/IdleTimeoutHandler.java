@@ -17,8 +17,8 @@ public class IdleTimeoutHandler extends IdleStateHandler {
 
     private final Logger logger = Logger.getLogger(IdleTimeoutHandler.class.getName());
 
-    public IdleTimeoutHandler() {
-        super(30, 30, 30);
+    public IdleTimeoutHandler(int idleTimeoutMillis) {
+        super(idleTimeoutMillis, idleTimeoutMillis, idleTimeoutMillis);
     }
 
     @Override

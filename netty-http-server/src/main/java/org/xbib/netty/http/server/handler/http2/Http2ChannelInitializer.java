@@ -29,15 +29,18 @@ import io.netty.util.DomainNameMapping;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.ServerConfig;
+import org.xbib.netty.http.server.api.HttpChannelInitializer;
 import org.xbib.netty.http.server.handler.ExtendedSNIHandler;
+import org.xbib.netty.http.server.handler.IdleTimeoutHandler;
 import org.xbib.netty.http.server.handler.TrafficLoggingHandler;
-import org.xbib.netty.http.server.transport.Transport;
+import org.xbib.netty.http.server.api.Transport;
 
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
+public class Http2ChannelInitializer extends ChannelInitializer<Channel>
+        implements HttpChannelInitializer {
 
     private static final Logger logger = Logger.getLogger(Http2ChannelInitializer.class.getName());
 
@@ -62,7 +65,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
     public void initChannel(Channel channel) {
         Transport transport = server.newTransport(httpAddress.getVersion());
         channel.attr(Transport.TRANSPORT_ATTRIBUTE_KEY).set(transport);
-        if (serverConfig.isDebug()) {
+        if (serverConfig.isTrafficDebug()) {
             channel.pipeline().addLast(new TrafficLoggingHandler(LogLevel.DEBUG));
         }
         if (httpAddress.isSecure()) {
@@ -70,7 +73,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
         } else {
             configureCleartext(channel);
         }
-        if (server.getServerConfig().isDebug() && logger.isLoggable(Level.FINE)) {
+        if (server.getServerConfig().isTrafficDebug() && logger.isLoggable(Level.FINE)) {
             logger.log(Level.FINE, "HTTP/2 server channel initialized: " + channel.pipeline().names());
         }
     }
@@ -100,15 +103,15 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> {
                         new HttpObjectAggregator(serverConfig.getMaxContentLength()));
                 pipeline.addLast("server-chunked-write", new ChunkedWriteHandler());
                 pipeline.addLast("server-request-handler", new ServerRequestHandler());
+                pipeline.addLast("server-idle-timeout-handler", new IdleTimeoutHandler(serverConfig.getIdleTimeoutMillis()));
             }
         };
         Http2MultiplexCodecBuilder multiplexCodecBuilder = Http2MultiplexCodecBuilder.forServer(channelHandler)
             .initialSettings(Http2Settings.defaultSettings());
-        if (serverConfig.isDebug()) {
+        if (serverConfig.isTrafficDebug()) {
             multiplexCodecBuilder.frameLogger(new Http2FrameLogger(LogLevel.DEBUG, "server"));
         }
         Http2MultiplexCodec multiplexCodec = multiplexCodecBuilder.build();
-
         HttpServerCodec serverCodec = new HttpServerCodec();
         HttpServerUpgradeHandler upgradeHandler = new HttpServerUpgradeHandler(serverCodec, protocol -> {
             if (AsciiString.contentEquals(Http2CodecUtil.HTTP_UPGRADE_PROTOCOL_NAME, protocol)) {

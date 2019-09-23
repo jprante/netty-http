@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.ServerResponse;
+import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.Domain;
 
 import java.io.IOException;

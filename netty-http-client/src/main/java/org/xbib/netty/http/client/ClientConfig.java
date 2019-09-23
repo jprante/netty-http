@@ -8,9 +8,8 @@ import io.netty.handler.logging.LogLevel;
 import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.ssl.CipherSuiteFilter;
 import io.netty.handler.ssl.SslProvider;
-import org.xbib.netty.http.client.pool.BoundedChannelPool;
-import org.xbib.netty.http.client.pool.Pool;
-import org.xbib.netty.http.client.retry.BackOff;
+import org.xbib.netty.http.client.api.Pool;
+import org.xbib.netty.http.client.api.BackOff;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.security.SecurityUtil;
 
@@ -20,7 +19,6 @@ import java.security.KeyStore;
 import java.security.Provider;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class ClientConfig {
 

@@ -5,10 +5,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.net.URL;
 import org.xbib.netty.http.client.Client;
-import org.xbib.netty.http.client.listener.ResponseListener;
+import org.xbib.netty.http.client.api.ResponseListener;
 import org.xbib.netty.http.client.test.NettyHttpTestExtension;
 import org.xbib.netty.http.common.HttpAddress;
-import org.xbib.netty.http.client.Request;
+import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.common.HttpResponse;
 
 import java.io.IOException;
@@ -49,8 +49,8 @@ class PooledClientTest {
                         for (int i = 0; i < loop; i++) {
                             Request request = Request.get().setVersion(httpAddress.getVersion())
                                     .url(url.toString())
-                                    .build()
-                                    .setResponseListener(responseListener);
+                                    .setResponseListener(responseListener)
+                                    .build();
                             client.newTransport().execute(request).get();
                         }
                         logger.log(Level.INFO, "done " + Thread.currentThread());

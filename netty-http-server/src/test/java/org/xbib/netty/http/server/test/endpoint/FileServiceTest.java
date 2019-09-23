@@ -5,7 +5,7 @@ import io.netty.handler.codec.http.HttpVersion;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;
-import org.xbib.netty.http.client.Request;
+import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.Domain;
@@ -46,11 +46,11 @@ class FileServiceTest {
             Request request = Request.get()
                     .setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base().resolve("/static/test.txt"))
-                    .build()
                     .setResponseListener(resp -> {
                         assertEquals("Hello Jörg", resp.getBodyAsString(StandardCharsets.UTF_8));
                         success.set(true);
-                    });
+                    })
+                    .build();
             client.execute(request).get();
         } finally {
             server.shutdownGracefully();
@@ -79,11 +79,11 @@ class FileServiceTest {
             Request request = Request.get()
                     .setVersion(HttpVersion.valueOf("HTTP/2.0"))
                     .url(server.getServerConfig().getAddress().base().resolve("/static/test.txt"))
-                    .build()
                     .setResponseListener(resp -> {
                         assertEquals("Hello Jörg", resp.getBodyAsString(StandardCharsets.UTF_8));
                         success.set(true);
-                    });
+                    })
+                    .build();
             client.execute(request).get();
         } finally {
             server.shutdownGracefully();
@@ -113,13 +113,13 @@ class FileServiceTest {
             server.accept();
             Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base().resolve("/static/forward_test"))
-                    .build()
                     .setResponseListener(resp -> {
                         if (resp.getStatus().getCode() ==  HttpResponseStatus.OK.code()) {
                             assertEquals("Hello Jörg", resp.getBodyAsString(StandardCharsets.UTF_8));
                             success.set(true);
                         }
-                    });
+                    })
+                    .build();
             client.execute(request).get();
         } finally {
             server.shutdownGracefully();
@@ -151,13 +151,13 @@ class FileServiceTest {
             Request request = Request.get()
                     .setVersion(HttpVersion.valueOf("HTTP/2.0"))
                     .url(server.getServerConfig().getAddress().base().resolve("/static/forward_test"))
-                    .build()
                     .setResponseListener(resp -> {
                         if (resp.getStatus().getCode() ==  HttpResponseStatus.OK.code()) {
                             assertEquals("Hello Jörg", resp.getBodyAsString(StandardCharsets.UTF_8));
                             success.set(true);
                         }
-                    });
+                    })
+                    .build();
             client.execute(request).get();
             // client waits for settings, we wait too
             Thread.sleep(1000L);
@@ -191,13 +191,13 @@ class FileServiceTest {
             server.accept();
             Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base().resolve("/static/forward_test?a=b"))
-                    .build()
                     .setResponseListener(resp -> {
                         if (resp.getStatus().getCode() ==  HttpResponseStatus.OK.code()) {
                             assertEquals("Hello Jörg", resp.getBodyAsString(StandardCharsets.UTF_8));
                             success.set(true);
                         }
-                    });
+                    })
+                    .build();
             client.execute(request).get();
         } finally {
             server.shutdownGracefully();

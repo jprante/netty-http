@@ -6,9 +6,10 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.ServerRequest;
-import org.xbib.netty.http.server.ServerResponse;
+import org.xbib.netty.http.server.api.ServerRequest;
+import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.Domain;
+import org.xbib.netty.http.server.api.Transport;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;

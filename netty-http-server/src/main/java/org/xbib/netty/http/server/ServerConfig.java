@@ -51,6 +51,16 @@ public class ServerConfig {
         int CHILD_THREAD_COUNT = 0;
 
         /**
+         * Blocking thread pool count.
+         */
+        int BLOCKING_THREAD_COUNT = Runtime.getRuntime().availableProcessors();
+
+        /**
+         * Blocking thread pool queue count.
+         */
+        int BLOCKING_QUEUE_COUNT = 1024;
+
+        /**
          * Default for SO_REUSEADDR.
          */
         boolean SO_REUSEADDR = true;
@@ -88,7 +98,7 @@ public class ServerConfig {
         /**
          * Default idle timeout in milliseconds.
          */
-        int IDLE_TIMEOUT_MILLIS = 30000;
+        int IDLE_TIMEOUT_MILLIS = 60000;
 
         /**
          * Set HTTP chunk maximum size to 8k.
@@ -109,9 +119,15 @@ public class ServerConfig {
         int MAX_HEADERS_SIZE = 8 * 1024;
 
         /**
-         * Set maximum content length to 100 MB.
+         * Set maximum content length to 256 MB.
          */
-        int MAX_CONTENT_LENGTH = 100 * 1024 * 1024;
+        int MAX_CONTENT_LENGTH = 256 * 1024 * 1024;
+
+        /**
+         * HTTP/1 pipelining capacity. 1024 is very high, it means
+         * 1024 requests can be present for a single client.
+         */
+        int PIPELINING_CAPACITY = 1024;
 
         /**
          * This is Netty's default.
@@ -128,6 +144,12 @@ public class ServerConfig {
          * Default for compression.
          */
         boolean ENABLE_COMPRESSION = true;
+
+        /**
+         * Default compression threshold. If a response size is over this value,
+         * it will be compressed, otherwise not.
+         */
+        int COMPRESSION_THRESHOLD = 8192;
 
         /**
          * Default for decompression.
@@ -156,6 +178,7 @@ public class ServerConfig {
 
         /**
          * Transport layer security protocol versions.
+         * Do not use SSLv2, SSLv3, TLS 1.0, TLS 1.1.
          */
         String[] PROTOCOLS = new String[] { "TLSv1.3", "TLSv1.2" };
 
@@ -183,6 +206,10 @@ public class ServerConfig {
 
     private int childThreadCount = Defaults.CHILD_THREAD_COUNT;
 
+    private int blockingThreadCount = Defaults.BLOCKING_THREAD_COUNT;
+
+    private int blockingQueueCount = Defaults.BLOCKING_QUEUE_COUNT;
+
     private boolean reuseAddr = Defaults.SO_REUSEADDR;
 
     private boolean tcpNodelay = Defaults.TCP_NODELAY;
@@ -201,6 +228,8 @@ public class ServerConfig {
 
     private int maxContentLength = Defaults.MAX_CONTENT_LENGTH;
 
+    private int pipeliningCapacity = Defaults.PIPELINING_CAPACITY;
+
     private int maxCompositeBufferComponents = Defaults.MAX_COMPOSITE_BUFFER_COMPONENTS;
 
     private int connectTimeoutMillis = Defaults.CONNECT_TIMEOUT_MILLIS;
@@ -212,6 +241,8 @@ public class ServerConfig {
     private WriteBufferWaterMark writeBufferWaterMark = Defaults.WRITE_BUFFER_WATER_MARK;
 
     private boolean enableCompression = Defaults.ENABLE_COMPRESSION;
+
+    private int compressionThreshold = Defaults.COMPRESSION_THRESHOLD;
 
     private boolean enableDecompression = Defaults.ENABLE_DECOMPRESSION;
 
@@ -249,7 +280,7 @@ public class ServerConfig {
         return this;
     }
 
-    public boolean isDebug() {
+    public boolean isTrafficDebug() {
         return debug;
     }
 
@@ -258,7 +289,7 @@ public class ServerConfig {
         return this;
     }
 
-    public LogLevel getDebugLogLevel() {
+    public LogLevel getTrafficDebugLogLevel() {
         return debugLogLevel;
     }
 
@@ -297,6 +328,24 @@ public class ServerConfig {
 
     public int getChildThreadCount() {
         return childThreadCount;
+    }
+
+    public ServerConfig setBlockingThreadCount(int blockingThreadCount) {
+        this.blockingThreadCount = blockingThreadCount;
+        return this;
+    }
+
+    public int getBlockingThreadCount() {
+        return blockingThreadCount;
+    }
+
+    public ServerConfig setBlockingQueueCount(int blockingQueueCount) {
+        this.blockingQueueCount = blockingQueueCount;
+        return this;
+    }
+
+    public int getBlockingQueueCount() {
+        return blockingQueueCount;
     }
 
     public ServerConfig setReuseAddr(boolean reuseAddr) {
@@ -416,6 +465,15 @@ public class ServerConfig {
         return maxContentLength;
     }
 
+    public ServerConfig setPipeliningCapacity(int pipeliningCapacity) {
+        this.pipeliningCapacity = pipeliningCapacity;
+        return this;
+    }
+
+    public int getPipeliningCapacity() {
+        return pipeliningCapacity;
+    }
+
     public ServerConfig setMaxCompositeBufferComponents(int maxCompositeBufferComponents) {
         this.maxCompositeBufferComponents = maxCompositeBufferComponents;
         return this;
@@ -441,6 +499,15 @@ public class ServerConfig {
 
     public boolean isCompressionEnabled() {
         return enableCompression;
+    }
+
+    public ServerConfig setCompressionThreshold(int compressionThreshold) {
+        this.compressionThreshold = compressionThreshold;
+        return this;
+    }
+
+    public int getCompressionThreshold() {
+        return compressionThreshold;
     }
 
     public ServerConfig setDecompression(boolean enabled) {

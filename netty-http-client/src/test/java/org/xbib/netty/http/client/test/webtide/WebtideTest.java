@@ -4,7 +4,7 @@ import io.netty.handler.codec.http.HttpMethod;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;
-import org.xbib.netty.http.client.Request;
+import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.client.test.NettyHttpTestExtension;
 
 import java.io.IOException;
@@ -21,8 +21,9 @@ class WebtideTest {
         Client client = Client.builder()
                 .build();
         try {
-            Request request = Request.get().url("https://webtide.com").setVersion("HTTP/2.0").build()
-                    .setResponseListener(msg -> logger.log(Level.INFO, "got response: " + msg));
+            Request request = Request.get().url("https://webtide.com").setVersion("HTTP/2.0")
+                    .setResponseListener(msg -> logger.log(Level.INFO, "got response: " + msg))
+                    .build();
             client.execute(request).get();
         } finally {
             client.shutdownGracefully();
@@ -35,16 +36,14 @@ class WebtideTest {
         try {
             Request request1 = Request.builder(HttpMethod.GET)
                     .url("https://webtide.com").setVersion("HTTP/2.0")
-                    .build()
                     .setResponseListener(resp -> logger.log(Level.INFO, "got response: " +
-                            resp.getHeaders() + " status=" + resp.getStatus()));
-
+                            resp.getHeaders() + " status=" + resp.getStatus()))
+                    .build();
             Request request2 = Request.builder(HttpMethod.GET)
                     .url("https://webtide.com/why-choose-jetty/").setVersion("HTTP/2.0")
-                    .build()
                     .setResponseListener(resp -> logger.log(Level.INFO, "got response: " +
-                            resp.getHeaders() + " status=" +resp.getStatus()));
-
+                            resp.getHeaders() + " status=" +resp.getStatus()))
+                    .build();
             client.execute(request1).execute(request2);
         } finally {
             client.shutdownGracefully();

@@ -1,0 +1,7 @@
+dependencies {
+    compile "io.netty:netty-codec-http:${project.property('netty.version')}"
+    compile "io.netty:netty-transport-native-epoll:${project.property('netty.version')}"
+    compile "io.reactivex:rxjava:${project.property('reactivex.version')}"
+    testCompile "org.hamcrest:hamcrest-all:${project.property('hamcrest.version')}"
+    testCompile "org.mockito:mockito-all:${project.property('mockito.version')}"
+}

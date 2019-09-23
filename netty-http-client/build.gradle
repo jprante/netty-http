@@ -1,6 +1,6 @@
 
 dependencies {
-    compile project(":netty-http-common")
+    compile project(":netty-http-client-api")
     compile "io.netty:netty-handler-proxy:${project.property('netty.version')}"
     compile "io.netty:netty-transport-native-epoll:${project.property('netty.version')}"
     testCompile "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"

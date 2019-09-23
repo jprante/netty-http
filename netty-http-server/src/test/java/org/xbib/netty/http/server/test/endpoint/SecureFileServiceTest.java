@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;
-import org.xbib.netty.http.client.Request;
+import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.Domain;
@@ -50,11 +50,11 @@ class SecureFileServiceTest {
             Request request = Request.get()
                     .setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base().resolve("/static/test.txt"))
-                    .build()
                     .setResponseListener(resp -> {
                         assertEquals("Hello Jörg", resp.getBodyAsString(StandardCharsets.UTF_8));
                         success.set(true);
-                    });
+                    })
+                    .build();
             client.execute(request).get();
         } finally {
             server.shutdownGracefully();
@@ -88,11 +88,11 @@ class SecureFileServiceTest {
             Request request = Request.get()
                     .setVersion(HttpVersion.valueOf("HTTP/2.0"))
                     .url(server.getServerConfig().getAddress().base().resolve("/static/test.txt"))
-                    .build()
                     .setResponseListener(resp -> {
                         assertEquals("Hello Jörg", resp.getBodyAsString(StandardCharsets.UTF_8));
                         success.set(true);
-                    });
+                    })
+                    .build();
             logger.log(Level.INFO, request.toString());
             client.execute(request).get();
             logger.log(Level.INFO, "request complete");
@@ -130,11 +130,11 @@ class SecureFileServiceTest {
                     .setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base()
                             .resolve("/static/test.txt"))
-                    .build()
                     .setResponseListener(resp -> {
                         assertEquals("Hello Jörg", resp.getBodyAsString(StandardCharsets.UTF_8));
                         success.set(true);
-                    });
+                    })
+                    .build();
             client.execute(request).get();
         } finally {
             server.shutdownGracefully();

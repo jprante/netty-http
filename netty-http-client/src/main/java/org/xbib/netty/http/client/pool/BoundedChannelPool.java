@@ -11,6 +11,7 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http2.DefaultHttp2GoAwayFrame;
 import io.netty.util.AttributeKey;
+import org.xbib.netty.http.client.api.Pool;
 import org.xbib.netty.http.common.PoolKey;
 
 import java.io.IOException;
@@ -65,8 +66,10 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
     private PoolKeySelector<K> poolKeySelector;
 
     /**
-     * @param semaphore the concurrency level
-     * @param httpVersion  the HTTP version of the pool connections
+     * A bounded channel pool.
+     *
+     * @param semaphore the level of concurrency
+     * @param httpVersion the HTTP version of the pool connections
      * @param nodes the endpoint nodes, any element may contain the port (followed after ":")
      *             to override the defaultPort argument
      * @param bootstrap bootstrap instance

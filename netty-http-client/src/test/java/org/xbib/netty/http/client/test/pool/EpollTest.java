@@ -22,7 +22,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.xbib.netty.http.common.HttpAddress;
-import org.xbib.netty.http.client.pool.Pool;
+import org.xbib.netty.http.client.api.Pool;
 import org.xbib.netty.http.client.pool.BoundedChannelPool;
 
 import java.io.Closeable;

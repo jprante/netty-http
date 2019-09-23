@@ -17,17 +17,14 @@ import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.util.AsciiString;
 import org.xbib.net.URLSyntaxException;
 import org.xbib.netty.http.client.Client;
+import org.xbib.netty.http.client.api.Transport;
 import org.xbib.netty.http.client.cookie.ClientCookieDecoder;
 import org.xbib.netty.http.client.cookie.ClientCookieEncoder;
 import org.xbib.netty.http.client.handler.http2.Http2ResponseHandler;
 import org.xbib.netty.http.client.handler.http2.Http2StreamFrameToHttpObjectCodec;
-import org.xbib.netty.http.client.listener.CookieListener;
-import org.xbib.netty.http.client.listener.StatusListener;
 import org.xbib.netty.http.common.DefaultHttpResponse;
 import org.xbib.netty.http.common.HttpAddress;
-import org.xbib.netty.http.client.Request;
-import org.xbib.netty.http.client.listener.ResponseListener;
-import org.xbib.netty.http.common.HttpResponse;
+import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.common.cookie.Cookie;
 
 import java.io.IOException;
@@ -74,7 +71,7 @@ public class Http2Transport extends BaseTransport {
             return this;
         }
         final String channelId = channel.id().toString();
-        channelFlowMap.putIfAbsent(channelId, new Flow());
+        flowMap.putIfAbsent(channelId, new Flow());
         Http2StreamChannel childChannel = new Http2StreamChannelBootstrap(channel)
                 .handler(initializer).open().syncUninterruptibly().getNow();
         AsciiString method = request.httpMethod().asciiName();
@@ -83,7 +80,7 @@ public class Http2Transport extends BaseTransport {
         String path = request.relative().isEmpty() ? "/" : request.relative();
         Http2Headers http2Headers = new DefaultHttp2Headers()
                 .method(method).scheme(scheme).authority(authority).path(path);
-        final Integer streamId = channelFlowMap.get(channelId).nextStreamId();
+        final Integer streamId = flowMap.get(channelId).nextStreamId();
         if (streamId == null) {
             throw new IllegalStateException();
         }
@@ -146,14 +143,14 @@ public class Http2Transport extends BaseTransport {
             logger.log(Level.WARNING, "stream ID is null?");
             return;
         }
-        DefaultHttpResponse httpResponse = new DefaultHttpResponse(httpAddress, fullHttpResponse);
+        DefaultHttpResponse httpResponse = null;
         client.getResponseCounter().incrementAndGet();
         try {
             // format of childchan channel ID is <parent channel ID> "/" <substream ID>
             String channelId = channel.id().toString();
             int pos = channelId.indexOf('/');
             channelId = pos > 0 ? channelId.substring(0, pos) : channelId;
-            Flow flow = channelFlowMap.get(channelId);
+            Flow flow = flowMap.get(channelId);
             if (flow == null) {
                 // should never happen since we keep the channelFlowMap around
                 if (logger.isLoggable(Level.WARNING)) {
@@ -172,24 +169,14 @@ public class Http2Transport extends BaseTransport {
                     promise.completeExceptionally(new IllegalStateException("no request"));
                 }
             } else {
-                StatusListener statusListener = request.getStatusListener();
-                if (statusListener != null) {
-                    statusListener.onStatus(httpResponse.getStatus());
-                }
-                for (String cookieString : httpResponse.getHeaders().getAllHeaders(HttpHeaderNames.SET_COOKIE)) {
+                for (String cookieString : fullHttpResponse.headers().getAll(HttpHeaderNames.SET_COOKIE)) {
                     Cookie cookie = ClientCookieDecoder.STRICT.decode(cookieString);
                     addCookie(cookie);
-                    CookieListener cookieListener = request.getCookieListener();
-                    if (cookieListener != null) {
-                        cookieListener.onCookie(cookie);
-                    }
                 }
+                httpResponse = new DefaultHttpResponse(httpAddress, fullHttpResponse, getCookieBox());
                 CompletableFuture<Boolean> promise = flow.get(streamId);
                 try {
-                    ResponseListener<HttpResponse> responseListener = request.getResponseListener();
-                    if (responseListener != null) {
-                        responseListener.onResponse(httpResponse);
-                    }
+                    request.onResponse(httpResponse);
                     Request retryRequest = retry(request, httpResponse);
                     if (retryRequest != null) {
                         // retry transport, wait for completion
@@ -218,14 +205,16 @@ public class Http2Transport extends BaseTransport {
                 }
             }
         } finally {
-            httpResponse.release();
+            if (httpResponse != null) {
+                httpResponse.release();
+            }
         }
     }
 
     @Override
     public void pushPromiseReceived(Channel channel, Integer streamId, Integer promisedStreamId, Http2Headers headers) {
         String channelId = channel.id().toString();
-        channelFlowMap.get(channelId).put(promisedStreamId, new CompletableFuture<>());
+        flowMap.get(channelId).put(promisedStreamId, new CompletableFuture<>());
         String requestKey = getRequestKey(channel.id().toString(), streamId);
         requests.put(requestKey, requests.get(requestKey));
     }

@@ -25,7 +25,7 @@ class ClientCookieDecoderTest {
     void testDecodingSingleCookieV0() {
         long millis = System.currentTimeMillis() + 50000;
         String cookieString = "myCookie=myValue;expires=" +
-                DateTimeUtil.formatMillis(millis) +
+                DateTimeUtil.formatRfc1123(millis) +
                 ";path=/apathsomewhere;domain=.adomainsomewhere;secure;";
         Cookie cookie = ClientCookieDecoder.STRICT.decode(cookieString);
         assertNotNull(cookie);

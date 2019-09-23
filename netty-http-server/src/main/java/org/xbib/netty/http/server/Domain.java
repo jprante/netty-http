@@ -9,9 +9,11 @@ import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.security.SecurityUtil;
+import org.xbib.netty.http.server.api.ServerRequest;
+import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.endpoint.HttpEndpoint;
 import org.xbib.netty.http.server.endpoint.HttpEndpointResolver;
-import org.xbib.netty.http.server.endpoint.service.Service;
+import org.xbib.netty.http.server.api.Filter;
 import org.xbib.netty.http.server.security.tls.SelfSignedCertificate;
 
 import javax.net.ssl.TrustManagerFactory;
@@ -282,44 +284,44 @@ public class Domain {
             return this;
         }
 
-        public Builder singleEndpoint(String path, Service service) {
+        public Builder singleEndpoint(String path, Filter filter) {
             Objects.requireNonNull(path);
-            Objects.requireNonNull(service);
+            Objects.requireNonNull(filter);
             addEndpointResolver(HttpEndpointResolver.builder()
                     .addEndpoint(HttpEndpoint.builder()
                             .setPath(path)
                             .build())
-                    .setDispatcher((endpoint, req, resp) -> service.handle(req, resp))
+                    .setDispatcher((endpoint, req, resp) -> filter.handle(req, resp))
                     .build());
             return this;
         }
 
-        public Builder singleEndpoint(String prefix, String path, Service service) {
+        public Builder singleEndpoint(String prefix, String path, Filter filter) {
             Objects.requireNonNull(prefix);
             Objects.requireNonNull(path);
-            Objects.requireNonNull(service);
+            Objects.requireNonNull(filter);
             addEndpointResolver(HttpEndpointResolver.builder()
                     .addEndpoint(HttpEndpoint.builder()
                             .setPrefix(prefix)
                             .setPath(path)
                             .build())
-                    .setDispatcher((endpoint, req, resp) -> service.handle(req, resp))
+                    .setDispatcher((endpoint, req, resp) -> filter.handle(req, resp))
                     .build());
             return this;
         }
 
-        public Builder singleEndpoint(String prefix, String path, Service service,
+        public Builder singleEndpoint(String prefix, String path, Filter filter,
                                       String... methods) {
             Objects.requireNonNull(prefix);
             Objects.requireNonNull(path);
-            Objects.requireNonNull(service);
+            Objects.requireNonNull(filter);
             addEndpointResolver(HttpEndpointResolver.builder()
                     .addEndpoint(HttpEndpoint.builder()
                             .setPrefix(prefix)
                             .setPath(path)
                             .setMethods(Arrays.asList(methods))
                             .build())
-                    .setDispatcher((endpoint, req, resp) -> service.handle(req, resp))
+                    .setDispatcher((endpoint, req, resp) -> filter.handle(req, resp))
                     .build());
             return this;
         }

@@ -6,7 +6,7 @@ import io.netty.handler.codec.http.HttpMethod;
 import org.xbib.net.URL;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.common.HttpAddress;
-import org.xbib.netty.http.client.Request;
+import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.common.HttpResponse;
 
 import java.io.IOException;
@@ -95,7 +95,7 @@ public class RestClient {
         requestBuilder.content(byteBuf);
         try {
             client.newTransport(HttpAddress.http1(url))
-                    .execute(requestBuilder.build().setResponseListener(restClient::setResponse)).close();
+                    .execute(requestBuilder.setResponseListener(restClient::setResponse).build()).close();
         } catch (Exception e) {
             throw new IOException(e);
         }

@@ -1,7 +1,7 @@
 package org.xbib.netty.http.client.test.retry;
 
 import org.junit.jupiter.api.Test;
-import org.xbib.netty.http.client.retry.BackOff;
+import org.xbib.netty.http.client.api.BackOff;
 
 import java.io.IOException;
 

@@ -1,8 +1,6 @@
 package org.xbib.netty.http.client.test.retry;
 
-import org.xbib.netty.http.client.retry.BackOff;
-
-import java.io.IOException;
+import org.xbib.netty.http.client.api.BackOff;
 
 /**
  * Mock for {@link BackOff} that always returns a fixed number.

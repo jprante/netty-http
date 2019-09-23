@@ -5,15 +5,14 @@ import io.netty.handler.codec.http.HttpVersion;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;
-import org.xbib.netty.http.client.Request;
+import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.ServerResponse;
+import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.endpoint.HttpEndpoint;
 import org.xbib.netty.http.server.endpoint.HttpEndpointResolver;
 import org.xbib.netty.http.server.Domain;
 import org.xbib.netty.http.server.endpoint.service.FileService;
-import org.xbib.netty.http.server.endpoint.service.Service;
 import org.xbib.netty.http.server.test.NettyHttpTestExtension;
 
 import java.io.IOException;
@@ -37,14 +36,14 @@ class EndpointTest {
     @Test
     void testEmptyPrefixEndpoint() throws Exception {
         Path vartmp = Paths.get("/var/tmp/");
-        Service service = new FileService(vartmp);
+        FileService fileService = new FileService(vartmp);
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         HttpEndpointResolver httpEndpointResolver = HttpEndpointResolver.builder()
                 .addEndpoint(HttpEndpoint.builder().setPath("/**").build())
                 .setDispatcher((endpoint, req, resp) -> {
                     logger.log(Level.FINE, "dispatching endpoint = " + endpoint +
                             " req = " + req + " req context path = " + req.getContextPath());
-                    service.handle(req, resp);
+                    fileService.handle(req, resp);
                 })
                 .build();
         Domain domain = Domain.builder(httpAddress)
@@ -60,11 +59,11 @@ class EndpointTest {
             server.accept();
             Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base().resolve("/test.txt"))
-                    .build()
                     .setResponseListener(resp -> {
                         assertEquals("Hello Jörg", resp.getBodyAsString(StandardCharsets.UTF_8));
                         success.set(true);
-                    });
+                    })
+                    .build();
             client.execute(request).get();
         } finally {
             server.shutdownGracefully();
@@ -78,14 +77,14 @@ class EndpointTest {
     @Test
     void testPlainPrefixEndpoint() throws Exception {
         Path vartmp = Paths.get("/var/tmp/");
-        Service service = new FileService(vartmp);
+        FileService fileService = new FileService(vartmp);
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         HttpEndpointResolver httpEndpointResolver = HttpEndpointResolver.builder()
                 .addEndpoint(HttpEndpoint.builder().setPrefix("/").setPath("/**").build())
                 .setDispatcher((endpoint, req, resp) -> {
                     logger.log(Level.FINE, "dispatching endpoint = " + endpoint +
                             " req = " + req + " req context path = " + req.getContextPath());
-                    service.handle(req, resp);
+                    fileService.handle(req, resp);
                 })
                 .build();
         Domain domain = Domain.builder(httpAddress)
@@ -101,11 +100,11 @@ class EndpointTest {
             server.accept();
             Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base().resolve("/test.txt"))
-                    .build()
                     .setResponseListener(resp -> {
                         assertEquals("Hello Jörg", resp.getBodyAsString(StandardCharsets.UTF_8));
                         success.set(true);
-                    });
+                    })
+                    .build();
             client.execute(request).get();
         } finally {
             server.shutdownGracefully();
@@ -119,7 +118,7 @@ class EndpointTest {
     @Test
     void testSimplePathEndpoints() throws Exception {
         Path vartmp = Paths.get("/var/tmp/");
-        Service service = new FileService(vartmp);
+        FileService fileService = new FileService(vartmp);
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         HttpEndpointResolver httpEndpointResolver = HttpEndpointResolver.builder()
                 .addEndpoint(HttpEndpoint.builder().setPrefix("/static1").setPath("/**").build())
@@ -128,7 +127,7 @@ class EndpointTest {
                 .setDispatcher((endpoint, req, resp) -> {
                     logger.log(Level.FINE, "dispatching endpoint = " + endpoint +
                             " req = " + req + " req context path = " + req.getContextPath());
-                    service.handle(req, resp);
+                    fileService.handle(req, resp);
                 })
                 .build();
         Domain domain = Domain.builder(httpAddress)
@@ -148,27 +147,27 @@ class EndpointTest {
             server.accept();
             Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base().resolve("/static1/test1.txt"))
-                    .build()
                     .setResponseListener(resp -> {
                         assertEquals("Hello Jörg 1", resp.getBodyAsString(StandardCharsets.UTF_8));
                         success1.set(true);
-                    });
+                    })
+                    .build();
             client.execute(request).get();
             Request request1 = Request.get().setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base().resolve("/static2/test2.txt"))
-                    .build()
                     .setResponseListener(resp -> {
                         assertEquals("Hello Jörg 2",resp.getBodyAsString(StandardCharsets.UTF_8));
                         success2.set(true);
-                    });
+                    })
+                    .build();
             client.execute(request1).get();
             Request request2 = Request.get().setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base().resolve("/static3/test3.txt"))
-                    .build()
                     .setResponseListener(resp -> {
                         assertEquals("Hello Jörg 3", resp.getBodyAsString(StandardCharsets.UTF_8));
                         success3.set(true);
-                    });
+                    })
+                    .build();
             client.execute(request2).get();
         } finally {
             server.shutdownGracefully();
@@ -186,7 +185,7 @@ class EndpointTest {
     @Test
     void testQueryEndpoints() throws Exception {
         Path vartmp = Paths.get("/var/tmp/");
-        Service service = new FileService(vartmp);
+        FileService fileService = new FileService(vartmp);
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         HttpEndpointResolver httpEndpointResolver = HttpEndpointResolver.builder()
                 .addEndpoint(HttpEndpoint.builder().setPrefix("/static1").setPath("/**").build())
@@ -194,7 +193,7 @@ class EndpointTest {
                 .addEndpoint(HttpEndpoint.builder().setPrefix("/static3").setPath("/**").build())
                 .setDispatcher((endpoint, req, resp) -> {
                     logger.log(Level.FINE, "dispatching endpoint = " + endpoint + " req = " + req);
-                    service.handle(req, resp);
+                    fileService.handle(req, resp);
                 })
                 .build();
         Domain domain = Domain.builder(httpAddress)
@@ -216,7 +215,6 @@ class EndpointTest {
                     .url(server.getServerConfig().getAddress().base()
                             .resolve("/static1/test1.txt"))
                     .addParameter("a", "b")
-                    .build()
                     .setResponseListener(resp -> {
                         if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
                             assertEquals("Hello Jörg 1", resp.getBodyAsString(StandardCharsets.UTF_8));
@@ -224,12 +222,12 @@ class EndpointTest {
                         } else {
                             logger.log(Level.WARNING, resp.getStatus().getReasonPhrase());
                         }
-                    });
+                    })
+                    .build();
             client.execute(request1).get();
             Request request2 = Request.get().setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base()
                             .resolve("/static2/test2.txt"))
-                    .build()
                     .setResponseListener(resp -> {
                         if (resp.getStatus().getCode() ==  HttpResponseStatus.OK.code()) {
                             assertEquals("Hello Jörg 2", resp.getBodyAsString(StandardCharsets.UTF_8));
@@ -237,13 +235,13 @@ class EndpointTest {
                         } else {
                             logger.log(Level.WARNING, resp.getStatus().getReasonPhrase());
                         }
-                    });
+                    })
+                    .build();
             client.execute(request2).get();
             Request request3 = Request.get().setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base()
                             .resolve("/static3/test3.txt"))
                     .content("{\"a\":\"b\"}","application/json")
-                    .build()
                     .setResponseListener(resp -> {
                         if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
                             assertEquals("Hello Jörg 3",resp.getBodyAsString(StandardCharsets.UTF_8));
@@ -251,7 +249,8 @@ class EndpointTest {
                         } else {
                             logger.log(Level.WARNING, resp.getStatus().getReasonPhrase());
                         }
-                    });
+                    })
+                    .build();
             client.execute(request3).get();
         } finally {
             server.shutdownGracefully();
@@ -269,29 +268,29 @@ class EndpointTest {
     @Test
     void testMultiResolver() throws Exception {
         Path vartmp = Paths.get("/var/tmp/");
-        Service service1 = new FileService(vartmp);
-        Service service2 = new FileService(vartmp);
-        Service service3 = new FileService(vartmp);
+        FileService fileService1 = new FileService(vartmp);
+        FileService fileService2 = new FileService(vartmp);
+        FileService fileService3 = new FileService(vartmp);
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         HttpEndpointResolver httpEndpointResolver1 = HttpEndpointResolver.builder()
                 .addEndpoint(HttpEndpoint.builder().setPrefix("/static1").setPath("/**").build())
                 .setDispatcher((endpoint, req, resp) -> {
                     logger.log(Level.FINE, "dispatching endpoint = " + endpoint + " context path = " + req.getContextPath());
-                    service1.handle(req, resp);
+                    fileService1.handle(req, resp);
                 })
                 .build();
         HttpEndpointResolver httpEndpointResolver2 = HttpEndpointResolver.builder()
                 .addEndpoint(HttpEndpoint.builder().setPrefix("/static2").setPath("/**").build())
                 .setDispatcher((endpoint, req, resp) -> {
                     logger.log(Level.FINE, "dispatching endpoint = " + endpoint + " context path = " + req.getContextPath());
-                    service2.handle(req, resp);
+                    fileService2.handle(req, resp);
                 })
                 .build();
         HttpEndpointResolver httpEndpointResolver3 = HttpEndpointResolver.builder()
                 .addEndpoint(HttpEndpoint.builder().setPrefix("/static3").setPath("/**").build())
                 .setDispatcher((endpoint, req, resp) -> {
                     logger.log(Level.FINE, "dispatching endpoint = " + endpoint + " context path = " + req.getContextPath());
-                    service3.handle(req, resp);
+                    fileService3.handle(req, resp);
                 })
                 .build();
         Domain domain = Domain.builder(httpAddress)
@@ -315,7 +314,6 @@ class EndpointTest {
                     .url(server.getServerConfig().getAddress().base()
                             .resolve("/static1/test1.txt"))
                     .addParameter("a", "b")
-                    .build()
                     .setResponseListener(resp -> {
                         if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
                             assertEquals("Hello Jörg 1", resp.getBodyAsString(StandardCharsets.UTF_8));
@@ -323,12 +321,13 @@ class EndpointTest {
                         } else {
                             logger.log(Level.WARNING, resp.getStatus().getReasonPhrase());
                         }
-                    });
+                    })
+                    .build();
             client.execute(request1).get();
             Request request2 = Request.get().setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base()
                             .resolve("/static2/test2.txt"))
-                    .build()
+
                     .setResponseListener(resp -> {
                         if (resp.getStatus().getCode() ==  HttpResponseStatus.OK.code()) {
                             assertEquals("Hello Jörg 2", resp.getBodyAsString(StandardCharsets.UTF_8));
@@ -336,13 +335,13 @@ class EndpointTest {
                         } else {
                             logger.log(Level.WARNING, resp.getStatus().getReasonPhrase());
                         }
-                    });
+                    })
+                    .build();
             client.execute(request2).get();
             Request request3 = Request.get().setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base()
                             .resolve("/static3/test3.txt"))
                     .content("{\"a\":\"b\"}","application/json")
-                    .build()
                     .setResponseListener(resp -> {
                         if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
                             assertEquals("Hello Jörg 3",resp.getBodyAsString(StandardCharsets.UTF_8));
@@ -350,7 +349,8 @@ class EndpointTest {
                         } else {
                             logger.log(Level.WARNING, resp.getStatus().getReasonPhrase());
                         }
-                    });
+                    })
+                    .build();
             client.execute(request3).get();
         } finally {
             server.shutdownGracefully();
@@ -391,14 +391,14 @@ class EndpointTest {
             for (int i = 0; i < max; i++) {
                 Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
                         .url(server.getServerConfig().getAddress().base().resolve("/static/" + i + "/test.txt"))
-                        .build()
                         .setResponseListener(resp -> {
                             if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
                                 count.incrementAndGet();
                             } else {
                                 logger.log(Level.WARNING, resp.getStatus().getReasonPhrase());
                             }
-                        });
+                        })
+                        .build();
                 client.execute(request).get();
             }
         } finally {
@@ -432,14 +432,14 @@ class EndpointTest {
             for (int i = 0; i < max; i++) {
                 Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
                         .url(server.getServerConfig().getAddress().base().resolve("/static/" + i + "/test.txt"))
-                        .build()
                         .setResponseListener(resp -> {
                             if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
                                 count.incrementAndGet();
                             } else {
                                 logger.log(Level.WARNING, resp.getStatus().getReasonPhrase());
                             }
-                        });
+                        })
+                        .build();
                 client.execute(request).get();
             }
         } finally {

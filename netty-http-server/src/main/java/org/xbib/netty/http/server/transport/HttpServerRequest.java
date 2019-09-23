@@ -4,6 +4,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpUtil;
@@ -12,18 +13,19 @@ import org.xbib.net.QueryParameters;
 import org.xbib.net.URL;
 import org.xbib.netty.http.common.HttpParameters;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.ServerRequest;
-import org.xbib.netty.http.server.endpoint.HttpEndpointDescriptor;
+import org.xbib.netty.http.server.api.ServerRequest;
 
 import javax.net.ssl.SSLSession;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.charset.MalformedInputException;
+import java.nio.charset.Charset;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
-import java.nio.charset.UnmappableCharacterException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * The {@code HttpServerRequest} class encapsulates a single request.
@@ -31,9 +33,9 @@ import java.util.Map;
  */
 public class HttpServerRequest implements ServerRequest {
 
-    private static final String PATH_SEPARATOR = "/";
+    private static final Logger logger = Logger.getLogger(HttpServerRequest.class.getName());
 
-    private static final CharSequence APPLICATION_FORM_URL_ENCODED = "application/x-www-form-urlencoded";
+    private static final String PATH_SEPARATOR = "/";
 
     private final FullHttpRequest httpRequest;
 
@@ -44,8 +46,6 @@ public class HttpServerRequest implements ServerRequest {
     private String contextPath;
 
     private Map<String, String> pathParameters = new LinkedHashMap<>();
-
-    private HttpEndpointDescriptor httpEndpointDescriptor;
 
     private HttpParameters parameters;
 
@@ -63,38 +63,53 @@ public class HttpServerRequest implements ServerRequest {
                       ChannelHandlerContext ctx) {
         this.httpRequest = fullHttpRequest.retainedDuplicate();
         this.ctx = ctx;
-        this.httpEndpointDescriptor = new HttpEndpointDescriptor(this);
     }
 
-    void handleParameters() throws IOException {
-        try {
-            HttpParameters httpParameters = new HttpParameters();
-            this.url = URL.builder()
-                    .path(httpRequest.uri()) // creates path, query params, fragment
-                    .build();
-            QueryParameters queryParameters = url.getQueryParams();
-            ByteBuf byteBuf = httpRequest.content();
-            if (APPLICATION_FORM_URL_ENCODED.equals(HttpUtil.getMimeType(httpRequest)) && byteBuf != null) {
-                String content = byteBuf.toString(HttpUtil.getCharset(httpRequest, StandardCharsets.ISO_8859_1));
-                queryParameters.addPercentEncodedBody(content);
-            }
-            for (Pair<String, String> pair : queryParameters) {
-                httpParameters.add(pair.getFirst(), pair.getSecond());
-            }
-            this.parameters = httpParameters;
-        } catch (MalformedInputException | UnmappableCharacterException e) {
-            throw new IOException(e);
+    void handleParameters() {
+        Charset charset = HttpUtil.getCharset(httpRequest, StandardCharsets.UTF_8);
+        HttpParameters httpParameters = new HttpParameters();
+        this.url = URL.builder()
+                .charset(charset, CodingErrorAction.REPLACE)
+                .path(httpRequest.uri()) // creates path, query params, fragment
+                .build();
+        QueryParameters queryParameters = url.getQueryParams();
+        CharSequence mimeType = HttpUtil.getMimeType(httpRequest);
+        ByteBuf byteBuf = httpRequest.content();
+        if (logger.isLoggable(Level.FINER)) {
+            logger.log(Level.FINER, "url = " + url +
+                    " mime type = " + mimeType +
+                    " queryParameters = " + queryParameters +
+                    " body exists = " + (byteBuf != null));
         }
+        if (byteBuf != null) {
+            if (httpRequest.method().equals(HttpMethod.POST) && mimeType != null) {
+                String params;
+                // https://www.w3.org/TR/html4/interact/forms.html#h-17.13.4
+                if (HttpHeaderValues.APPLICATION_X_WWW_FORM_URLENCODED.toString().equals(mimeType.toString())) {
+                    Charset htmlCharset = HttpUtil.getCharset(httpRequest, StandardCharsets.ISO_8859_1);
+                    params = byteBuf.toString(htmlCharset).replace('+', ' ');
+                    if (logger.isLoggable(Level.FINER)) {
+                        logger.log(Level.FINER, "html form, charset = " + htmlCharset + " param body = " + params);
+                    }
+                } else {
+                    params = byteBuf.toString(charset);
+                    if (logger.isLoggable(Level.FINER)) {
+                        logger.log(Level.FINER, "not a html form, charset = " + charset + " param body = " + params);
+                    }
+                }
+                queryParameters.addPercentEncodedBody(params);
+                queryParameters.add("_body", params);
+            }
+        }
+        for (Pair<String, String> pair : queryParameters) {
+            httpParameters.add(pair.getFirst(), pair.getSecond());
+        }
+        this.parameters = httpParameters;
     }
 
     @Override
     public URL getURL() {
         return url;
-    }
-
-    @Override
-    public HttpEndpointDescriptor getEndpointDescriptor() {
-        return httpEndpointDescriptor;
     }
 
     @Override
@@ -115,7 +130,7 @@ public class HttpServerRequest implements ServerRequest {
 
     @Override
     public String getEffectiveRequestPath() {
-        String path = getEndpointDescriptor().getPath();
+        String path = extractPath(getRequestURI());
         String effective = contextPath != null && !PATH_SEPARATOR.equals(contextPath) && path.startsWith(contextPath) ?
                 path.substring(contextPath.length()) : path;
         return effective.isEmpty() ? PATH_SEPARATOR : effective;
@@ -214,5 +229,14 @@ public class HttpServerRequest implements ServerRequest {
 
     public String toString() {
         return "ServerRequest[request=" + httpRequest + "]";
+    }
+
+    private static String extractPath(String uri) {
+        String path = uri;
+        int pos = uri.lastIndexOf('#');
+        path = pos >= 0 ? path.substring(0, pos) : path;
+        pos = uri.lastIndexOf('?');
+        path = pos >= 0 ? path.substring(0, pos) : path;
+        return path;
     }
 }

@@ -5,9 +5,10 @@ import org.xbib.net.QueryParameters;
 import org.xbib.net.path.PathMatcher;
 import org.xbib.net.path.PathNormalizer;
 import org.xbib.netty.http.common.HttpMethod;
-import org.xbib.netty.http.server.ServerRequest;
-import org.xbib.netty.http.server.ServerResponse;
-import org.xbib.netty.http.server.endpoint.service.Service;
+import org.xbib.netty.http.server.api.Endpoint;
+import org.xbib.netty.http.server.api.ServerRequest;
+import org.xbib.netty.http.server.api.ServerResponse;
+import org.xbib.netty.http.server.api.Filter;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -32,17 +33,21 @@ public class HttpEndpoint implements Endpoint<HttpEndpointDescriptor> {
 
     private final List<String> contentTypes;
 
-    private final List<Service> filters;
+    private final List<Filter> beforeFilters;
+
+    private final List<Filter> afterFilters;
 
     private HttpEndpoint(String prefix, String path,
                          EnumSet<HttpMethod> methods,
                          List<String> contentTypes,
-                         List<Service> filters) {
+                         List<Filter> beforeFilters,
+                         List<Filter> afterFilters) {
         this.prefix = PathNormalizer.normalize(prefix);
         this.path = PathNormalizer.normalize(path);
         this.methods = methods;
         this.contentTypes = contentTypes;
-        this.filters = filters;
+        this.beforeFilters = beforeFilters;
+        this.afterFilters = afterFilters;
     }
 
     public static Builder builder() {
@@ -55,7 +60,8 @@ public class HttpEndpoint implements Endpoint<HttpEndpointDescriptor> {
                 .setPath(endpoint.path)
                 .setMethods(endpoint.methods)
                 .setContentTypes(endpoint.contentTypes)
-                .setFilters(endpoint.filters);
+                .setBefore(endpoint.beforeFilters)
+                .setAfter(endpoint.afterFilters);
     }
 
     @Override
@@ -69,11 +75,11 @@ public class HttpEndpoint implements Endpoint<HttpEndpointDescriptor> {
     }
 
     @Override
-    public boolean matches(HttpEndpointDescriptor info) {
-        return pathMatcher.match(prefix + path, info.getPath()) &&
-                (methods == null || methods.isEmpty() || (methods.contains(info.getMethod()))) &&
-                (contentTypes == null || contentTypes.isEmpty() || info.getContentType() == null ||
-                contentTypes.stream().anyMatch(info.getContentType()::startsWith));
+    public boolean matches(HttpEndpointDescriptor httpEndpointDescriptor) {
+        return pathMatcher.match(prefix + path, httpEndpointDescriptor.getPath()) &&
+                (methods == null || methods.isEmpty() || (methods.contains(httpEndpointDescriptor.getMethod()))) &&
+                (contentTypes == null || contentTypes.isEmpty() || httpEndpointDescriptor.getContentType() == null ||
+                contentTypes.stream().anyMatch(httpEndpointDescriptor.getContentType()::startsWith));
     }
 
     @Override
@@ -88,19 +94,29 @@ public class HttpEndpoint implements Endpoint<HttpEndpointDescriptor> {
     }
 
     @Override
-    public void handle(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
+    public void before(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
         serverRequest.setContext(pathMatcher.tokenizePath(getPrefix()));
-        for (Service service : filters) {
-            service.handle(serverRequest, serverResponse);
-            if (serverResponse.getStatus() != null) {
-                break;
-            }
+        for (Filter filter : beforeFilters) {
+            filter.handle(serverRequest, serverResponse);
+        }
+    }
+
+    @Override
+    public void after(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
+        serverRequest.setContext(pathMatcher.tokenizePath(getPrefix()));
+        for (Filter filter : afterFilters) {
+            filter.handle(serverRequest, serverResponse);
         }
     }
 
     @Override
     public String toString() {
-        return "Endpoint[prefix=" + prefix + ",path=" + path + ",methods=" + methods + ",contentTypes=" + contentTypes + ",filters=" + filters +"]";
+        return "Endpoint[prefix=" + prefix + ",path=" + path +
+                ",methods=" + methods +
+                ",contentTypes=" + contentTypes +
+                ",before=" + beforeFilters +
+                ",after=" + afterFilters +
+                "]";
     }
 
     static class EndpointPathComparator implements Comparator<HttpEndpoint> {
@@ -127,14 +143,17 @@ public class HttpEndpoint implements Endpoint<HttpEndpointDescriptor> {
 
         private List<String> contentTypes;
 
-        private List<Service> filters;
+        private List<Filter> beforeFilters;
+
+        private List<Filter> afterFilters;
 
         Builder() {
             this.prefix = "/";
             this.path = "/**";
             this.methods = DEFAULT_METHODS;
             this.contentTypes = new ArrayList<>();
-            this.filters = new ArrayList<>();
+            this.beforeFilters = new ArrayList<>();
+            this.afterFilters = new ArrayList<>();
         }
 
         public Builder setPrefix(String prefix) {
@@ -175,20 +194,21 @@ public class HttpEndpoint implements Endpoint<HttpEndpointDescriptor> {
             return this;
         }
 
-        public Builder setFilters(List<Service> filters) {
+        public Builder setBefore(List<Filter> filters) {
             Objects.requireNonNull(filters);
-            this.filters = filters;
+            this.beforeFilters = filters;
             return this;
         }
 
-        public Builder addFilter(Service filter) {
-            Objects.requireNonNull(filter);
-            this.filters.add(filter);
+        public Builder setAfter(List<Filter> filters) {
+            Objects.requireNonNull(filters);
+            this.afterFilters = filters;
             return this;
         }
 
         public HttpEndpoint build() {
-            return new HttpEndpoint(prefix, path, methods, contentTypes, filters);
+            return new HttpEndpoint(prefix, path, methods, contentTypes,
+                    beforeFilters, afterFilters);
         }
     }
 }

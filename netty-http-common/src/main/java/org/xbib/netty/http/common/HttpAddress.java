@@ -10,6 +10,8 @@ import java.net.InetSocketAddress;
  */
 public class HttpAddress implements PoolKey {
 
+    public static final HttpVersion HTTP_1_1 = HttpVersion.valueOf("HTTP/1.1");
+
     public static final HttpVersion HTTP_2_0 = HttpVersion.valueOf("HTTP/2.0");
 
     private final String host;
@@ -23,19 +25,19 @@ public class HttpAddress implements PoolKey {
     private InetSocketAddress inetSocketAddress;
 
     public static HttpAddress http1(String host) {
-        return new HttpAddress(host, 80, HttpVersion.HTTP_1_1, false);
+        return new HttpAddress(host, 80, HTTP_1_1, false);
     }
 
     public static HttpAddress http1(String host, int port) {
-        return new HttpAddress(host, port, HttpVersion.HTTP_1_1, false);
+        return new HttpAddress(host, port, HTTP_1_1, false);
     }
 
     public static HttpAddress secureHttp1(String host) {
-        return new HttpAddress(host, 443, HttpVersion.HTTP_1_1, true);
+        return new HttpAddress(host, 443, HTTP_1_1, true);
     }
 
     public static HttpAddress secureHttp1(String host, int port) {
-        return new HttpAddress(host, port, HttpVersion.HTTP_1_1, true);
+        return new HttpAddress(host, port, HTTP_1_1, true);
     }
 
     public static HttpAddress http2(String host) {
@@ -55,7 +57,7 @@ public class HttpAddress implements PoolKey {
     }
 
     public static HttpAddress http1(URL url) {
-        return new HttpAddress(url, HttpVersion.HTTP_1_1);
+        return new HttpAddress(url, HTTP_1_1);
     }
 
     public static HttpAddress http2(URL url) {
@@ -63,7 +65,7 @@ public class HttpAddress implements PoolKey {
     }
 
     public static HttpAddress of(URL url) {
-        return new HttpAddress(url, HttpVersion.HTTP_1_1);
+        return new HttpAddress(url, HTTP_1_1);
     }
 
     public static HttpAddress of(URL url, HttpVersion httpVersion) {
@@ -95,7 +97,9 @@ public class HttpAddress implements PoolKey {
     }
 
     public URL base() {
-        return isSecure() ? URL.https().host(host).port(port).build() : URL.http().host(host).port(port).build();
+        return isSecure() ?
+                URL.https().host(host).port(port).build() :
+                URL.http().host(host).port(port).build();
     }
 
     public HttpVersion getVersion() {

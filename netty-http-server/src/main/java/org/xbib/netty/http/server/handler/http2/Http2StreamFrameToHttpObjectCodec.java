@@ -78,9 +78,7 @@ public class Http2StreamFrameToHttpObjectCodec extends MessageToMessageCodec<Htt
             int id = frame.stream() != null ? frame.stream().id() : -1;
             Http2HeadersFrame headersFrame = (Http2HeadersFrame) frame;
             Http2Headers headers = headersFrame.headers();
-
             final CharSequence status = headers.status();
-
             // 100-continue response is a special case where Http2HeadersFrame#isEndStream=false
             // but we need to decode it as a FullHttpResponse to play nice with HttpObjectAggregator.
             if (null != status && HttpResponseStatus.CONTINUE.codeAsText().contentEquals(status)) {
@@ -88,7 +86,6 @@ public class Http2StreamFrameToHttpObjectCodec extends MessageToMessageCodec<Htt
                 out.add(fullMsg);
                 return;
             }
-
             if (headersFrame.isEndStream()) {
                 if (headers.method() == null && status == null) {
                     LastHttpContent last = new DefaultLastHttpContent(Unpooled.EMPTY_BUFFER, validateHeaders);
@@ -156,7 +153,6 @@ public class Http2StreamFrameToHttpObjectCodec extends MessageToMessageCodec<Htt
                 }
             }
         }
-
         if (obj instanceof HttpMessage) {
             Http2Headers headers = toHttp2Headers((HttpMessage) obj);
             boolean noMoreFrames = false;
@@ -164,7 +160,6 @@ public class Http2StreamFrameToHttpObjectCodec extends MessageToMessageCodec<Htt
                 FullHttpMessage full = (FullHttpMessage) obj;
                 noMoreFrames = !full.content().isReadable() && full.trailingHeaders().isEmpty();
             }
-
             out.add(new DefaultHttp2HeadersFrame(headers, noMoreFrames));
         }
 
@@ -183,7 +178,6 @@ public class Http2StreamFrameToHttpObjectCodec extends MessageToMessageCodec<Htt
                     HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(),
                     scheme.name());
         }
-
         return HttpConversionUtil.toHttp2Headers(msg, validateHeaders);
     }
 
@@ -205,8 +199,7 @@ public class Http2StreamFrameToHttpObjectCodec extends MessageToMessageCodec<Htt
     @Override
     public void handlerAdded(final ChannelHandlerContext ctx) throws Exception {
         super.handlerAdded(ctx);
-
-        // this handler is typically used on an Http2StreamChannel. at this
+        // This handler is typically used on an Http2StreamChannel. At this
         // stage, ssl handshake should've been established. checking for the
         // presence of SslHandler in the parent's channel pipeline to
         // determine the HTTP scheme should suffice, even for the case where

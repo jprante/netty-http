@@ -2,7 +2,7 @@ package org.xbib.netty.http.client.test;
 
 import org.junit.jupiter.api.Test;
 import org.xbib.netty.http.client.Client;
-import org.xbib.netty.http.client.Request;
+import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.common.HttpResponse;
 
 import java.io.IOException;

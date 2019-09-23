@@ -13,7 +13,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.pool.BoundedChannelPool;
-import org.xbib.netty.http.client.pool.Pool;
+import org.xbib.netty.http.client.api.Pool;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,10 +47,10 @@ class PoolTest {
         ServerBootstrap serverBootstrap = new ServerBootstrap()
                 .group(new NioEventLoopGroup())
                 .channel(NioServerSocketChannel.class)
-                .childHandler(new ChannelInitializer<Channel>() {
-                        @Override
-                        protected void initChannel(Channel ch) {
-                        }
+                .childHandler(new ChannelInitializer<>() {
+                    @Override
+                    protected void initChannel(Channel ch) {
+                    }
                 });
         Channel serverChannel = serverBootstrap.bind("localhost", 8008).sync().channel();
 
