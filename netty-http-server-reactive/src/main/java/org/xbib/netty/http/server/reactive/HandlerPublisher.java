@@ -166,9 +166,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
         if (subscriber == null) {
             throw new NullPointerException("Null subscriber");
         }
-
         if (!hasSubscriber.compareAndSet(false, true)) {
-            // Must call onSubscribe first.
             subscriber.onSubscribe(new Subscription() {
                 @Override
                 public void request(long n) {
@@ -179,12 +177,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
             });
             subscriber.onError(new IllegalStateException("This publisher only supports one subscriber"));
         } else {
-            executor.execute(new Runnable() {
-                @Override
-                public void run() {
-                    provideSubscriber(subscriber);
-                }
-            });
+            executor.execute(() -> provideSubscriber(subscriber));
         }
     }
 
@@ -216,8 +209,6 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) {
-        // If the channel is not yet registered, then it's not safe to invoke any methods on it, eg read() or close()
-        // So don't provide the context until it is registered.
         if (ctx.channel().isRegistered()) {
             provideChannelContext(ctx);
         }
@@ -234,7 +225,6 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
             case NO_SUBSCRIBER_OR_CONTEXT:
                 verifyRegisteredWithRightExecutor(ctx);
                 this.ctx = ctx;
-                // It's set, we don't have a subscriber
                 state = NO_SUBSCRIBER;
                 break;
             case NO_CONTEXT:
@@ -244,7 +234,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
                 subscriber.onSubscribe(new ChannelSubscription());
                 break;
             default:
-                // Ignore, this could be invoked twice by both handlerAdded and channelRegistered.
+                break;
         }
     }
 
@@ -256,7 +246,6 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) {
-        // If we subscribed before the channel was active, then our read would have been ignored.
         if (state == DEMANDING) {
             requestDemand();
         }
@@ -278,19 +267,16 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
 
             case IDLE:
                 if (addDemand(demand)) {
-                    // Important to change state to demanding before doing a read, in case we get a synchronous
-                    // read back.
                     state = DEMANDING;
                     requestDemand();
                 }
                 break;
             default:
-
+                break;
         }
     }
 
     private boolean addDemand(long demand) {
-
         if (demand <= 0) {
             illegalDemand();
             return false;
@@ -320,7 +306,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
             if (outstandingDemand > 0) {
                 if (state == BUFFERING) {
                     state = DEMANDING;
-                } // otherwise we're draining
+                }
                 requestDemand();
             } else if (state == BUFFERING) {
                 state = IDLE;
@@ -409,7 +395,6 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
     }
 
     private void complete() {
-
         switch (state) {
             case NO_SUBSCRIBER:
             case BUFFERING:
@@ -422,8 +407,8 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
                 state = DONE;
                 break;
             case NO_SUBSCRIBER_ERROR:
-                // Ignore, we're already going to complete the stream with an error
-                // when the subscriber subscribes.
+                break;
+            default:
                 break;
         }
     }
@@ -443,6 +428,8 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
                 state = DONE;
                 cleanup();
                 subscriber.onError(cause);
+                break;
+            default:
                 break;
         }
     }
@@ -464,7 +451,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
 
         @Override
         public void cancel() {
-            executor.execute(() -> receivedCancel());
+            executor.execute(HandlerPublisher.this::receivedCancel);
         }
     }
 

@@ -4,6 +4,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpContentDecompressor;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http2.DefaultHttp2DataFrame;
@@ -13,6 +14,7 @@ import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
+import io.netty.handler.codec.http2.Http2StreamFrameToHttpObjectCodec;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.util.AsciiString;
 import org.xbib.net.URLSyntaxException;
@@ -21,7 +23,6 @@ import org.xbib.netty.http.client.api.Transport;
 import org.xbib.netty.http.client.cookie.ClientCookieDecoder;
 import org.xbib.netty.http.client.cookie.ClientCookieEncoder;
 import org.xbib.netty.http.client.handler.http2.Http2ResponseHandler;
-import org.xbib.netty.http.client.handler.http2.Http2StreamFrameToHttpObjectCodec;
 import org.xbib.netty.http.common.DefaultHttpResponse;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.api.Request;
@@ -56,6 +57,8 @@ public class Http2Transport extends BaseTransport {
                 ChannelPipeline p = ch.pipeline();
                 p.addLast("child-client-frame-converter",
                         new Http2StreamFrameToHttpObjectCodec(false));
+                p.addLast("child-client-decompressor",
+                        new HttpContentDecompressor());
                 p.addLast("child-client-chunk-aggregator",
                         new HttpObjectAggregator(client.getClientConfig().getMaxContentLength()));
                 p.addLast("child-client-response-handler",

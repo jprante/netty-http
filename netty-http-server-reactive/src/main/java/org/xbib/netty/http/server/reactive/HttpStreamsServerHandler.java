@@ -53,7 +53,7 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
     private final List<ChannelHandler> dependentHandlers;
 
     public HttpStreamsServerHandler() {
-        this(Collections.<ChannelHandler>emptyList());
+        this(Collections.emptyList());
     }
 
     /**
@@ -89,11 +89,8 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        // Set to false, since if it was true, and the client is sending data, then the
-        // client must no longer be expecting it (due to a timeout, for example).
         continueExpected = false;
         sendContinue = false;
-
         if (msg instanceof HttpRequest) {
             HttpRequest request = (HttpRequest) msg;
             lastRequest = request;
@@ -117,7 +114,6 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
             sendContinue = false;
             continueExpected = false;
         }
-
         if (close) {
             ctx.close();
         }
@@ -125,13 +121,10 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
 
     @Override
     protected void unbufferedWrite(ChannelHandlerContext ctx, HttpStreamsHandler<HttpRequest, HttpResponse>.Outgoing out) {
-
         if (out.message instanceof WebSocketHttpResponse) {
             if ((lastRequest instanceof FullHttpRequest) || !hasBody(lastRequest)) {
                 handleWebSocketResponse(ctx, out);
             } else {
-                // If the response has a streamed body, then we can't send the WebSocket response until we've received
-                // the body.
                 webSocketResponse = out;
             }
         } else {
@@ -150,8 +143,6 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
                 close = true;
                 continueExpected = false;
             }
-            // According to RFC 7230 a server MUST NOT send a Content-Length or a Transfer-Encoding when the status
-            // code is 1xx or 204, also a status code 304 may not have a Content-Length or Transfer-Encoding set.
             if (!HttpUtil.isContentLengthSet(out.message) && !HttpUtil.isTransferEncodingChunked(out.message)
                     && canHaveBody(out.message)) {
                 HttpUtil.setKeepAlive(out.message, false);
@@ -163,8 +154,6 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
 
     private boolean canHaveBody(HttpResponse message) {
         HttpResponseStatus status = message.status();
-        // All 1xx (Informational), 204 (No Content), and 304 (Not Modified)
-        // responses do not include a message body
         return !(status == HttpResponseStatus.CONTINUE || status == HttpResponseStatus.SWITCHING_PROTOCOLS ||
                 status == HttpResponseStatus.PROCESSING || status == HttpResponseStatus.NO_CONTENT ||
                 status == HttpResponseStatus.NOT_MODIFIED);
@@ -181,7 +170,6 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
     private void handleWebSocketResponse(ChannelHandlerContext ctx, Outgoing out) {
         WebSocketHttpResponse response = (WebSocketHttpResponse) out.message;
         WebSocketServerHandshaker handshaker = response.handshakerFactory().newHandshaker(lastRequest);
-
         if (handshaker == null) {
             HttpResponse res = new DefaultFullHttpResponse(
                     HttpVersion.HTTP_1_1,
@@ -191,26 +179,16 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
             super.unbufferedWrite(ctx, new Outgoing(res, out.promise));
             response.subscribe(new CancelledSubscriber<>());
         } else {
-            // First, insert new handlers in the chain after us for handling the websocket
             ChannelPipeline pipeline = ctx.pipeline();
             HandlerPublisher<WebSocketFrame> publisher = new HandlerPublisher<>(ctx.executor(), WebSocketFrame.class);
             HandlerSubscriber<WebSocketFrame> subscriber = new HandlerSubscriber<>(ctx.executor());
             pipeline.addAfter(ctx.executor(), ctx.name(), "websocket-subscriber", subscriber);
             pipeline.addAfter(ctx.executor(), ctx.name(), "websocket-publisher", publisher);
-
-            // Now remove ourselves from the chain
             ctx.pipeline().remove(ctx.name());
-
-            // Now do the handshake
-            // Wrap the request in an empty request because we don't need the WebSocket handshaker ignoring the body,
-            // we already have handled the body.
             handshaker.handshake(ctx.channel(), new EmptyHttpRequest(lastRequest));
-
-            // And hook up the subscriber/publishers
             response.subscribe(subscriber);
             publisher.subscribe(response);
         }
-
     }
 
     @Override

@@ -51,21 +51,16 @@ public class HttpStreamsClientHandler extends HttpStreamsHandler<HttpResponse, H
         if (response.status().code() >= 100 && response.status().code() < 200) {
             return false;
         }
-
         if (response.status().equals(HttpResponseStatus.NO_CONTENT) ||
                 response.status().equals(HttpResponseStatus.NOT_MODIFIED)) {
             return false;
         }
-
         if (HttpUtil.isTransferEncodingChunked(response)) {
             return true;
         }
-
-
         if (HttpUtil.isContentLengthSet(response)) {
             return HttpUtil.getContentLength(response) > 0;
         }
-
         return true;
     }
 
@@ -132,7 +127,7 @@ public class HttpStreamsClientHandler extends HttpStreamsHandler<HttpResponse, H
                     ignoreResponseBody = true;
                 }
             } else {
-                awaiting100ContinueMessage.subscribe(new CancelledSubscriber<HttpContent>());
+                awaiting100ContinueMessage.subscribe(new CancelledSubscriber<>());
                 awaiting100ContinueMessage = null;
                 awaiting100Continue.onSubscribe(new Subscription() {
                     public void request(long n) {

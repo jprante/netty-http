@@ -76,12 +76,10 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> impleme
         Http2MultiplexCodec multiplexCodec = multiplexCodecBuilder.autoAckSettingsFrame(true) .build();
         ChannelPipeline pipeline = ch.pipeline();
         pipeline.addLast("client-multiplex", multiplexCodec);
-        // does not work
-        //pipeline.addLast("client-decompressor", new HttpContentDecompressor());
         pipeline.addLast("client-messages", new ClientMessages());
     }
 
-    class ClientMessages extends ChannelInboundHandlerAdapter {
+    static class ClientMessages extends ChannelInboundHandlerAdapter {
 
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
@@ -118,9 +116,9 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> impleme
         }
     }
 
-    class PushPromiseHandler extends Http2FrameLogger {
+    static class PushPromiseHandler extends Http2FrameLogger {
 
-        public PushPromiseHandler(LogLevel level, String name) {
+        PushPromiseHandler(LogLevel level, String name) {
             super(level, name);
         }
 

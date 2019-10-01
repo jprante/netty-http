@@ -17,7 +17,8 @@ public class GoogleTest {
                 .build();
         try {
             // TODO decompression of frames
-            Request request2 = Request.get().url("https://google.com").setVersion("HTTP/2.0")
+            Request request2 = Request.get().url("https://google.com")
+                    .setVersion("HTTP/2.0")
                     .setResponseListener(resp -> logger.log(Level.INFO, "got HTTP/2 response: " +
                             resp.getHeaders() + resp.getBodyAsString(StandardCharsets.UTF_8)))
                     .build();

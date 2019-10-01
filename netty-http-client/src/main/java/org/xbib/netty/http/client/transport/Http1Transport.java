@@ -5,6 +5,7 @@ import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.multipart.HttpPostRequestEncoder;
 import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.HttpConversionUtil;
@@ -16,8 +17,6 @@ import org.xbib.netty.http.client.cookie.ClientCookieEncoder;
 import org.xbib.netty.http.common.DefaultHttpResponse;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.api.Request;
-import org.xbib.netty.http.client.api.ResponseListener;
-import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.common.cookie.Cookie;
 
 import java.io.IOException;
@@ -51,6 +50,7 @@ public class Http1Transport extends BaseTransport {
         FullHttpRequest fullHttpRequest = request.content() == null ?
                 new DefaultFullHttpRequest(request.httpVersion(), request.httpMethod(), uri) :
                 new DefaultFullHttpRequest(request.httpVersion(), request.httpMethod(), uri, request.content());
+        HttpPostRequestEncoder httpPostRequestEncoder = null;
         final Integer streamId = flowMap.get(channelId).nextStreamId();
         if (streamId == null) {
             throw new IllegalStateException();
@@ -68,9 +68,25 @@ public class Http1Transport extends BaseTransport {
         }
         // add stream-id and cookie headers
         fullHttpRequest.headers().set(request.headers());
-        // flush after putting request into requests map
+        if (request.content() == null && !request.getBodyData().isEmpty()) {
+            try {
+                httpPostRequestEncoder =
+                        new HttpPostRequestEncoder(httpDataFactory, fullHttpRequest, true);
+                httpPostRequestEncoder.setBodyHttpDatas(request.getBodyData());
+                httpPostRequestEncoder.finalizeRequest();
+            } catch (HttpPostRequestEncoder.ErrorDataEncoderException e) {
+                throw new IOException(e);
+            }
+        }
         if (channel.isWritable()) {
-            channel.writeAndFlush(fullHttpRequest);
+            channel.write(fullHttpRequest);
+            if (httpPostRequestEncoder != null && httpPostRequestEncoder.isChunked()) {
+                channel.write(httpPostRequestEncoder);
+            }
+            channel.flush();
+            if (httpPostRequestEncoder != null) {
+                httpPostRequestEncoder.cleanFiles();
+            }
             client.getRequestCounter().incrementAndGet();
         }
         return this;
@@ -119,15 +135,17 @@ public class Http1Transport extends BaseTransport {
             } catch (URLSyntaxException | IOException e) {
                 logger.log(Level.WARNING, e.getMessage(), e);
             }
-            // acknowledge success
+            // acknowledge success, if possible
             String channelId = channel.id().toString();
             Flow flow = flowMap.get(channelId);
-            if (flow == null) {
-                return;
-            }
-            CompletableFuture<Boolean> promise = flow.get(flow.lastKey());
-            if (promise != null) {
-                promise.complete(true);
+            if (flow != null) {
+                Integer lastKey = flow.lastKey();
+                if (lastKey != null) {
+                    CompletableFuture<Boolean> promise = flow.get(lastKey);
+                    if (promise != null) {
+                        promise.complete(true);
+                    }
+                }
             }
         } finally {
             if (requestKey != null) {

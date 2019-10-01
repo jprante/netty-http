@@ -66,8 +66,10 @@ public class HttpServerRequest implements ServerRequest {
     }
 
     void handleParameters() {
+        if (logger.isLoggable(Level.FINER)) {
+            logger.log(Level.FINER, () -> "request = " + httpRequest);
+        }
         Charset charset = HttpUtil.getCharset(httpRequest, StandardCharsets.UTF_8);
-        HttpParameters httpParameters = new HttpParameters();
         this.url = URL.builder()
                 .charset(charset, CodingErrorAction.REPLACE)
                 .path(httpRequest.uri()) // creates path, query params, fragment
@@ -76,31 +78,28 @@ public class HttpServerRequest implements ServerRequest {
         CharSequence mimeType = HttpUtil.getMimeType(httpRequest);
         ByteBuf byteBuf = httpRequest.content();
         if (logger.isLoggable(Level.FINER)) {
-            logger.log(Level.FINER, "url = " + url +
+            logger.log(Level.FINER, () -> "url = " + url +
+                    " charset = " + charset +
                     " mime type = " + mimeType +
                     " queryParameters = " + queryParameters +
                     " body exists = " + (byteBuf != null));
         }
         if (byteBuf != null) {
-            if (httpRequest.method().equals(HttpMethod.POST) && mimeType != null) {
+            if (httpRequest.method().equals(HttpMethod.POST)) {
                 String params;
                 // https://www.w3.org/TR/html4/interact/forms.html#h-17.13.4
-                if (HttpHeaderValues.APPLICATION_X_WWW_FORM_URLENCODED.toString().equals(mimeType.toString())) {
+                if (mimeType != null && HttpHeaderValues.APPLICATION_X_WWW_FORM_URLENCODED.toString().equals(mimeType.toString())) {
                     Charset htmlCharset = HttpUtil.getCharset(httpRequest, StandardCharsets.ISO_8859_1);
                     params = byteBuf.toString(htmlCharset).replace('+', ' ');
                     if (logger.isLoggable(Level.FINER)) {
                         logger.log(Level.FINER, "html form, charset = " + htmlCharset + " param body = " + params);
                     }
-                } else {
-                    params = byteBuf.toString(charset);
-                    if (logger.isLoggable(Level.FINER)) {
-                        logger.log(Level.FINER, "not a html form, charset = " + charset + " param body = " + params);
-                    }
+                    queryParameters.addPercentEncodedBody(params);
+                    queryParameters.add("_raw", params);
                 }
-                queryParameters.addPercentEncodedBody(params);
-                queryParameters.add("_body", params);
             }
         }
+        HttpParameters httpParameters = new HttpParameters();
         for (Pair<String, String> pair : queryParameters) {
             httpParameters.add(pair.getFirst(), pair.getSecond());
         }

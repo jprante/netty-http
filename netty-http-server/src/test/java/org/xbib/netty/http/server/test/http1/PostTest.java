@@ -241,4 +241,53 @@ class PostTest {
         assertTrue(success3.get());
         assertTrue(success4.get());
     }
+
+    @Test
+    void testPostInvalidPercentEncodings() throws Exception {
+        final AtomicBoolean success1 = new AtomicBoolean(false);
+        final AtomicBoolean success2 = new AtomicBoolean(false);
+        final AtomicBoolean success3 = new AtomicBoolean(false);
+        HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
+        Domain domain = Domain.builder(httpAddress)
+                .singleEndpoint("/post", "/**", (req, resp) -> {
+                    HttpParameters parameters = req.getParameters();
+                    logger.log(Level.INFO, "got request " + parameters.toString() + ", sending OK");
+                    if ("myÿvalue".equals(parameters.getFirst("my param"))) {
+                        success1.set(true);
+                    }
+                    if ("b%YYc".equals(parameters.getFirst("a"))) {
+                        success2.set(true);
+                    }
+                    ServerResponse.write(resp, HttpResponseStatus.OK);
+                },  "POST")
+                .build();
+        Server server = Server.builder(domain)
+                .build();
+        Client client = Client.builder()
+                .build();
+        try {
+            server.accept();
+            ResponseListener<HttpResponse> responseListener = (resp) -> {
+                if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
+                    success3.set(true);
+                }
+            };
+            Request postRequest = Request.post().setVersion(HttpVersion.HTTP_1_1)
+                    .url(server.getServerConfig().getAddress().base().resolve("/post/test.txt"))
+                    .contentType(HttpHeaderValues.APPLICATION_X_WWW_FORM_URLENCODED, StandardCharsets.ISO_8859_1)
+                    .addRawParameter("a", "b%YYc")
+                    .addRawFormParameter("my param", "my%ZZvalue")
+                    .setResponseListener(responseListener)
+                    .build();
+            client.execute(postRequest).get();
+        } finally {
+            server.shutdownGracefully();
+            client.shutdownGracefully();
+            logger.log(Level.INFO, "server and client shut down");
+        }
+        assertTrue(success1.get());
+        assertTrue(success2.get());
+        assertTrue(success3.get());
+    }
+
 }

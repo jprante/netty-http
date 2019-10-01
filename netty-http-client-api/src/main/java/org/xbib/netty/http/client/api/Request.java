@@ -13,6 +13,7 @@ import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.QueryStringEncoder;
+import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.util.AsciiString;
 import org.xbib.net.PercentEncoder;
@@ -57,6 +58,8 @@ public final class Request {
 
     private final ByteBuf content;
 
+    private final List<InterfaceHttpData> bodyData;
+
     private final long timeoutInMillis;
 
     private final boolean followRedirect;
@@ -74,7 +77,7 @@ public final class Request {
     private ResponseListener<HttpResponse> responseListener;
 
     private Request(URL url, String uri, HttpVersion httpVersion, HttpMethod httpMethod,
-                    HttpHeaders headers, Collection<Cookie> cookies, ByteBuf content,
+                    HttpHeaders headers, Collection<Cookie> cookies, ByteBuf content, List<InterfaceHttpData> bodyData,
                     long timeoutInMillis, boolean followRedirect, int maxRedirect, int redirectCount,
                     boolean isBackOff, BackOff backOff, ResponseListener<HttpResponse> responseListener) {
         this.url = url;
@@ -84,6 +87,7 @@ public final class Request {
         this.headers = headers;
         this.cookies = cookies;
         this.content = content;
+        this.bodyData = bodyData;
         this.timeoutInMillis = timeoutInMillis;
         this.followRedirect = followRedirect;
         this.maxRedirects = maxRedirect;
@@ -124,6 +128,10 @@ public final class Request {
 
     public ByteBuf content() {
         return content;
+    }
+
+    public List<InterfaceHttpData> getBodyData() {
+        return bodyData;
     }
 
     /**
@@ -306,6 +314,8 @@ public final class Request {
 
         private ByteBuf content;
 
+        private List<InterfaceHttpData> bodyData;
+
         private long timeoutInMillis;
 
         private boolean followRedirect;
@@ -333,6 +343,7 @@ public final class Request {
             this.removeHeaders = new ArrayList<>();
             this.cookies = new HashSet<>();
             this.uriParameters = new HttpParameters();
+            this.bodyData = new ArrayList<>();
             charset(StandardCharsets.UTF_8);
         }
 
@@ -439,10 +450,29 @@ public final class Request {
             return this;
         }
 
+        public Builder addRawParameter(String name, String value) {
+            Objects.requireNonNull(name);
+            Objects.requireNonNull(value);
+            uriParameters.add(name, value);
+            return this;
+        }
+
         public Builder addFormParameter(String name, String value) {
             Objects.requireNonNull(name);
             Objects.requireNonNull(value);
             formParameters.add(encode(contentType, name), encode(contentType, value));
+            return this;
+        }
+
+        public Builder addRawFormParameter(String name, String value) {
+            Objects.requireNonNull(name);
+            Objects.requireNonNull(value);
+            formParameters.add(name, value);
+            return this;
+        }
+
+        public Builder addBodyData(InterfaceHttpData data) {
+            bodyData.add(data);
             return this;
         }
 
@@ -631,7 +661,7 @@ public final class Request {
             for (String headerName : removeHeaders) {
                 validatedHeaders.remove(headerName);
             }
-            return new Request(url, uri, httpVersion, httpMethod, validatedHeaders, cookies, content,
+            return new Request(url, uri, httpVersion, httpMethod, validatedHeaders, cookies, content, bodyData,
                     timeoutInMillis, followRedirect, maxRedirects, 0, enableBackOff, backOff,
                     responseListener);
         }

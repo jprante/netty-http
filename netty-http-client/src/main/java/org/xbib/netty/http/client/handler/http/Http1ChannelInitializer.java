@@ -11,6 +11,7 @@ import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.handler.stream.ChunkedWriteHandler;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.ClientConfig;
 import org.xbib.netty.http.client.api.HttpChannelInitializer;
@@ -63,7 +64,7 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel> impleme
     private void configureEncrypted(Channel channel)  {
         ChannelPipeline pipeline = channel.pipeline();
         SslHandler sslHandler = sslHandlerFactory.create();
-        pipeline.addLast("ssl-handler", sslHandler);
+        pipeline.addLast("client-ssl-handler", sslHandler);
         if (clientConfig.isEnableNegotiation()) {
             ApplicationProtocolNegotiationHandler negotiationHandler =
                     new ApplicationProtocolNegotiationHandler(ApplicationProtocolNames.HTTP_1_1) {
@@ -95,15 +96,17 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel> impleme
 
     private void configureCleartext(Channel channel) {
         ChannelPipeline pipeline = channel.pipeline();
-        pipeline.addLast(new HttpClientCodec(clientConfig.getMaxInitialLineLength(),
+        //pipeline.addLast("client-chunk-compressor", new HttpChunkContentCompressor(6));
+        pipeline.addLast("http-client-chunk-writer", new ChunkedWriteHandler());
+        pipeline.addLast("http-client-codec", new HttpClientCodec(clientConfig.getMaxInitialLineLength(),
                  clientConfig.getMaxHeadersSize(), clientConfig.getMaxChunkSize()));
         if (clientConfig.isEnableGzip()) {
-            pipeline.addLast(new HttpContentDecompressor());
+            pipeline.addLast("http-client-decompressor", new HttpContentDecompressor());
         }
         HttpObjectAggregator httpObjectAggregator = new HttpObjectAggregator(clientConfig.getMaxContentLength(),
                 false);
         httpObjectAggregator.setMaxCumulationBufferComponents(clientConfig.getMaxCompositeBufferComponents());
-        pipeline.addLast(httpObjectAggregator);
-        pipeline.addLast(httpResponseHandler);
+        pipeline.addLast("http-client-aggregator", httpObjectAggregator);
+        pipeline.addLast("http-client-handler", httpResponseHandler);
     }
 }

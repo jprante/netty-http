@@ -26,11 +26,11 @@ class Flow {
     }
 
     Integer firstKey() {
-        return map.firstKey();
+        return map.isEmpty() ? null : map.firstKey();
     }
 
     Integer lastKey() {
-        return map.lastKey();
+        return map.isEmpty() ? null : map.lastKey();
     }
 
     void put(Integer key, CompletableFuture<Boolean> promise) {

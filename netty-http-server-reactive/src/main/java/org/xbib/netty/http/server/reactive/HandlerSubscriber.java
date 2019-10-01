@@ -103,16 +103,13 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
         switch (state) {
             case NO_SUBSCRIPTION_OR_CONTEXT:
                 this.ctx = ctx;
-                // We were in no subscription or context, now we just don't have a subscription.
                 state = NO_SUBSCRIPTION;
                 break;
             case NO_CONTEXT:
                 this.ctx = ctx;
-                // We were in no context, we're now fully initialised
                 maybeStart();
                 break;
             case COMPLETE:
-                // We are complete, close
                 state = COMPLETE;
                 ctx.close();
                 break;
@@ -175,6 +172,8 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
                 subscription.cancel();
                 state = CANCELLED;
                 break;
+            default:
+                break;
         }
     }
 
@@ -200,6 +199,8 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
                 break;
             case CANCELLED:
                 subscription.cancel();
+                break;
+            default:
                 break;
         }
     }
@@ -248,6 +249,9 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
                     ctx.close();
                     state = COMPLETE;
                     break;
+                default:
+                    break;
+
             }
         });
     }
@@ -255,7 +259,6 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
     private void maybeRequestMore() {
         if (outstandingDemand <= demandLowWatermark && ctx.channel().isWritable()) {
             long toRequest = demandHighWatermark - outstandingDemand;
-
             outstandingDemand = demandHighWatermark;
             subscription.request(toRequest);
         }

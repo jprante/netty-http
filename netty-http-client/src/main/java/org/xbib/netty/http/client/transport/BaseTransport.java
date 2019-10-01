@@ -3,6 +3,8 @@ package org.xbib.netty.http.client.transport;
 import io.netty.channel.Channel;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
+import io.netty.handler.codec.http.multipart.HttpDataFactory;
 import io.netty.handler.ssl.SslHandler;
 import org.xbib.net.PercentDecoder;
 import org.xbib.net.URL;
@@ -58,12 +60,15 @@ public abstract class BaseTransport implements Transport {
 
     private CookieBox cookieBox;
 
+    protected HttpDataFactory httpDataFactory;
+
     BaseTransport(Client client, HttpAddress httpAddress) {
         this.client = client;
         this.httpAddress = httpAddress;
         this.channels = new ConcurrentHashMap<>();
         this.flowMap = new ConcurrentHashMap<>();
         this.requests = new ConcurrentSkipListMap<>();
+        this.httpDataFactory = new DefaultHttpDataFactory();
     }
 
     @Override
@@ -104,6 +109,7 @@ public abstract class BaseTransport implements Transport {
             flow.close();
         }
         channels.clear();
+        httpDataFactory.cleanAllHttpData();
         // do not clear requests
     }
 
@@ -296,10 +302,7 @@ public abstract class BaseTransport implements Transport {
                                 hostAndPort.append(':').append(redirUrl.getPort());
                             }
                             newHttpRequest.headers().set(HttpHeaderNames.HOST, hostAndPort.toString());
-                            logger.log(Level.FINE, "redirect url: " + redirUrl +
-                                    " old request: " + request.toString() +
-                                    " new request: " + newHttpRequest.toString());
-                            request.release();
+                            logger.log(Level.FINE, "redirect url: " + redirUrl);
                             return newHttpRequest;
                         }
                         break;
@@ -338,7 +341,7 @@ public abstract class BaseTransport implements Transport {
                     if (backOff != null) {
                         long millis = backOff.nextBackOffMillis();
                         if (millis != BackOff.STOP) {
-                            logger.log(Level.FINE, "status = " + status + " backing off request by " + millis + " milliseconds");
+                            logger.log(Level.FINE, () -> "status = " + status + " backing off request by " + millis + " milliseconds");
                             try {
                                 Thread.sleep(millis);
                             } catch (InterruptedException e) {

@@ -79,6 +79,7 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel>
 
     private void configureCleartext(Channel channel) {
         ChannelPipeline pipeline = channel.pipeline();
+        pipeline.addLast("http-server-chunked-write", new ChunkedWriteHandler());
         pipeline.addLast("http-server-codec",
                 new HttpServerCodec(serverConfig.getMaxInitialLineLength(),
                         serverConfig.getMaxHeadersSize(), serverConfig.getMaxChunkSize()));
@@ -96,7 +97,6 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel>
         httpObjectAggregator.setMaxCumulationBufferComponents(serverConfig.getMaxCompositeBufferComponents());
         pipeline.addLast("http-server-aggregator", httpObjectAggregator);
         pipeline.addLast("http-server-pipelining", new HttpPipeliningHandler(serverConfig.getPipeliningCapacity()));
-        pipeline.addLast("http-server-chunked-write", new ChunkedWriteHandler());
         pipeline.addLast("http-server-handler", new HttpHandler(server));
         pipeline.addLast("http-idle-timeout-handler", new IdleTimeoutHandler(serverConfig.getIdleTimeoutMillis()));
     }
