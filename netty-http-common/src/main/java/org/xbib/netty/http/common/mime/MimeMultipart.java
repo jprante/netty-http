@@ -5,7 +5,7 @@ import java.util.Map;
 
 public interface MimeMultipart {
 
-    Map headers();
+    Map<String, String> headers();
 
     ByteBuf body();
 

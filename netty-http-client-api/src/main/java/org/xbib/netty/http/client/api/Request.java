@@ -11,8 +11,6 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.codec.http.QueryStringDecoder;
-import io.netty.handler.codec.http.QueryStringEncoder;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.util.AsciiString;
@@ -35,7 +33,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
@@ -45,8 +42,6 @@ import java.util.concurrent.CompletableFuture;
 public final class Request {
 
     private final URL url;
-
-    private final String uri;
 
     private final HttpVersion httpVersion;
 
@@ -76,12 +71,11 @@ public final class Request {
 
     private ResponseListener<HttpResponse> responseListener;
 
-    private Request(URL url, String uri, HttpVersion httpVersion, HttpMethod httpMethod,
+    private Request(URL url, HttpVersion httpVersion, HttpMethod httpMethod,
                     HttpHeaders headers, Collection<Cookie> cookies, ByteBuf content, List<InterfaceHttpData> bodyData,
                     long timeoutInMillis, boolean followRedirect, int maxRedirect, int redirectCount,
                     boolean isBackOff, BackOff backOff, ResponseListener<HttpResponse> responseListener) {
         this.url = url;
-        this.uri = uri;
         this.httpVersion = httpVersion;
         this.httpMethod = httpMethod;
         this.headers = headers;
@@ -106,8 +100,7 @@ public final class Request {
     }
 
     public String relative() {
-        // is already in external form
-        return uri;
+        return url.relativeReference();
     }
 
     public HttpVersion httpVersion() {
@@ -135,7 +128,8 @@ public final class Request {
     }
 
     /**
-     * Return the timeout in milliseconds per request. This overrides the read timeout of the client.
+     * Return the timeout in milliseconds per request.
+     * This overrides the read timeout of the client.
      * @return timeout timeout in milliseconds
      */
     public long getTimeoutInMillis() {
@@ -248,7 +242,7 @@ public final class Request {
     public static Builder builder(HttpMethod httpMethod, Request request) {
         return builder(PooledByteBufAllocator.DEFAULT, httpMethod)
                 .setVersion(request.httpVersion)
-                .uri(request.uri)
+                .url(request.url)
                 .setHeaders(request.headers)
                 .content(request.content)
                 .setResponseListener(request.responseListener);
@@ -304,8 +298,6 @@ public final class Request {
 
         private URL url;
 
-        private String uri;
-
         private CharSequence contentType;
 
         private HttpParameters uriParameters;
@@ -342,9 +334,15 @@ public final class Request {
             this.headers = new DefaultHttpHeaders();
             this.removeHeaders = new ArrayList<>();
             this.cookies = new HashSet<>();
-            this.uriParameters = new HttpParameters();
             this.bodyData = new ArrayList<>();
             charset(StandardCharsets.UTF_8);
+        }
+
+        public Builder charset(Charset charset) {
+            this.encoder = PercentEncoders.getQueryEncoder(charset);
+            this.formParameters = new HttpParameters(DEFAULT_FORM_CONTENT_TYPE);
+            this.uriParameters = new HttpParameters(DEFAULT_FORM_CONTENT_TYPE);
+            return this;
         }
 
         public Builder setMethod(HttpMethod httpMethod) {
@@ -396,11 +394,6 @@ public final class Request {
             return this;
         }
 
-        public Builder uri(String uri) {
-            this.uri = uri;
-            return this;
-        }
-
         public Builder setHeaders(HttpHeaders headers) {
             this.headers = headers;
             return this;
@@ -418,12 +411,6 @@ public final class Request {
 
         public Builder removeHeader(String name) {
             removeHeaders.add(name);
-            return this;
-        }
-
-        public Builder charset(Charset charset) {
-            this.encoder = PercentEncoders.getQueryEncoder(charset);
-            this.formParameters = new HttpParameters(DEFAULT_FORM_CONTENT_TYPE);
             return this;
         }
 
@@ -446,28 +433,28 @@ public final class Request {
         public Builder addParameter(String name, String value) {
             Objects.requireNonNull(name);
             Objects.requireNonNull(value);
-            uriParameters.add(encode(contentType, name), encode(contentType, value));
+            uriParameters.addRaw(encode(contentType, name), encode(contentType, value));
             return this;
         }
 
         public Builder addRawParameter(String name, String value) {
             Objects.requireNonNull(name);
             Objects.requireNonNull(value);
-            uriParameters.add(name, value);
+            uriParameters.addRaw(name, value);
             return this;
         }
 
         public Builder addFormParameter(String name, String value) {
             Objects.requireNonNull(name);
             Objects.requireNonNull(value);
-            formParameters.add(encode(contentType, name), encode(contentType, value));
+            formParameters.addRaw(encode(contentType, name), encode(contentType, value));
             return this;
         }
 
         public Builder addRawFormParameter(String name, String value) {
             Objects.requireNonNull(name);
             Objects.requireNonNull(value);
-            formParameters.add(name, value);
+            formParameters.addRaw(name, value);
             return this;
         }
 
@@ -488,7 +475,7 @@ public final class Request {
                 }
                 return encodedValue;
             } catch (MalformedInputException | UnmappableCharacterException e) {
-                // should never be reached
+                // should never be reached because encoder does not bail out on error
                 throw new IllegalArgumentException(e);
             }
         }
@@ -591,33 +578,16 @@ public final class Request {
 
         public Request build() {
             DefaultHttpHeaders validatedHeaders = new DefaultHttpHeaders(true);
+            validatedHeaders.set(headers);
             if (url != null) {
-                // attach user query parameters to URL
+                // add our URI parameters to the URL
                 URL.Builder mutator = url.mutator();
-                uriParameters.forEach((k, v) -> v.forEach(value -> mutator.queryParam(k, value)));
+                uriParameters.forEach((k, v) -> v.forEach(vv -> {
+                    // no percent encoding
+                    mutator.queryParam(k, vv);
+                }));
+                // calling build() performs percent encoding
                 url = mutator.build();
-                // let Netty's query string decoder/encoder work over the URL to add parameters given implicitly in url()
-                String path = url.getPath();
-                String query = url.getQuery();
-                QueryStringDecoder queryStringDecoder = new QueryStringDecoder(query != null ? path + "?" + query : path, StandardCharsets.UTF_8);
-                QueryStringEncoder queryStringEncoder = new QueryStringEncoder(queryStringDecoder.path());
-                for (Map.Entry<String, List<String>> entry : queryStringDecoder.parameters().entrySet()) {
-                    for (String value : entry.getValue()) {
-                        queryStringEncoder.addParam(entry.getKey(), value);
-                    }
-                }
-                // build uri from QueryStringDecoder
-                String pathAndQuery = queryStringEncoder.toString();
-                StringBuilder sb = new StringBuilder();
-                if (!pathAndQuery.isEmpty()) {
-                    sb.append(pathAndQuery);
-                }
-                String fragment = url.getFragment();
-                if (fragment != null && !fragment.isEmpty()) {
-                    sb.append('#').append(fragment);
-                }
-                this.uri = sb.toString(); // the encoded form of path/query/fragment
-                validatedHeaders.set(headers);
                 String scheme = url.getScheme();
                 if (httpVersion.majorVersion() == 2) {
                     validatedHeaders.set(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), scheme);
@@ -631,10 +601,9 @@ public final class Request {
             if (gzip) {
                 validatedHeaders.set(HttpHeaderNames.ACCEPT_ENCODING, "gzip");
             }
-            // form parameters
             if (!formParameters.isEmpty()) {
                 try {
-                    // formParameters is already percent encoded
+                    // form parameters are already percent encoded
                     content(formParameters.getAsQueryString(false), formParameters.getContentType());
                 } catch (MalformedInputException | UnmappableCharacterException e) {
                     throw new IllegalArgumentException();
@@ -661,7 +630,7 @@ public final class Request {
             for (String headerName : removeHeaders) {
                 validatedHeaders.remove(headerName);
             }
-            return new Request(url, uri, httpVersion, httpMethod, validatedHeaders, cookies, content, bodyData,
+            return new Request(url, httpVersion, httpMethod, validatedHeaders, cookies, content, bodyData,
                     timeoutInMillis, followRedirect, maxRedirects, 0, enableBackOff, backOff,
                     responseListener);
         }

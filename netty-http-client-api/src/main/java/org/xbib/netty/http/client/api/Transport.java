@@ -51,4 +51,6 @@ public interface Transport extends AutoCloseable {
 
     SSLSession getSession();
 
+    void close() throws IOException;
+
 }

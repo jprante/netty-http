@@ -15,13 +15,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public class HttpEndpointResolver {
-
-    private static final Logger logger = Logger.getLogger(HttpEndpointResolver.class.getName());
 
     private static final int DEFAULT_LIMIT = 1024;
 
@@ -57,20 +53,12 @@ public class HttpEndpointResolver {
     public void handle(List<HttpEndpoint> matchingEndpoints,
                        ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
         Objects.requireNonNull(matchingEndpoints);
-        if (logger.isLoggable(Level.FINE)) {
-            logger.log(Level.FINE, () ->
-                    "matching endpoints = " + matchingEndpoints.size() + " --> " + matchingEndpoints);
-        }
         for (HttpEndpoint endpoint : matchingEndpoints) {
-            if (logger.isLoggable(Level.FINE)) {
-                logger.log(Level.FINE, () -> "executing endpoint = " + endpoint);
-            }
             endpoint.resolveUriTemplate(serverRequest);
             endpoint.before(serverRequest, serverResponse);
             endpointDispatcher.dispatch(endpoint, serverRequest, serverResponse);
             endpoint.after(serverRequest, serverResponse);
             if (serverResponse.getStatus() != null) {
-                logger.log(Level.FINEST, () -> "endpoint " + endpoint + " break, status = " + serverResponse.getStatus());
                 break;
             }
         }
@@ -122,14 +110,8 @@ public class HttpEndpointResolver {
                 HttpEndpoint prefixedEndpoint = HttpEndpoint.builder(endpoint)
                         .setPrefix(prefix + endpoint.getPrefix())
                         .build();
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.log(Level.FINE, () -> "prefix " + prefix + ": adding endpoint = " + prefixedEndpoint);
-                }
                 endpoints.add(prefixedEndpoint);
             } else {
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.log(Level.FINE, () -> "adding endpoint = " + endpoint);
-                }
                 endpoints.add(endpoint);
             }
             return this;

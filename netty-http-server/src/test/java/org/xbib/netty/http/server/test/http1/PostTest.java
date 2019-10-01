@@ -152,7 +152,6 @@ class PostTest {
         Server server = Server.builder(domain)
                 .build();
         Client client = Client.builder()
-                .enableDebug()
                 .build();
         try {
             server.accept();
@@ -210,7 +209,6 @@ class PostTest {
         Server server = Server.builder(domain)
                 .build();
         Client client = Client.builder()
-                .enableDebug()
                 .build();
         try {
             server.accept();
@@ -220,14 +218,15 @@ class PostTest {
                     success1.set(true);
                 }
             };
-            Request postRequest = Request.post().setVersion(HttpVersion.HTTP_1_1)
+            Request postRequest = Request.post()
+                    .setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base().resolve("/post/test.txt"))
                     .contentType(HttpHeaderValues.TEXT_PLAIN, StandardCharsets.UTF_8)
+                    // you can not pass form parameters on content type "text/plain"
                     .addParameter("a", "b")
-                    // test 'plus' encoding
-                    .addFormParameter("my param", "my value")
-                    .addFormParameter("withoutplus", "Hello World")
-                    .addFormParameter("name", "Jörg")
+                    .addParameter("my param", "my value")
+                    .addParameter("withoutplus", "Hello World")
+                    .addParameter("name", "Jörg")
                     .setResponseListener(responseListener)
                     .build();
             client.execute(postRequest).get();
@@ -255,7 +254,7 @@ class PostTest {
                     if ("myÿvalue".equals(parameters.getFirst("my param"))) {
                         success1.set(true);
                     }
-                    if ("b%YYc".equals(parameters.getFirst("a"))) {
+                    if ("bÿc".equals(parameters.getFirst("a"))) {
                         success2.set(true);
                     }
                     ServerResponse.write(resp, HttpResponseStatus.OK);

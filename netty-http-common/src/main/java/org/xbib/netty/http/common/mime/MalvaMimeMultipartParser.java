@@ -30,7 +30,7 @@ public class MalvaMimeMultipartParser implements MimeMultipartParser {
             this.type = pos >= 0 ? contentType.substring(0, pos) : contentType;
             this.type = type.trim().toLowerCase();
             this.subType = type.startsWith("multipart") ? type.substring(10).trim() : null;
-            Map m = parseHeaderLine(contentType);
+            Map<String, String> m = parseHeaderLine(contentType);
             this.boundary = m.containsKey("boundary") ? m.get("boundary").toString().getBytes(StandardCharsets.US_ASCII) : null;
         }
     }

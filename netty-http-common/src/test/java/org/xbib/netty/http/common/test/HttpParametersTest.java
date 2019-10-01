@@ -13,7 +13,7 @@ class HttpParametersTest {
     @Test
     void testParameters() throws MalformedInputException, UnmappableCharacterException {
         HttpParameters httpParameters = new HttpParameters();
-        httpParameters.add("a", "b");
+        httpParameters.addRaw("a", "b");
         String query = httpParameters.getAsQueryString(false);
         assertEquals("a=b", query);
     }
@@ -21,7 +21,7 @@ class HttpParametersTest {
     @Test
     void testUtf8() throws MalformedInputException, UnmappableCharacterException {
         HttpParameters httpParameters = new HttpParameters("text/plain; charset=utf-8");
-        httpParameters.add("Hello", "Jörg");
+        httpParameters.addRaw("Hello", "Jörg");
         String query = httpParameters.getAsQueryString(false);
         assertEquals("Hello=Jörg", query);
     }

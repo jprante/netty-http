@@ -9,6 +9,7 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpUtil;
 import org.xbib.net.Pair;
+import org.xbib.net.PercentDecoder;
 import org.xbib.net.QueryParameters;
 import org.xbib.net.URL;
 import org.xbib.netty.http.common.HttpParameters;
@@ -45,7 +46,7 @@ public class HttpServerRequest implements ServerRequest {
 
     private String contextPath;
 
-    private Map<String, String> pathParameters = new LinkedHashMap<>();
+    private Map<String, String> pathParameters;
 
     private HttpParameters parameters;
 
@@ -63,6 +64,7 @@ public class HttpServerRequest implements ServerRequest {
                       ChannelHandlerContext ctx) {
         this.httpRequest = fullHttpRequest.retainedDuplicate();
         this.ctx = ctx;
+        this.pathParameters = new LinkedHashMap<>();
     }
 
     void handleParameters() {
@@ -95,13 +97,21 @@ public class HttpServerRequest implements ServerRequest {
                         logger.log(Level.FINER, "html form, charset = " + htmlCharset + " param body = " + params);
                     }
                     queryParameters.addPercentEncodedBody(params);
-                    queryParameters.add("_raw", params);
                 }
             }
         }
-        HttpParameters httpParameters = new HttpParameters();
+        // copy to HTTP parameters but percent-decoded (looks very clumsy)
+        PercentDecoder percentDecoder = new PercentDecoder(charset.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPLACE)
+                .onUnmappableCharacter(CodingErrorAction.REPLACE));
+        HttpParameters httpParameters = new HttpParameters(mimeType, charset);
         for (Pair<String, String> pair : queryParameters) {
-            httpParameters.add(pair.getFirst(), pair.getSecond());
+            try {
+                httpParameters.addRaw(percentDecoder.decode(pair.getFirst()), percentDecoder.decode(pair.getSecond()));
+            } catch (Exception e) {
+                // does not happen
+                throw new IllegalArgumentException(pair.toString());
+            }
         }
         this.parameters = httpParameters;
     }
@@ -138,7 +148,7 @@ public class HttpServerRequest implements ServerRequest {
     @Override
     public void addPathParameter(String key, String value) throws IOException {
         pathParameters.put(key, value);
-        parameters.add(key, value);
+        parameters.addRaw(key, value);
     }
 
     @Override

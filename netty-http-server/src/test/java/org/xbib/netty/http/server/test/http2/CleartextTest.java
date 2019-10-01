@@ -248,10 +248,9 @@ class CleartextTest {
                     try {
                         for (int i = 0; i < loop; i++) {
                             String payload = t + "/" + i;
+                            // note  that we do not set url() in the request
                             Request request = Request.get()
                                     .setVersion("HTTP/2.0")
-                                    //.url(server1.getServerConfig().getAddress().base())
-                                    .uri("/")
                                     .content(payload, "text/plain")
                                     .setResponseListener(responseListener)
                                     .build();

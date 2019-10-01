@@ -106,7 +106,8 @@ public class Http1Transport extends BaseTransport {
         Request request;
         DefaultHttpResponse httpResponse = null;
         try {
-            // streamID is expected to be null, last request on memory is expected to be current, remove request from memory
+            // streamID is expected to be null, last request on memory
+            // is expected to be current, remove request from memory
             request = requests.get(requestKey);
             if (request != null) {
                 for (String cookieString : fullHttpResponse.headers().getAll(HttpHeaderNames.SET_COOKIE)) {
@@ -128,7 +129,8 @@ public class Http1Transport extends BaseTransport {
                 } else {
                     Request continueRequest = continuation(request, httpResponse);
                     if (continueRequest != null) {
-                        // continue with new transport, synchronous call here, wait for completion
+                        // continue with new transport, synchronous call here,
+                        // wait for completion
                         client.continuation(this, continueRequest);
                     }
                 }
@@ -166,7 +168,8 @@ public class Http1Transport extends BaseTransport {
     }
 
     @Override
-    public void pushPromiseReceived(Channel channel, Integer streamId, Integer promisedStreamId, Http2Headers headers) {
+    public void pushPromiseReceived(Channel channel, Integer streamId,
+                                    Integer promisedStreamId, Http2Headers headers) {
     }
 
     @Override

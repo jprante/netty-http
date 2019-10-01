@@ -117,7 +117,9 @@ public final class Server implements AutoCloseable {
         this.protocolProviders =new ArrayList<>();
         for (ProtocolProvider<HttpChannelInitializer, Transport> provider : ServiceLoader.load(ProtocolProvider.class)) {
             protocolProviders.add(provider);
-            logger.log(Level.INFO, "protocol provider up: " + provider.transportClass() );
+            if (logger.isLoggable(Level.FINEST)) {
+                logger.log(Level.FINEST, "protocol provider up: " + provider.transportClass());
+            }
         }
         this.bootstrap = new ServerBootstrap()
                 .group(this.parentEventLoopGroup, this.childEventLoopGroup)

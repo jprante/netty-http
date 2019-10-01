@@ -51,16 +51,19 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
 
     private final CharSequence contentType;
 
-    private final Charset charset;
-
     public HttpParameters() {
         this(1024, 1024, 65536,
                 HttpHeaderValues.APPLICATION_X_WWW_FORM_URLENCODED, StandardCharsets.UTF_8);
     }
 
-    public HttpParameters(String contentType) {
+    public HttpParameters(CharSequence contentType) {
         this(1024, 1024, 65536,
                 contentType, StandardCharsets.UTF_8);
+    }
+
+    public HttpParameters(CharSequence contentType, Charset charset) {
+        this(1024, 1024, 65536,
+                contentType, charset);
     }
 
     public HttpParameters(int maxParam, int sizeLimit, int elementSizeLimit,
@@ -72,7 +75,6 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
         this.percentEncoder = PercentEncoders.getQueryEncoder(charset);
         this.percentDecoder = new PercentDecoder();
         this.contentType = contentType;
-        this.charset = charset;
     }
 
     @Override
@@ -150,7 +152,7 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
         if (percentEncode) {
             remove(key);
             for (String v : values) {
-                add(key, v, true);
+                add(key, v, percentEncode);
             }
             return get(key);
         } else {
@@ -165,8 +167,12 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
      * @param value the parameter value
      * @return the value
      */
-    public String add(String key, String value) {
+    public String addRaw(String key, String value) {
         return add(key, value, false);
+    }
+
+    public String add(String key, String value) {
+        return add(key, value, true);
     }
 
     /**
@@ -179,7 +185,7 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
      *        inserted into the map
      * @return the value
      */
-    public String add(String key, String value, boolean percentEncode) {
+    private String add(String key, String value, boolean percentEncode) {
         String v = null;
         try {
             String k = percentEncode ? percentEncoder.encode(key) : key;
@@ -208,23 +214,22 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
      * @return null
      */
     public String addNull(String key, String nullString) {
-        return add(key, nullString);
+        return addRaw(key, nullString);
     }
 
-    public void addAll(Map<? extends String, ? extends SortedSet<String>> m, boolean percentEncode)
-            throws MalformedInputException, UnmappableCharacterException {
+    public void addAll(String[] keyValuePairs, boolean percentEncode) {
+        for (int i = 0; i < keyValuePairs.length - 1; i += 2) {
+            add(keyValuePairs[i], keyValuePairs[i + 1], percentEncode);
+        }
+    }
+
+    public void addAll(Map<? extends String, ? extends SortedSet<String>> m, boolean percentEncode) {
         if (percentEncode) {
             for (String key : m.keySet()) {
                 put(key, m.get(key), true);
             }
         } else {
             map.putAll(m);
-        }
-    }
-
-    public void addAll(String[] keyValuePairs, boolean percentEncode) {
-        for (int i = 0; i < keyValuePairs.length - 1; i += 2) {
-            add(keyValuePairs[i], keyValuePairs[i + 1], percentEncode);
         }
     }
 
