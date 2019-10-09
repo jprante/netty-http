@@ -1,7 +1,6 @@
 package org.xbib.netty.http.client.rest;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.HttpMethod;
 import org.xbib.net.URL;
 import org.xbib.netty.http.client.Client;
@@ -12,11 +11,8 @@ import org.xbib.netty.http.common.HttpResponse;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.Objects;
 
 public class RestClient {
-
-    private static final Client client = new Client();
 
     private HttpResponse response;
 
@@ -25,7 +21,7 @@ public class RestClient {
     private RestClient() {
     }
 
-    public void setResponse(HttpResponse response) {
+    private void setResponse(HttpResponse response) {
         this.response = response;
         this.byteBuf = response != null ? response.getBody().retain() : null;
     }
@@ -38,12 +34,8 @@ public class RestClient {
         return asString(StandardCharsets.UTF_8);
     }
 
-    public String asString(Charset charset) {
+    private String asString(Charset charset) {
         return byteBuf != null && byteBuf.isReadable() ? byteBuf.toString(charset) : null;
-    }
-
-    public void close() throws IOException {
-        client.shutdownGracefully();
     }
 
     public static RestClient get(String urlString) throws IOException {
@@ -58,42 +50,28 @@ public class RestClient {
         return method(urlString, body, StandardCharsets.UTF_8, HttpMethod.POST);
     }
 
-    public static RestClient post(String urlString, ByteBuf content) throws IOException {
-        return method(urlString, content, HttpMethod.POST);
-    }
-
     public static RestClient put(String urlString, String body) throws IOException {
         return method(urlString, body, StandardCharsets.UTF_8, HttpMethod.PUT);
     }
 
-    public static RestClient put(String urlString, ByteBuf content) throws IOException {
-        return method(urlString, content, HttpMethod.PUT);
+    private static RestClient method(String urlString, HttpMethod httpMethod) throws IOException {
+        return method(urlString, null, null, httpMethod);
     }
 
-    public static RestClient method(String urlString,
-                                    HttpMethod httpMethod) throws IOException {
-        return method(urlString, Unpooled.buffer(), httpMethod);
-    }
-
-    public static RestClient method(String urlString,
-                                    String body, Charset charset,
-                                    HttpMethod httpMethod) throws IOException {
-        Objects.requireNonNull(body);
-        Objects.requireNonNull(charset);
-        ByteBuf byteBuf = client.getByteBufAllocator().buffer();
-        byteBuf.writeCharSequence(body, charset);
-        return method(urlString, byteBuf, httpMethod);
-    }
-
-    public static RestClient method(String urlString,
-                                    ByteBuf byteBuf,
-                                    HttpMethod httpMethod) throws IOException {
-        Objects.requireNonNull(byteBuf);
+    private static RestClient method(String urlString,
+                                     String body, Charset charset,
+                                     HttpMethod httpMethod) throws IOException {
         URL url = URL.create(urlString);
         RestClient restClient = new RestClient();
-        Request.Builder requestBuilder = Request.builder(httpMethod).url(url);
-        requestBuilder.content(byteBuf);
-        try {
+        try (Client client = Client.builder()
+                .setThreadCount(2) // for redirect
+                .build()) {
+            Request.Builder requestBuilder = Request.builder(httpMethod).url(url);
+            if (body != null) {
+                ByteBuf byteBuf = client.getByteBufAllocator().buffer();
+                byteBuf.writeCharSequence(body, charset);
+                requestBuilder.content(byteBuf);
+            }
             client.newTransport(HttpAddress.http1(url))
                     .execute(requestBuilder.setResponseListener(restClient::setResponse).build()).close();
         } catch (Exception e) {

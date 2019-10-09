@@ -318,6 +318,7 @@ public abstract class BaseTransport implements Transport {
 
     protected Request retry(Request request, HttpResponse httpResponse) {
         if (httpResponse == null) {
+            // no response present, invalid in any way
             return null;
         }
         if (request == null) {

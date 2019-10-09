@@ -361,7 +361,7 @@ public final class Server implements AutoCloseable {
 
     static class HttpServerParentThreadFactory implements ThreadFactory {
 
-        private int number = 0;
+        private long number = 0;
 
         @Override
         public Thread newThread(Runnable runnable) {
@@ -373,7 +373,7 @@ public final class Server implements AutoCloseable {
 
     static class HttpServerChildThreadFactory implements ThreadFactory {
 
-        private int number = 0;
+        private long number = 0;
 
         @Override
         public Thread newThread(Runnable runnable) {
@@ -385,7 +385,7 @@ public final class Server implements AutoCloseable {
 
     static class BlockingThreadFactory implements ThreadFactory {
 
-        private int number = 0;
+        private long number = 0;
 
         @Override
         public Thread newThread(Runnable runnable) {

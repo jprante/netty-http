@@ -57,6 +57,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.logging.Level;
@@ -65,8 +66,6 @@ import java.util.logging.Logger;
 public final class Client implements AutoCloseable {
 
     private static final Logger logger = Logger.getLogger(Client.class.getName());
-
-    private static final ThreadFactory httpClientThreadFactory = new HttpClientThreadFactory();
 
     static {
         if (System.getProperty("xbib.netty.http.client.extendsystemproperties") != null) {
@@ -80,9 +79,9 @@ public final class Client implements AutoCloseable {
             System.setProperty("io.netty.noKeySetOptimization", Boolean.toString(true));
         }
     }
-    private static final AtomicLong requestCounter = new AtomicLong();
+    private final AtomicLong requestCounter;
 
-    private static final AtomicLong responseCounter = new AtomicLong();
+    private final AtomicLong responseCounter;
 
     private final ClientConfig clientConfig;
 
@@ -98,6 +97,8 @@ public final class Client implements AutoCloseable {
 
     private final List<ProtocolProvider<HttpChannelInitializer, Transport>> protocolProviders;
 
+    private final AtomicBoolean closed;
+
     private BoundedChannelPool<HttpAddress> pool;
 
     public Client() {
@@ -112,6 +113,9 @@ public final class Client implements AutoCloseable {
     public Client(ClientConfig clientConfig, ByteBufAllocator byteBufAllocator,
                   EventLoopGroup eventLoopGroup, Class<? extends SocketChannel> socketChannelClass) {
         Objects.requireNonNull(clientConfig);
+        this.requestCounter = new AtomicLong();
+        this.responseCounter = new AtomicLong();
+        this.closed = new AtomicBoolean(false);
         this.clientConfig = clientConfig;
         this.protocolProviders = new ArrayList<>();
         for (ProtocolProvider<HttpChannelInitializer, Transport> provider : ServiceLoader.load(ProtocolProvider.class)) {
@@ -124,8 +128,8 @@ public final class Client implements AutoCloseable {
         this.byteBufAllocator = byteBufAllocator != null ?
                 byteBufAllocator : ByteBufAllocator.DEFAULT;
         this.eventLoopGroup = eventLoopGroup != null ? eventLoopGroup : clientConfig.isEpoll() ?
-                    new EpollEventLoopGroup(clientConfig.getThreadCount(), httpClientThreadFactory) :
-                    new NioEventLoopGroup(clientConfig.getThreadCount(), httpClientThreadFactory);
+                    new EpollEventLoopGroup(clientConfig.getThreadCount(), new HttpClientThreadFactory()) :
+                    new NioEventLoopGroup(clientConfig.getThreadCount(), new HttpClientThreadFactory());
         this.socketChannelClass = socketChannelClass != null ? socketChannelClass : clientConfig.isEpoll() ?
                 EpollSocketChannel.class : NioSocketChannel.class;
         this.bootstrap = new Bootstrap()
@@ -328,7 +332,7 @@ public final class Client implements AutoCloseable {
         nextTransport.setCookieBox(transport.getCookieBox());
         nextTransport.execute(request);
         nextTransport.get();
-        close(nextTransport);
+        closeAndRemove(nextTransport);
     }
 
     /**
@@ -341,16 +345,12 @@ public final class Client implements AutoCloseable {
     public void retry(Transport transport, Request request) throws IOException {
         transport.execute(request);
         transport.get();
-        close(transport);
+        closeAndRemove(transport);
     }
 
     @Override
-    public void close() {
-        try {
-            shutdownGracefully();
-        } catch (IOException e) {
-            logger.log(Level.SEVERE, e.getMessage(), e);
-        }
+    public void close() throws IOException {
+        shutdownGracefully();
     }
 
     public void shutdownGracefully() throws IOException {
@@ -358,22 +358,24 @@ public final class Client implements AutoCloseable {
     }
 
     public void shutdownGracefully(long amount, TimeUnit timeUnit) throws IOException {
-        logger.log(Level.FINE, "shutting down");
-        for (Transport transport : transports) {
-            close(transport);
-        }
-        if (hasPooledConnections()) {
-            pool.close();
-        }
-        eventLoopGroup.shutdownGracefully(1L, amount, timeUnit);
-        try {
-            eventLoopGroup.awaitTermination(amount, timeUnit);
-        } catch (InterruptedException e) {
-            throw new IOException(e);
+        if (closed.compareAndSet(false, true)) {
+            try {
+                for (Transport transport : transports) {
+                    transport.close();
+                }
+                transports.clear();
+                if (hasPooledConnections()) {
+                    pool.close();
+                }
+                eventLoopGroup.shutdownGracefully(1L, amount, timeUnit);
+                eventLoopGroup.awaitTermination(amount, timeUnit);
+            } catch (Exception e) {
+                throw new IOException(e);
+            }
         }
     }
 
-    private void close(Transport transport) throws IOException {
+    private void closeAndRemove(Transport transport) throws IOException {
         try {
             transport.close();
         } catch (Exception e) {
@@ -446,7 +448,7 @@ public final class Client implements AutoCloseable {
 
     static class HttpClientThreadFactory implements ThreadFactory {
 
-        private int number = 0;
+        private long number = 0;
 
         @Override
         public Thread newThread(Runnable runnable) {

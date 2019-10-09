@@ -31,8 +31,10 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
@@ -394,6 +396,11 @@ public final class Request {
             return this;
         }
 
+        public Builder setHeaders(Map<String, Object> headers) {
+            headers.forEach(this::addHeader);
+            return this;
+        }
+
         public Builder setHeaders(HttpHeaders headers) {
             this.headers = headers;
             return this;
@@ -430,10 +437,23 @@ public final class Request {
             return this;
         }
 
-        public Builder addParameter(String name, String value) {
+        public Builder setParameters(Map<String, Object> parameters) {
+            parameters.forEach(this::addParameter);
+            return this;
+        }
+
+        @SuppressWarnings("unchecked")
+        public Builder addParameter(String name, Object value) {
             Objects.requireNonNull(name);
             Objects.requireNonNull(value);
-            uriParameters.addRaw(encode(contentType, name), encode(contentType, value));
+            Collection<Object> collection;
+            if (!(value instanceof Collection)) {
+                collection = Collections.singletonList(value);
+            } else {
+                collection = (Collection<Object>) value;
+            }
+            String k = encode(contentType, name);
+            collection.forEach(v -> uriParameters.addRaw(k, encode(contentType, v.toString())));
             return this;
         }
 
