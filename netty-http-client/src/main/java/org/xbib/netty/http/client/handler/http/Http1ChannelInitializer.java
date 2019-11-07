@@ -57,7 +57,8 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel> impleme
             configureCleartext(channel);
         }
         if (clientConfig.isDebug()) {
-            logger.log(Level.FINE, "HTTP 1.1 client channel initialized: " + channel.pipeline().names());
+            logger.log(Level.FINE, "HTTP 1.1 client channel initialized: " +
+                    " address=" + httpAddress + " pipeline=" + channel.pipeline().names());
         }
     }
 
@@ -88,7 +89,7 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel> impleme
                     throw new IllegalStateException("protocol not accepted: " + protocol);
                 }
             };
-            channel.pipeline().addLast(negotiationHandler);
+            channel.pipeline().addLast("client-negotiation", negotiationHandler);
         } else {
             configureCleartext(channel);
         }

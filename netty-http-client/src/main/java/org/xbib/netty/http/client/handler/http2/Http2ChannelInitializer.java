@@ -52,7 +52,8 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> impleme
             configureCleartext(channel);
         }
         if (clientConfig.isDebug()) {
-            logger.log(Level.FINE, "HTTP/2 client channel initialized: " + channel.pipeline().names());
+            logger.log(Level.FINE, "HTTP/2 client channel initialized: " +
+                    " address=" + httpAddress + " pipeline=" + channel.pipeline().names());
         }
     }
 

@@ -7,6 +7,7 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpContentCompressor;
 import io.netty.handler.codec.http.HttpContentDecompressor;
@@ -42,7 +43,6 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel>
 
     private final HttpAddress httpAddress;
 
-
     private final DomainNameMapping<SslContext> domainNameMapping;
 
     public Http1ChannelInitializer(Server server,
@@ -67,7 +67,8 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel>
             configureCleartext(channel);
         }
         if (serverConfig.isTrafficDebug()) {
-            logger.log(Level.FINE, "HTTP 1 channel initialized: " + channel.pipeline().names());
+            logger.log(Level.FINE, "HTTP 1.1 server channel initialized: " +
+                    " address=" + httpAddress + " pipeline=" + channel.pipeline().names());
         }
     }
 
@@ -97,18 +98,18 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel>
         httpObjectAggregator.setMaxCumulationBufferComponents(serverConfig.getMaxCompositeBufferComponents());
         pipeline.addLast("http-server-aggregator", httpObjectAggregator);
         pipeline.addLast("http-server-pipelining", new HttpPipeliningHandler(serverConfig.getPipeliningCapacity()));
-        pipeline.addLast("http-server-handler", new HttpHandler(server));
+        pipeline.addLast("http-server-handler", new ServerMessages(server));
         pipeline.addLast("http-idle-timeout-handler", new IdleTimeoutHandler(serverConfig.getIdleTimeoutMillis()));
     }
 
     @Sharable
-    class HttpHandler extends ChannelInboundHandlerAdapter {
+    class ServerMessages extends ChannelInboundHandlerAdapter {
 
-        private final Logger logger = Logger.getLogger(HttpHandler.class.getName());
+        private final Logger logger = Logger.getLogger(ServerMessages.class.getName());
 
         private final Server server;
 
-        public HttpHandler(Server server) {
+        public ServerMessages(Server server) {
             this.server = server;
         }
 
@@ -118,8 +119,15 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel>
                 HttpPipelinedRequest httpPipelinedRequest = (HttpPipelinedRequest) msg;
                 if (httpPipelinedRequest.getRequest() instanceof FullHttpRequest) {
                     FullHttpRequest fullHttpRequest = (FullHttpRequest) httpPipelinedRequest.getRequest();
-                    Transport transport = server.newTransport(fullHttpRequest.protocolVersion());
-                    transport.requestReceived(ctx, fullHttpRequest, httpPipelinedRequest.getSequenceId());
+                    if (fullHttpRequest.protocolVersion().majorVersion() == 2) {
+                        // PRI * HTTP/2.0
+                        DefaultHttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1,
+                                HttpResponseStatus.HTTP_VERSION_NOT_SUPPORTED);
+                        ctx.channel().writeAndFlush(response);
+                    } else {
+                        Transport transport = server.newTransport(fullHttpRequest.protocolVersion());
+                        transport.requestReceived(ctx, fullHttpRequest, httpPipelinedRequest.getSequenceId());
+                    }
                     fullHttpRequest.release();
                 }
             } else {

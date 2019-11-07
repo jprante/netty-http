@@ -7,12 +7,16 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.handler.codec.http.DefaultHttpRequest;
+import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpContentCompressor;
 import io.netty.handler.codec.http.HttpContentDecompressor;
 import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpServerUpgradeHandler;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http2.CleartextHttp2ServerUpgradeHandler;
 import io.netty.handler.codec.http2.DefaultHttp2SettingsFrame;
 import io.netty.handler.codec.http2.Http2CodecUtil;
@@ -74,8 +78,9 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel>
         } else {
             configureCleartext(channel);
         }
-        if (server.getServerConfig().isTrafficDebug() && logger.isLoggable(Level.FINE)) {
-            logger.log(Level.FINE, "HTTP/2 server channel initialized: " + channel.pipeline().names());
+        if (serverConfig.isTrafficDebug()) {
+            logger.log(Level.FINE, "HTTP/2 server channel initialized: " +
+                    " address=" + httpAddress + " pipeline=" + channel.pipeline().names());
         }
     }
 
@@ -145,6 +150,10 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel>
                 DefaultHttp2SettingsFrame http2SettingsFrame = (DefaultHttp2SettingsFrame) msg;
                 Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
                 transport.settingsReceived(ctx, http2SettingsFrame.settings());
+            } else if (msg instanceof DefaultHttpRequest) {
+                DefaultHttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1,
+                        HttpResponseStatus.HTTP_VERSION_NOT_SUPPORTED);
+                ctx.channel().writeAndFlush(response);
             }
         }
 
