@@ -1,4 +1,4 @@
-package org.xbib.netty.http.server.security.tls;
+package org.xbib.netty.http.bouncycastle;
 
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
@@ -57,16 +57,6 @@ public final class SelfSignedCertificate {
     private Certificate cert;
 
     private PrivateKey key;
-
-    public SelfSignedCertificate()
-            throws IOException, NoSuchProviderException, NoSuchAlgorithmException, OperatorCreationException {
-        this("localhost");
-    }
-
-    public SelfSignedCertificate(String fqdn)
-            throws IOException, NoSuchProviderException, NoSuchAlgorithmException, OperatorCreationException {
-        generate(fqdn, new SecureRandom(), 2048);
-    }
 
     /**
      * Creates a new instance.

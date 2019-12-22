@@ -1,10 +1,8 @@
 package org.xbib.netty.http.client.test;
 
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 
-import java.security.Security;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Handler;
 import java.util.logging.Level;
@@ -16,9 +14,9 @@ public class NettyHttpTestExtension implements BeforeAllCallback {
 
     @Override
     public void beforeAll(ExtensionContext context) {
-        if (Security.getProvider("BC") == null) {
-            Security.addProvider(new BouncyCastleProvider());
-        }
+        //if (Security.getProvider("BC") == null) {
+        //    Security.addProvider(new BouncyCastleProvider());
+        //}
         System.setProperty("io.netty.noUnsafe", Boolean.toString(true));
         // System.setProperty("io.netty.leakDetection.level", "paranoid");
         Level level = Level.INFO;

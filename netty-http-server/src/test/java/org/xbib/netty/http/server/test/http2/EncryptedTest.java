@@ -71,7 +71,7 @@ class EncryptedTest {
 
     @Test
     void testPooledSecureHttp2() throws Exception {
-        int loop = 4096;
+        int loop = 1024;
         HttpAddress httpAddress = HttpAddress.secureHttp2("localhost", 8143);
         Server server = Server.builder(Domain.builder(httpAddress)
                 .setSelfCert()
@@ -116,8 +116,8 @@ class EncryptedTest {
 
     @Test
     void testMultithreadPooledSecureHttp2() throws Exception {
-        int threads = 4;
-        int loop = 4 * 1024;
+        int threads = 2;
+        int loop = 1024;
         HttpAddress httpAddress = HttpAddress.secureHttp2("localhost", 8143);
         Server server = Server.builder(Domain.builder(httpAddress)
                 .setSelfCert()
@@ -164,12 +164,13 @@ class EncryptedTest {
                 });
             }
             executorService.shutdown();
-            boolean terminated = executorService.awaitTermination(60, TimeUnit.SECONDS);
+            boolean terminated = executorService.awaitTermination(20, TimeUnit.SECONDS);
+            executorService.shutdownNow();
             logger.log(Level.INFO, "terminated = " + terminated + ", now waiting for transport to complete");
-            transport.get(60, TimeUnit.SECONDS);
+            transport.get(20, TimeUnit.SECONDS);
         } finally {
-            client.shutdownGracefully();
-            server.shutdownGracefully();
+            client.shutdownGracefully(20, TimeUnit.SECONDS);
+            server.shutdownGracefully(20, TimeUnit.SECONDS);
         }
         assertEquals(threads * loop , counter.get());
     }

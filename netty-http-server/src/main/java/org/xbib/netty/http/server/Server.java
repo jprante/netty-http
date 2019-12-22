@@ -6,9 +6,6 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.WriteBufferWaterMark;
-import io.netty.channel.epoll.Epoll;
-import io.netty.channel.epoll.EpollEventLoopGroup;
-import io.netty.channel.epoll.EpollServerSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
@@ -20,6 +17,7 @@ import io.netty.util.DomainNameMapping;
 import io.netty.util.DomainNameMappingBuilder;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.NetworkUtils;
+import org.xbib.netty.http.common.TransportProvider;
 import org.xbib.netty.http.server.api.HttpChannelInitializer;
 import org.xbib.netty.http.server.api.ProtocolProvider;
 import org.xbib.netty.http.server.api.ServerResponse;
@@ -328,9 +326,15 @@ public final class Server implements AutoCloseable {
                                                              EventLoopGroup parentEventLoopGroup ) {
         EventLoopGroup eventLoopGroup = parentEventLoopGroup;
         if (eventLoopGroup == null) {
-            eventLoopGroup = serverConfig.isEpoll() ?
-                    new EpollEventLoopGroup(serverConfig.getParentThreadCount(), new HttpServerParentThreadFactory()) :
-                    new NioEventLoopGroup(serverConfig.getParentThreadCount(), new HttpServerParentThreadFactory());
+            ServiceLoader<TransportProvider> transportProviders = ServiceLoader.load(TransportProvider.class);
+            for (TransportProvider transportProvider : transportProviders) {
+                if (serverConfig.getTransportProviderName() == null || serverConfig.getTransportProviderName().equals(transportProvider.getClass().getName())) {
+                    eventLoopGroup = transportProvider.createEventLoopGroup(serverConfig.getParentThreadCount(), new HttpServerParentThreadFactory());
+                }
+            }
+        }
+        if (eventLoopGroup == null) {
+            eventLoopGroup = new NioEventLoopGroup(serverConfig.getParentThreadCount(), new HttpServerParentThreadFactory());
         }
         return eventLoopGroup;
     }
@@ -339,9 +343,15 @@ public final class Server implements AutoCloseable {
                                                              EventLoopGroup childEventLoopGroup ) {
         EventLoopGroup eventLoopGroup = childEventLoopGroup;
         if (eventLoopGroup == null) {
-            eventLoopGroup = serverConfig.isEpoll() ?
-                    new EpollEventLoopGroup(serverConfig.getChildThreadCount(), new HttpServerChildThreadFactory()) :
-                    new NioEventLoopGroup(serverConfig.getChildThreadCount(), new HttpServerChildThreadFactory());
+            ServiceLoader<TransportProvider> transportProviders = ServiceLoader.load(TransportProvider.class);
+            for (TransportProvider transportProvider : transportProviders) {
+                if (serverConfig.getTransportProviderName() == null || serverConfig.getTransportProviderName().equals(transportProvider.getClass().getName())) {
+                    eventLoopGroup = transportProvider.createEventLoopGroup(serverConfig.getChildThreadCount(), new HttpServerChildThreadFactory());
+                }
+            }
+        }
+        if (eventLoopGroup == null) {
+            eventLoopGroup = new NioEventLoopGroup(serverConfig.getChildThreadCount(), new HttpServerChildThreadFactory());
         }
         return eventLoopGroup;
     }
@@ -350,11 +360,15 @@ public final class Server implements AutoCloseable {
                                                                                  Class<? extends ServerSocketChannel> socketChannelClass) {
         Class<? extends ServerSocketChannel> channelClass = socketChannelClass;
         if (channelClass == null) {
-            if (serverConfig.isEpoll() && Epoll.isAvailable()) {
-                channelClass = EpollServerSocketChannel.class;
-            } else {
-                channelClass = NioServerSocketChannel.class;
+            ServiceLoader<TransportProvider> transportProviders = ServiceLoader.load(TransportProvider.class);
+            for (TransportProvider transportProvider : transportProviders) {
+                if (serverConfig.getTransportProviderName() == null || serverConfig.getTransportProviderName().equals(transportProvider.getClass().getName())) {
+                    channelClass = transportProvider.createServerSocketChannelClass();
+                }
             }
+        }
+        if (channelClass == null) {
+            channelClass = NioServerSocketChannel.class;
         }
         return channelClass;
     }
@@ -470,6 +484,11 @@ public final class Server implements AutoCloseable {
             return this;
         }
 
+        public Builder setTransportProviderName(String transportProviderName) {
+            this.serverConfig.setTransportProviderName(transportProviderName);
+            return this;
+        }
+
         public Builder setParentEventLoopGroup(EventLoopGroup parentEventLoopGroup) {
             this.parentEventLoopGroup = parentEventLoopGroup;
             return this;
@@ -482,11 +501,6 @@ public final class Server implements AutoCloseable {
 
         public Builder setChannelClass(Class<? extends ServerSocketChannel> socketChannelClass) {
             this.socketChannelClass = socketChannelClass;
-            return this;
-        }
-
-        public Builder setUseEpoll(boolean useEpoll) {
-            this.serverConfig.setEpoll(useEpoll);
             return this;
         }
 

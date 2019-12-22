@@ -1,7 +1,6 @@
 package org.xbib.netty.http.server;
 
 import io.netty.channel.WriteBufferWaterMark;
-import io.netty.channel.epoll.Epoll;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.CipherSuiteFilter;
@@ -35,10 +34,7 @@ public class ServerConfig {
          */
         LogLevel DEBUG_LOG_LEVEL = LogLevel.DEBUG;
 
-        /**
-         * The default for selecting epoll. If available, select epoll.
-         */
-        boolean EPOLL = Epoll.isAvailable();
+        String TRANSPORT_PROVIDER_NAME = null;
 
         /**
          * Let Netty decide about parent thread count.
@@ -200,7 +196,7 @@ public class ServerConfig {
 
     private LogLevel debugLogLevel = Defaults.DEBUG_LOG_LEVEL;
 
-    private boolean epoll = Defaults.EPOLL;
+    private String transportProviderName = Defaults.TRANSPORT_PROVIDER_NAME;
 
     private int parentThreadCount = Defaults.PARENT_THREAD_COUNT;
 
@@ -293,23 +289,13 @@ public class ServerConfig {
         return debugLogLevel;
     }
 
-    public ServerConfig enableEpoll() {
-        this.epoll = true;
+    public ServerConfig setTransportProviderName(String transportProviderName) {
+        this.transportProviderName = transportProviderName;
         return this;
     }
 
-    public ServerConfig disableEpoll() {
-        this.epoll = false;
-        return this;
-    }
-
-    public ServerConfig setEpoll(boolean epoll) {
-        this.epoll = epoll;
-        return this;
-    }
-
-    public boolean isEpoll() {
-        return epoll;
+    public String getTransportProviderName() {
+        return transportProviderName;
     }
 
     public ServerConfig setParentThreadCount(int parentThreadCount) {

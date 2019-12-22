@@ -38,7 +38,9 @@ subprojects {
 
     jar {
         manifest {
+            attributes('Implementation-Title': project.name)
             attributes('Implementation-Version': project.version)
+            attributes('Implementation-Vendor': 'Jörg Prante')
         }
     }
 

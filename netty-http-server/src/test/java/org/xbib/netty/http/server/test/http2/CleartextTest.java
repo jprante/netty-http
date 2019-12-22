@@ -128,7 +128,7 @@ class CleartextTest {
     @Test
     void testMultithreadPooledClearTextHttp2() throws Exception {
         int threads = 2;
-        int loop = 1000;
+        int loop = 1024;
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
         Domain domain = Domain.builder(httpAddress)
                 .singleEndpoint("/", (request, response) ->
@@ -179,13 +179,13 @@ class CleartextTest {
                 });
             }
             executorService.shutdown();
-            boolean terminated = executorService.awaitTermination(10L, TimeUnit.SECONDS);
+            boolean terminated = executorService.awaitTermination(20L, TimeUnit.SECONDS);
             executorService.shutdownNow();
             logger.log(Level.INFO, "terminated = " + terminated + ", now waiting for transport to complete");
-            transport.get(10L, TimeUnit.SECONDS);
+            transport.get(20L, TimeUnit.SECONDS);
         } finally {
-            server.shutdownGracefully(10L, TimeUnit.SECONDS);
-            client.shutdownGracefully(10L, TimeUnit.SECONDS);
+            server.shutdownGracefully(20L, TimeUnit.SECONDS);
+            client.shutdownGracefully(20L, TimeUnit.SECONDS);
         }
         logger.log(Level.INFO, "server requests = " + server.getRequestCounter() +
                 " server responses = " + server.getResponseCounter());

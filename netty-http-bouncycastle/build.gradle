@@ -1,0 +1,4 @@
+dependencies {
+    compile project(":netty-http-common")
+    compile "org.bouncycastle:bcpkix-jdk15on:${project.property('bouncycastle.version')}"
+}

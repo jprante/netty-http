@@ -1,4 +1,7 @@
 include 'netty-http-common'
+include 'netty-http-epoll'
+include 'netty-http-kqueue'
+include 'netty-http-bouncycastle'
 include 'netty-http-client-api'
 include 'netty-http-client'
 include 'netty-http-client-rest'

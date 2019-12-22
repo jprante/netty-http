@@ -1,0 +1,4 @@
+dependencies {
+    compile project(":netty-http-common")
+    compile "io.netty:netty-transport-native-epoll:${project.property('netty.version')}"
+}

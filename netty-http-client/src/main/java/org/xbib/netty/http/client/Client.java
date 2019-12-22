@@ -6,8 +6,6 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.WriteBufferWaterMark;
-import io.netty.channel.epoll.EpollEventLoopGroup;
-import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.pool.ChannelPoolHandler;
 import io.netty.channel.socket.SocketChannel;
@@ -32,6 +30,7 @@ import org.xbib.netty.http.client.api.Transport;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.common.NetworkUtils;
+import org.xbib.netty.http.common.TransportProvider;
 import org.xbib.netty.http.common.security.SecurityUtil;
 
 import javax.net.ssl.SNIHostName;
@@ -87,10 +86,6 @@ public final class Client implements AutoCloseable {
 
     private final ByteBufAllocator byteBufAllocator;
 
-    private final EventLoopGroup eventLoopGroup;
-
-    private final Class<? extends SocketChannel> socketChannelClass;
-
     private final Bootstrap bootstrap;
 
     private final Queue<Transport> transports;
@@ -98,6 +93,10 @@ public final class Client implements AutoCloseable {
     private final List<ProtocolProvider<HttpChannelInitializer, Transport>> protocolProviders;
 
     private final AtomicBoolean closed;
+
+    private EventLoopGroup eventLoopGroup;
+
+    private Class<? extends SocketChannel> socketChannelClass;
 
     private BoundedChannelPool<HttpAddress> pool;
 
@@ -125,13 +124,39 @@ public final class Client implements AutoCloseable {
             }
         }
         initializeTrustManagerFactory(clientConfig);
-        this.byteBufAllocator = byteBufAllocator != null ?
-                byteBufAllocator : ByteBufAllocator.DEFAULT;
-        this.eventLoopGroup = eventLoopGroup != null ? eventLoopGroup : clientConfig.isEpoll() ?
-                    new EpollEventLoopGroup(clientConfig.getThreadCount(), new HttpClientThreadFactory()) :
-                    new NioEventLoopGroup(clientConfig.getThreadCount(), new HttpClientThreadFactory());
-        this.socketChannelClass = socketChannelClass != null ? socketChannelClass : clientConfig.isEpoll() ?
-                EpollSocketChannel.class : NioSocketChannel.class;
+        this.byteBufAllocator = byteBufAllocator != null ? byteBufAllocator : ByteBufAllocator.DEFAULT;
+        if (eventLoopGroup != null) {
+            this.eventLoopGroup = eventLoopGroup;
+        } else {
+            ServiceLoader<TransportProvider> transportProviders = ServiceLoader.load(TransportProvider.class);
+            for (TransportProvider transportProvider : transportProviders) {
+                if (clientConfig.getTransportProviderName() == null || clientConfig.getTransportProviderName().equals(transportProvider.getClass().getName())) {
+                    this.eventLoopGroup = transportProvider.createEventLoopGroup(clientConfig.getThreadCount(), new HttpClientThreadFactory());
+                    if (logger.isLoggable(Level.FINEST)) {
+                        logger.log(Level.FINEST, "transport provider event loop group: " + this.eventLoopGroup.getClass().getName());
+                    }
+                }
+            }
+        }
+        if (this.eventLoopGroup == null) {
+            this.eventLoopGroup = new NioEventLoopGroup(clientConfig.getThreadCount(), new HttpClientThreadFactory());
+        }
+        if (socketChannelClass != null) {
+            this.socketChannelClass = socketChannelClass;
+        } else {
+            ServiceLoader<TransportProvider> transportProviders = ServiceLoader.load(TransportProvider.class);
+            for (TransportProvider transportProvider : transportProviders) {
+                if (clientConfig.getTransportProviderName() == null || clientConfig.getTransportProviderName().equals(transportProvider.getClass().getName())) {
+                    this.socketChannelClass = transportProvider.createSocketChannelClass();
+                    if (logger.isLoggable(Level.FINEST)) {
+                        logger.log(Level.FINEST, "transport provider channel: " + this.socketChannelClass.getName());
+                    }
+                }
+            }
+        }
+        if (this.socketChannelClass == null) {
+            this.socketChannelClass = NioSocketChannel.class;
+        }
         this.bootstrap = new Bootstrap()
                 .group(this.eventLoopGroup)
                 .channel(this.socketChannelClass)
@@ -564,6 +589,11 @@ public final class Client implements AutoCloseable {
          */
         public Builder setByteBufAllocator(ByteBufAllocator byteBufAllocator) {
             this.byteBufAllocator = byteBufAllocator;
+            return this;
+        }
+
+        public Builder setTransportProviderName(String transportProviderName) {
+            clientConfig.setTransportProviderName(transportProviderName);
             return this;
         }
 

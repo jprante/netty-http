@@ -8,13 +8,13 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
 import org.xbib.netty.http.common.HttpAddress;
+import org.xbib.netty.http.common.ServerCertificateProvider;
 import org.xbib.netty.http.common.security.SecurityUtil;
 import org.xbib.netty.http.server.api.ServerRequest;
 import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.endpoint.HttpEndpoint;
 import org.xbib.netty.http.server.endpoint.HttpEndpointResolver;
 import org.xbib.netty.http.server.api.Filter;
-import org.xbib.netty.http.server.security.tls.SelfSignedCertificate;
 
 import javax.net.ssl.TrustManagerFactory;
 import java.io.IOException;
@@ -27,12 +27,17 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * The {@code Domain} class represents a virtual server with a name, with or without SSL.
  */
 public class Domain {
+
+    private static final Logger logger = Logger.getLogger(Domain.class.getName());
 
     private final String name;
 
@@ -259,10 +264,19 @@ public class Domain {
         }
 
         public Builder setSelfCert() throws Exception {
-            SelfSignedCertificate selfSignedCertificate = new SelfSignedCertificate(serverName);
-            setKeyCertChainInputStream(selfSignedCertificate.certificate());
-            setKeyInputStream(selfSignedCertificate.privateKey());
-            setKeyPassword(null);
+            ServiceLoader<ServerCertificateProvider> serverCertificateProviders = ServiceLoader.load(ServerCertificateProvider.class);
+            for (ServerCertificateProvider serverCertificateProvider : serverCertificateProviders) {
+                if ("org.xbib.netty.http.bouncycastle.BouncyCastleSelfSignedCertificateProvider".equals(serverCertificateProvider.getClass().getName())) {
+                    serverCertificateProvider.prepare(serverName);
+                    setKeyCertChainInputStream(serverCertificateProvider.getCertificateChain());
+                    setKeyInputStream(serverCertificateProvider.getPrivateKey());
+                    setKeyPassword(serverCertificateProvider.getKeyPassword());
+                    logger.log(Level.INFO, "self signed certificate installed");
+                }
+            }
+            if (keyCertChainInputStream == null) {
+                logger.log(Level.WARNING, "unable to install self signed certificate. Is netty-http-bouncycastle present?");
+            }
             return this;
         }
 

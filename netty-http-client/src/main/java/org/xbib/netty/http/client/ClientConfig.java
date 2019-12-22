@@ -1,7 +1,6 @@
 package org.xbib.netty.http.client;
 
 import io.netty.channel.WriteBufferWaterMark;
-import io.netty.channel.epoll.Epoll;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.logging.LogLevel;
@@ -35,9 +34,9 @@ public class ClientConfig {
         LogLevel DEFAULT_DEBUG_LOG_LEVEL = LogLevel.DEBUG;
 
         /**
-         * The default for selecting epoll. If available, select epoll.
+         * The transport provider
          */
-        boolean EPOLL = Epoll.isAvailable();
+        String DEFAULT_TRANSPORT_PROVIDER = null;
 
         /**
          * If set to 0, then Netty will decide about thread count.
@@ -178,7 +177,7 @@ public class ClientConfig {
 
     private LogLevel debugLogLevel = Defaults.DEFAULT_DEBUG_LOG_LEVEL;
 
-    private boolean epoll = Defaults.EPOLL;
+    private String transportProviderName = Defaults.DEFAULT_TRANSPORT_PROVIDER;
 
     private int threadCount = Defaults.THREAD_COUNT;
 
@@ -282,18 +281,13 @@ public class ClientConfig {
         return debugLogLevel;
     }
 
-    public ClientConfig enableEpoll() {
-        this.epoll = true;
+    public ClientConfig setTransportProviderName(String transportProviderName) {
+        this.transportProviderName = transportProviderName;
         return this;
     }
 
-    public ClientConfig disableEpoll() {
-        this.epoll = false;
-        return this;
-    }
-
-    public boolean isEpoll() {
-        return epoll;
+    public String getTransportProviderName() {
+        return transportProviderName;
     }
 
     public ClientConfig setThreadCount(int threadCount) {
