@@ -336,6 +336,7 @@ public final class Server implements AutoCloseable {
         if (eventLoopGroup == null) {
             eventLoopGroup = new NioEventLoopGroup(serverConfig.getParentThreadCount(), new HttpServerParentThreadFactory());
         }
+        logger.log(Level.INFO, "parent event loop group = " + eventLoopGroup);
         return eventLoopGroup;
     }
 
@@ -353,6 +354,7 @@ public final class Server implements AutoCloseable {
         if (eventLoopGroup == null) {
             eventLoopGroup = new NioEventLoopGroup(serverConfig.getChildThreadCount(), new HttpServerChildThreadFactory());
         }
+        logger.log(Level.INFO, "child event loop group = " + eventLoopGroup);
         return eventLoopGroup;
     }
 
@@ -370,6 +372,7 @@ public final class Server implements AutoCloseable {
         if (channelClass == null) {
             channelClass = NioServerSocketChannel.class;
         }
+        logger.log(Level.INFO, "server socket channel class = " + channelClass);
         return channelClass;
     }
 
