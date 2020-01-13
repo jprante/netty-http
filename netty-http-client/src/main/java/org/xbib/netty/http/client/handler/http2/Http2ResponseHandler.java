@@ -15,12 +15,13 @@ public class Http2ResponseHandler extends SimpleChannelInboundHandler<FullHttpRe
         Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
         Integer streamId = httpResponse.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text());
         transport.responseReceived(ctx.channel(), streamId, httpResponse);
+        // do not close ctx here
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
         transport.fail(cause);
-        ctx.channel().close();
+        // do not close ctx here
     }
 }

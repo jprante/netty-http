@@ -4,11 +4,10 @@ dependencies {
     compile project(":netty-http-client-api")
     compile "io.netty:netty-handler-proxy:${project.property('netty.version')}"
     runtime "org.bouncycastle:bcpkix-jdk15on:${project.property('bouncycastle.version')}"
-    // we are an Mac OS X 10.12, but tcnative > 2.0.26 is for 10.13+
     if (Os.isFamily(Os.FAMILY_MAC)) {
         runtime "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative-legacy-macosx.version')}"
-        runtime project(':netty-http-kqueue')
-    } else {
+        //runtime project(':netty-http-kqueue')
+    } else if (Os.isFamily(Os.FAMILY_UNIX)) {
         runtime "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
         runtime project(':netty-http-epoll')
     }

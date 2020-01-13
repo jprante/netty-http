@@ -131,29 +131,24 @@ class CleartextTest {
         int loop = 1024;
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
         Domain domain = Domain.builder(httpAddress)
-                .singleEndpoint("/", (request, response) ->
+                .singleEndpoint("/**", (request, response) ->
                         ServerResponse.write(response, HttpResponseStatus.OK, "text/plain",
-                                request.getContent().retain()))
+                                request.getContent().toString(StandardCharsets.UTF_8)))
                 .build();
-        Server server = Server.builder(domain)
-                .build();
+        Server server = Server.builder(domain).build();
         server.accept();
         Client client = Client.builder()
                 .addPoolNode(httpAddress)
                 .setPoolNodeConnectionLimit(threads)
                 .build();
-        AtomicInteger counter = new AtomicInteger();
-        // a HTTP/2 listener always receives responses out-of-order
+        AtomicInteger counter = new AtomicInteger(0);
         final ResponseListener<HttpResponse> responseListener = resp -> {
-            if (resp.getStatus().getCode() ==  HttpResponseStatus.OK.code()) {
+            if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
                 counter.incrementAndGet();
-            } else {
-                logger.log(Level.INFO, "response listener: headers = " + resp.getHeaders() +
-                        " response body = " + resp.getBodyAsString(StandardCharsets.UTF_8));
             }
         };
         try {
-            // note: for HTTP/2 only, we use a single shared transport
+            // note: for HTTP/2 only, we can use a single shared transport
             final Transport transport = client.newTransport();
             ExecutorService executorService = Executors.newFixedThreadPool(threads);
             for (int n = 0; n < threads; n++) {
@@ -162,7 +157,8 @@ class CleartextTest {
                     try {
                         for (int i = 0; i < loop; i++) {
                             String payload = t + "/" + i;
-                            Request request = Request.get().setVersion("HTTP/2.0")
+                            Request request = Request.get()
+                                    .setVersion("HTTP/2.0")
                                     .url(server.getServerConfig().getAddress().base())
                                     .content(payload, "text/plain")
                                     .setResponseListener(responseListener)
@@ -183,6 +179,7 @@ class CleartextTest {
             executorService.shutdownNow();
             logger.log(Level.INFO, "terminated = " + terminated + ", now waiting for transport to complete");
             transport.get(20L, TimeUnit.SECONDS);
+            logger.log(Level.INFO, "transport complete");
         } finally {
             server.shutdownGracefully(20L, TimeUnit.SECONDS);
             client.shutdownGracefully(20L, TimeUnit.SECONDS);

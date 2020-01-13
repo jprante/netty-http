@@ -68,9 +68,6 @@ public class HttpServerRequest implements ServerRequest {
     }
 
     void handleParameters() {
-        if (logger.isLoggable(Level.FINER)) {
-            logger.log(Level.FINER, () -> "request = " + httpRequest);
-        }
         Charset charset = HttpUtil.getCharset(httpRequest, StandardCharsets.UTF_8);
         this.url = URL.builder()
                 .charset(charset, CodingErrorAction.REPLACE)
@@ -79,13 +76,6 @@ public class HttpServerRequest implements ServerRequest {
         QueryParameters queryParameters = url.getQueryParams();
         CharSequence mimeType = HttpUtil.getMimeType(httpRequest);
         ByteBuf byteBuf = httpRequest.content();
-        if (logger.isLoggable(Level.FINER)) {
-            logger.log(Level.FINER, () -> "url = " + url +
-                    " charset = " + charset +
-                    " mime type = " + mimeType +
-                    " queryParameters = " + queryParameters +
-                    " body exists = " + (byteBuf != null));
-        }
         if (byteBuf != null) {
             if (httpRequest.method().equals(HttpMethod.POST)) {
                 String params;

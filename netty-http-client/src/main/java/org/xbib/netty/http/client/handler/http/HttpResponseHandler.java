@@ -13,12 +13,13 @@ public class HttpResponseHandler extends SimpleChannelInboundHandler<FullHttpRes
     public void channelRead0(ChannelHandlerContext ctx, FullHttpResponse fullHttpResponse) throws Exception {
         Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
         transport.responseReceived(ctx.channel(), null, fullHttpResponse);
+        // do not close ctx here
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
         transport.fail(cause);
-        ctx.channel().close();
+        // do not close ctx here
     }
 }

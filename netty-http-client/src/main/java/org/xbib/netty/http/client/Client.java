@@ -22,6 +22,7 @@ import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
+import io.netty.util.concurrent.Future;
 import org.xbib.netty.http.client.api.HttpChannelInitializer;
 import org.xbib.netty.http.client.api.ProtocolProvider;
 import org.xbib.netty.http.client.api.Request;
@@ -120,42 +121,39 @@ public final class Client implements AutoCloseable {
         for (ProtocolProvider<HttpChannelInitializer, Transport> provider : ServiceLoader.load(ProtocolProvider.class)) {
             protocolProviders.add(provider);
             if (logger.isLoggable(Level.FINEST)) {
-                logger.log(Level.FINEST, "protocol provider up: " + provider.transportClass());
+                logger.log(Level.FINEST, "protocol provider: " + provider.transportClass());
             }
         }
         initializeTrustManagerFactory(clientConfig);
         this.byteBufAllocator = byteBufAllocator != null ? byteBufAllocator : ByteBufAllocator.DEFAULT;
         if (eventLoopGroup != null) {
             this.eventLoopGroup = eventLoopGroup;
-        } else {
-            ServiceLoader<TransportProvider> transportProviders = ServiceLoader.load(TransportProvider.class);
-            for (TransportProvider transportProvider : transportProviders) {
-                if (clientConfig.getTransportProviderName() == null || clientConfig.getTransportProviderName().equals(transportProvider.getClass().getName())) {
-                    this.eventLoopGroup = transportProvider.createEventLoopGroup(clientConfig.getThreadCount(), new HttpClientThreadFactory());
-                    if (logger.isLoggable(Level.FINEST)) {
-                        logger.log(Level.FINEST, "transport provider event loop group: " + this.eventLoopGroup.getClass().getName());
-                    }
-                }
+        }
+        if (socketChannelClass != null) {
+            this.socketChannelClass = socketChannelClass;
+        }
+        ServiceLoader<TransportProvider> transportProviders = ServiceLoader.load(TransportProvider.class);
+        for (TransportProvider transportProvider : transportProviders) {
+            if (this.eventLoopGroup == null &&
+                    (clientConfig.getTransportProviderName() == null || clientConfig.getTransportProviderName().equals(transportProvider.getClass().getName()))) {
+                this.eventLoopGroup = transportProvider.createEventLoopGroup(clientConfig.getThreadCount(), new HttpClientThreadFactory());
+            }
+            if (this.socketChannelClass == null &&
+                    (clientConfig.getTransportProviderName() == null || clientConfig.getTransportProviderName().equals(transportProvider.getClass().getName()))) {
+                this.socketChannelClass = transportProvider.createSocketChannelClass();
             }
         }
         if (this.eventLoopGroup == null) {
             this.eventLoopGroup = new NioEventLoopGroup(clientConfig.getThreadCount(), new HttpClientThreadFactory());
         }
-        if (socketChannelClass != null) {
-            this.socketChannelClass = socketChannelClass;
-        } else {
-            ServiceLoader<TransportProvider> transportProviders = ServiceLoader.load(TransportProvider.class);
-            for (TransportProvider transportProvider : transportProviders) {
-                if (clientConfig.getTransportProviderName() == null || clientConfig.getTransportProviderName().equals(transportProvider.getClass().getName())) {
-                    this.socketChannelClass = transportProvider.createSocketChannelClass();
-                    if (logger.isLoggable(Level.FINEST)) {
-                        logger.log(Level.FINEST, "transport provider channel: " + this.socketChannelClass.getName());
-                    }
-                }
-            }
+        if (logger.isLoggable(Level.FINEST)) {
+            logger.log(Level.FINEST, "event loop group class: " + this.eventLoopGroup.getClass().getName());
         }
         if (this.socketChannelClass == null) {
             this.socketChannelClass = NioSocketChannel.class;
+        }
+        if (logger.isLoggable(Level.FINEST)) {
+            logger.log(Level.FINEST, "socket channel class: " + this.socketChannelClass.getName());
         }
         this.bootstrap = new Bootstrap()
                 .group(this.eventLoopGroup)
@@ -392,8 +390,9 @@ public final class Client implements AutoCloseable {
                 if (hasPooledConnections()) {
                     pool.close();
                 }
-                eventLoopGroup.shutdownGracefully(1L, amount, timeUnit);
+                Future<?> future = eventLoopGroup.shutdownGracefully(1L, amount, timeUnit);
                 eventLoopGroup.awaitTermination(amount, timeUnit);
+                future.sync();
             } catch (Exception e) {
                 throw new IOException(e);
             }

@@ -102,15 +102,11 @@ public abstract class BaseTransport implements Transport {
 
     @Override
     public void close() {
+        // channels are present, maybe forgot a get() to receive responses?
         if (!channels.isEmpty()) {
             get();
         }
-        for (Flow flow : flowMap.values()) {
-            flow.close();
-        }
-        channels.clear();
-        httpDataFactory.cleanAllHttpData();
-        // do not clear requests
+        cancel();
     }
 
     @Override
@@ -160,12 +156,7 @@ public abstract class BaseTransport implements Transport {
                         flow.get(key).get(value, timeUnit);
                         completeRequest(requestKey);
                     } catch (Exception e) {
-                        if (requestKey != null) {
-                            Request request = requests.get(requestKey);
-                            if (request != null && request.getCompletableFuture() != null) {
-                                request.getCompletableFuture().completeExceptionally(e);
-                            }
-                        }
+                        completeRequestExceptionally(requestKey, e);
                         flow.fail(e);
                     } finally {
                         flow.remove(key);
@@ -217,6 +208,7 @@ public abstract class BaseTransport implements Transport {
         flowMap.clear();
         channels.clear();
         requests.clear();
+        httpDataFactory.cleanAllHttpData();
     }
 
     @Override

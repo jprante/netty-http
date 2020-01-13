@@ -63,9 +63,9 @@ public final class Server implements AutoCloseable {
         }
     }
 
-    private static final AtomicLong requestCounter = new AtomicLong();
+    private static final AtomicLong requestCounter = new AtomicLong(0);
 
-    private static final AtomicLong responseCounter = new AtomicLong();
+    private static final AtomicLong responseCounter = new AtomicLong(0);
 
     private final ServerConfig serverConfig;
 

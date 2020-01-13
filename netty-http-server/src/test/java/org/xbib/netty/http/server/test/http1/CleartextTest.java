@@ -108,9 +108,9 @@ class CleartextTest {
     }
 
     @Test
-    void testMultithreadedPooledClearTextHttp1() throws Exception {
-        int threads = 8;
-        int loop = 1000;
+    void testMultithreadPooledClearTextHttp1() throws Exception {
+        int threads = 2;
+        int loop = 1024;
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         Domain domain = Domain.builder(httpAddress)
                 .singleEndpoint("/**", (request, response) ->
@@ -123,10 +123,9 @@ class CleartextTest {
                 .addPoolNode(httpAddress)
                 .setPoolNodeConnectionLimit(threads)
                 .build();
-        AtomicInteger counter = new AtomicInteger();
+        AtomicInteger counter = new AtomicInteger(0);
         final ResponseListener<HttpResponse> responseListener = resp -> {
             if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
-                logger.log(Level.FINE, resp.getBodyAsString(StandardCharsets.UTF_8));
                 counter.incrementAndGet();
             }
         };
@@ -138,34 +137,41 @@ class CleartextTest {
                     try {
                         for (int i = 0; i < loop; i++) {
                             String payload = t + "/" + i;
-                            Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
+                            Request request = Request.get()
+                                    .setVersion(HttpVersion.HTTP_1_1)
                                     .url(server.getServerConfig().getAddress().base())
                                     .content(payload, "text/plain")
                                     .setResponseListener(responseListener)
                                     .build();
-                            // note: a new transport is created per execution
+                            // note: in HTTP 1, a new transport is created per execution
                             Transport transport = client.newTransport();
                             transport.execute(request);
                             if (transport.isFailed()) {
                                 logger.log(Level.WARNING, "transport failed: " + transport.getFailure().getMessage(), transport.getFailure());
                                 break;
                             }
-                            transport.get();
+                            transport.get(20L, TimeUnit.SECONDS);
                         }
-                    } catch (Exception e) {
+                    } catch (Throwable e) {
                         logger.log(Level.SEVERE, e.getMessage(), e);
                     }
                 });
             }
             executorService.shutdown();
-            boolean terminated = executorService.awaitTermination(30, TimeUnit.SECONDS);
+            boolean terminated = executorService.awaitTermination(20L, TimeUnit.SECONDS);
+            executorService.shutdownNow();
             logger.log(Level.INFO, "terminated = " + terminated + ", now waiting for transport to complete");
         } catch (Exception e) {
             logger.log(Level.SEVERE, e.getMessage(), e);
         } finally {
-            client.shutdownGracefully();
-            server.shutdownGracefully();
+            server.shutdownGracefully(20L, TimeUnit.SECONDS);
+            client.shutdownGracefully(20L, TimeUnit.SECONDS);
         }
+        logger.log(Level.INFO, "server requests = " + server.getRequestCounter() +
+                " server responses = " + server.getResponseCounter());
+        logger.log(Level.INFO, "client requests = " + client.getRequestCounter() +
+                " client responses = " + client.getResponseCounter());
+        logger.log(Level.INFO, "expected=" + (threads * loop) + " counter=" + counter.get());
         assertEquals(threads * loop, counter.get());
     }
 }
