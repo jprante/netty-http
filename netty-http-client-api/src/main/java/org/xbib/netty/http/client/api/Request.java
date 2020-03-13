@@ -30,6 +30,7 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -475,6 +476,12 @@ public final class Request {
             Objects.requireNonNull(name);
             Objects.requireNonNull(value);
             formParameters.addRaw(name, value);
+            return this;
+        }
+
+        public Builder addBasicAuthorization(String name, String password) {
+            String encoding = Base64.getEncoder().encodeToString((name + ":" + password).getBytes(StandardCharsets.UTF_8));
+            this.headers.add(HttpHeaderNames.AUTHORIZATION, "Basic " + encoding);
             return this;
         }
 

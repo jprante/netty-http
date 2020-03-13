@@ -9,7 +9,7 @@ public interface ServerCertificateProvider {
      *
      * @param fqdn the full qualified domain name.
      */
-    void prepare(String fqdn) throws Exception;
+    void prepare(String fqdn);
 
     /**
      * Returns the generated RSA private key file in PEM format.

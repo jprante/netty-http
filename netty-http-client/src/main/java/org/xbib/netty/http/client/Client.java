@@ -79,6 +79,7 @@ public final class Client implements AutoCloseable {
             System.setProperty("io.netty.noKeySetOptimization", Boolean.toString(true));
         }
     }
+
     private final AtomicLong requestCounter;
 
     private final AtomicLong responseCounter;
@@ -219,7 +220,6 @@ public final class Client implements AutoCloseable {
         logger.log(level, () -> "JDK ciphers: " + SecurityUtil.Defaults.JDK_CIPHERS);
         logger.log(level, () -> "OpenSSL ciphers: " + SecurityUtil.Defaults.OPENSSL_CIPHERS);
         logger.log(level, () -> "OpenSSL available: " + OpenSsl.isAvailable());
-        logger.log(level, () -> "OpenSSL ALPN support: " + OpenSsl.isAlpnSupported());
         logger.log(level, () -> "Candidate ciphers on client: " + clientConfig.getCiphers());
         logger.log(level, () -> "Local host name: " + NetworkUtils.getLocalHostName("localhost"));
         logger.log(level, () -> "Event loop group: " + eventLoopGroup + " threads=" + clientConfig.getThreadCount());

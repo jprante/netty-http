@@ -263,7 +263,7 @@ public class Domain {
             return this;
         }
 
-        public Builder setSelfCert() throws Exception {
+        public Builder setSelfCert() {
             ServiceLoader<ServerCertificateProvider> serverCertificateProviders = ServiceLoader.load(ServerCertificateProvider.class);
             for (ServerCertificateProvider serverCertificateProvider : serverCertificateProviders) {
                 if ("org.xbib.netty.http.bouncycastle.BouncyCastleSelfSignedCertificateProvider".equals(serverCertificateProvider.getClass().getName())) {

@@ -233,7 +233,6 @@ public final class Server implements AutoCloseable {
         logger.log(level, () -> "JDK ciphers: " + SecurityUtil.Defaults.JDK_CIPHERS);
         logger.log(level, () -> "OpenSSL ciphers: " + SecurityUtil.Defaults.OPENSSL_CIPHERS);
         logger.log(level, () -> "OpenSSL available: " + OpenSsl.isAvailable());
-        logger.log(level, () -> "OpenSSL ALPN support: " + OpenSsl.isAlpnSupported());
         logger.log(level, () -> "Installed ciphers on default server: " +
                 (serverConfig.getAddress().isSecure() ? serverConfig.getDefaultDomain().getSslContext().cipherSuites() : ""));
         logger.log(level, () -> "Local host name: " + NetworkUtils.getLocalHostName("localhost"));
