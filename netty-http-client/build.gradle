@@ -9,7 +9,7 @@ dependencies {
         //runtime project(':netty-http-kqueue')
     } else if (Os.isFamily(Os.FAMILY_UNIX)) {
         runtime "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
-        runtime project(':netty-http-epoll')
+        //runtime project(':netty-http-epoll')
     }
     testCompile "org.conscrypt:conscrypt-openjdk-uber:${project.property('conscrypt.version')}"
     testCompile "com.fasterxml.jackson.core:jackson-databind:${project.property('jackson.version')}"

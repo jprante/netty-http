@@ -73,13 +73,14 @@ class EncryptedTest {
     void testPooledSecureHttp2() throws Exception {
         int loop = 1024;
         HttpAddress httpAddress = HttpAddress.secureHttp2("localhost", 8143);
-        Server server = Server.builder(Domain.builder(httpAddress)
+        Domain domain = Domain.builder(httpAddress)
                 .setSelfCert()
                 .singleEndpoint("/", (request, response) ->
-                                response.withStatus(HttpResponseStatus.OK)
-                                        .withContentType("text/plain")
-                                        .write(request.getContent().retain()))
-                .build())
+                        response.withStatus(HttpResponseStatus.OK)
+                                .withContentType("text/plain")
+                                .write(request.getContent().retain()))
+                .build();
+        Server server = Server.builder(domain)
                 .build();
         server.accept();
         Client client = Client.builder()
@@ -87,9 +88,15 @@ class EncryptedTest {
                 .addPoolNode(httpAddress)
                 .setPoolNodeConnectionLimit(2)
                 .build();
-        AtomicInteger counter = new AtomicInteger();
-        // a single instance of HTTP/2 response listener, always receives responses out-of-order
-        final ResponseListener<HttpResponse> responseListener = resp -> counter.incrementAndGet();
+        final AtomicInteger counter = new AtomicInteger();
+        final ResponseListener<HttpResponse> responseListener = resp -> {
+            if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
+                counter.incrementAndGet();
+            } else {
+                logger.log(Level.INFO, "response listener: headers = " + resp.getHeaders() +
+                        " response body = " + resp.getBodyAsString(StandardCharsets.UTF_8));
+            }
+        };
         try {
             // single transport, single thread
             Transport transport = client.newTransport();
@@ -106,11 +113,12 @@ class EncryptedTest {
                     break;
                 }
             }
-            transport.get(60, TimeUnit.SECONDS);
+            transport.get(60L, TimeUnit.SECONDS);
         } finally {
-            client.shutdownGracefully();
             server.shutdownGracefully();
+            client.shutdownGracefully();
         }
+        logger.log(Level.INFO, "expecting=" + loop + " counter=" + counter.get());
         assertEquals(loop, counter.get());
     }
 

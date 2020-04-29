@@ -8,8 +8,8 @@ dependencies {
         //runtime project(':netty-http-kqueue')
     } else if (Os.isFamily(Os.FAMILY_UNIX)) {
         testRuntime "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
-        testRuntime project(':netty-http-epoll')
+        //testRuntime project(':netty-http-epoll')
     }
     testCompile project(":netty-http-client")
-    testRuntime project(":netty-http-bouncycastle")
+    testCompile project(":netty-http-bouncycastle")
 }

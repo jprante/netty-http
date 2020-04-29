@@ -75,7 +75,7 @@ class CleartextTest {
 
     @Test
     void testPooledClearTextHttp2() throws Exception {
-        int loop = 1000;
+        int loop = 1024;
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
         Domain domain = Domain.builder(httpAddress)
                 .singleEndpoint("/", (request, response) ->
@@ -90,8 +90,7 @@ class CleartextTest {
                 .addPoolNode(httpAddress)
                 .setPoolNodeConnectionLimit(2)
                 .build();
-        AtomicInteger counter = new AtomicInteger();
-        // a single instance of HTTP/2 response listener, always receives responses out-of-order
+        final AtomicInteger counter = new AtomicInteger();
         final ResponseListener<HttpResponse> responseListener = resp -> {
             if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
                 counter.incrementAndGet();
@@ -116,7 +115,7 @@ class CleartextTest {
                     break;
                 }
             }
-            transport.get();
+            transport.get(60L, TimeUnit.SECONDS);
         } finally {
             server.shutdownGracefully();
             client.shutdownGracefully();
