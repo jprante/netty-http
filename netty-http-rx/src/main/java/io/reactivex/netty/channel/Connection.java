@@ -289,8 +289,6 @@ public abstract class Connection<R, W> implements ChannelOperations<W> {
     /**
      * Returns the underlying netty {@link Channel} for this connection.
      *
-     * <h2>Why unsafe?</h2>
-     *
      * It is advisable to use this connection abstraction for all interactions with the channel, however, advanced users
      * may find directly using the netty channel useful in some cases.
      *

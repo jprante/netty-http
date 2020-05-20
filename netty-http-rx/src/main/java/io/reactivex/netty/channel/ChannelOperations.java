@@ -64,8 +64,6 @@ public interface ChannelOperations<W> {
     /**
      * On subscription of the returned {@link Observable}, writes the passed message stream on the underneath channel.
      *
-     * <h2>Flush.</h2>
-     *
      * All writes will be flushed on completion of the passed {@code Observable}
      *
      * @param msgs Stream of messages to write.
@@ -107,8 +105,6 @@ public interface ChannelOperations<W> {
 
     /**
      * On subscription of the returned {@link Observable}, writes the passed message stream on the underneath channel.
-     *
-     * <h2>Flush.</h2>
      *
      * All writes will be flushed on completion of the passed {@code Observable}
      *
@@ -152,8 +148,6 @@ public interface ChannelOperations<W> {
     /**
      * On subscription of the returned {@link Observable}, writes the passed message stream on the underneath channel.
      *
-     * <h2>Flush.</h2>
-     *
      * All writes will be flushed on completion of the passed {@code Observable}
      *
      * @param msgs Stream of messages to write.
@@ -195,8 +189,6 @@ public interface ChannelOperations<W> {
 
     /**
      * On subscription of the returned {@link Observable}, writes the passed message stream on the underneath channel.
-     *
-     * <h2>Flush.</h2>
      *
      * All writes will be flushed on completion of the passed {@code Observable}
      *

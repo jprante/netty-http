@@ -38,8 +38,6 @@ public abstract class ResponseContentWriter<C> extends Observable<Void> {
     /**
      * On subscription of the returned {@link Observable}, writes the passed message stream on the underneath channel.
      *
-     * <h2>Flush</h2>
-     *
      * The writes are flushed when the passed stream completes.
      *
      * @param msgs Stream of messages to write.
@@ -57,13 +55,9 @@ public abstract class ResponseContentWriter<C> extends Observable<Void> {
      * {@code trailerMutator} will be invoked for every item emitted from the content source, giving a chance to modify
      * the trailing headers instance.
      *
-     * <h2>Multiple invocations</h2>
-     *
      * This method can <em>not</em> be invoked multiple times for the same response as on completion of the passed
      * source, it writes the trailing headers and trailing headers can only be written once for an HTTP response.
      * So, any subsequent invocation of this method will always emit an error when subscribed.
-     *
-     * <h2>Flush</h2>
      *
      * The writes are flushed when the passed stream completes.
      *
@@ -84,8 +78,6 @@ public abstract class ResponseContentWriter<C> extends Observable<Void> {
      * A new instance of {@link TrailingHeaders} will be created using the passed {@code trailerFactory} and the passed
      * {@code trailerMutator} will be invoked for every item emitted from the content source, giving a chance to modify
      * the trailing headers instance.
-     *
-     * <h2>Multiple invocations</h2>
      *
      * This method can <em>not</em> be invoked multiple times for the same response as on completion of the passed
      * source, it writes the trailing headers and trailing headers can only be written once for an HTTP response.
@@ -137,8 +129,6 @@ public abstract class ResponseContentWriter<C> extends Observable<Void> {
     /**
      * On subscription of the returned {@link Observable}, writes the passed message stream on the underneath channel.
      *
-     * <h2>Flush</h2>
-     *
      * The writes are flushed when the passed stream completes.
      *
      * @param msgs Stream of messages to write.
@@ -156,13 +146,9 @@ public abstract class ResponseContentWriter<C> extends Observable<Void> {
      * {@code trailerMutator} will be invoked for every item emitted from the content source, giving a chance to modify
      * the trailing headers instance.
      *
-     * <h2>Multiple invocations</h2>
-     *
      * This method can <em>not</em> be invoked multiple times for the same response as on completion of the passed
      * source, it writes the trailing headers and trailing headers can only be written once for an HTTP response.
      * So, any subsequent invocation of this method will always emit an error when subscribed.
-     *
-     * <h2>Flush</h2>
      *
      * The writes are flushed when the passed stream completes.
      *
@@ -183,8 +169,6 @@ public abstract class ResponseContentWriter<C> extends Observable<Void> {
      * A new instance of {@link TrailingHeaders} will be created using the passed {@code trailerFactory} and the passed
      * {@code trailerMutator} will be invoked for every item emitted from the content source, giving a chance to modify
      * the trailing headers instance.
-     *
-     * <h2>Multiple invocations</h2>
      *
      * This method can <em>not</em> be invoked multiple times for the same response as on completion of the passed
      * source, it writes the trailing headers and trailing headers can only be written once for an HTTP response.
@@ -236,8 +220,6 @@ public abstract class ResponseContentWriter<C> extends Observable<Void> {
     /**
      * On subscription of the returned {@link Observable}, writes the passed message stream on the underneath channel.
      *
-     * <h2>Flush</h2>
-     *
      * The writes are flushed when the passed stream completes.
      *
      * @param msgs Stream of messages to write.
@@ -255,13 +237,9 @@ public abstract class ResponseContentWriter<C> extends Observable<Void> {
      * {@code trailerMutator} will be invoked for every item emitted from the content source, giving a chance to modify
      * the trailing headers instance.
      *
-     * <h2>Multiple invocations</h2>
-     *
      * This method can <em>not</em> be invoked multiple times for the same response as on completion of the passed
      * source, it writes the trailing headers and trailing headers can only be written once for an HTTP response.
      * So, any subsequent invocation of this method will always emit an error when subscribed.
-     *
-     * <h2>Flush</h2>
      *
      * The writes are flushed when the passed stream completes.
      *
@@ -282,8 +260,6 @@ public abstract class ResponseContentWriter<C> extends Observable<Void> {
      * A new instance of {@link TrailingHeaders} will be created using the passed {@code trailerFactory} and the passed
      * {@code trailerMutator} will be invoked for every item emitted from the content source, giving a chance to modify
      * the trailing headers instance.
-     *
-     * <h2>Multiple invocations</h2>
      *
      * This method can <em>not</em> be invoked multiple times for the same response as on completion of the passed
      * source, it writes the trailing headers and trailing headers can only be written once for an HTTP response.

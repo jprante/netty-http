@@ -300,7 +300,6 @@ public abstract class HttpServerResponse<C> extends ResponseContentWriter<C> {
     /**
      * This is a performance optimization to <em>not</em> flush the channel on every response send.
      *
-     * <h2>When NOT to use</h2>
      * This can be used
      * only when the processing for a server is not asynchronous, in which case, one would have to flush the responses
      * written explicitly (done on completion of the {@link Observable} written). Something like this:
@@ -311,8 +310,6 @@ public abstract class HttpServerResponse<C> extends ResponseContentWriter<C> {
                                               .map(aLong -$gt; "Interval =&gt;" + aLong)
                                    )
      </PRE>
-     *
-     * <h2>When to use</h2>
      *
      * This can be used when the response is written synchronously from a {@link RequestHandler}, something like:
      *
