@@ -1,4 +1,4 @@
 dependencies {
-    compile "org.xbib:net-url:${project.property('xbib-net-url.version')}"
-    compile "io.netty:netty-codec-http2:${project.property('netty.version')}"
+    api "org.xbib:net-url:${project.property('xbib.net.version')}"
+    api "io.netty:netty-codec-http2:${project.property('netty.version')}"
 }

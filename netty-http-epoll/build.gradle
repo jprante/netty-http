@@ -1,4 +1,4 @@
 dependencies {
-    compile project(":netty-http-common")
-    compile "io.netty:netty-transport-native-epoll:${project.property('netty.version')}:linux-x86_64"
+    api project(":netty-http-common")
+    implementation "io.netty:netty-transport-native-epoll:${project.property('netty.version')}:linux-x86_64"
 }

@@ -1,248 +1,29 @@
 plugins {
-    id "com.github.spotbugs" version "2.0.1"
+    id "de.marcphilipp.nexus-publish" version "0.4.0"
     id "io.codearte.nexus-staging" version "0.21.1"
-    id "org.xbib.gradle.plugin.asciidoctor" version "1.5.6.0.1"
 }
 
-apply plugin: 'org.xbib.gradle.plugin.asciidoctor'
-apply plugin: "io.codearte.nexus-staging"
+ext {
+    user = 'jprante'
+    name = 'netty-http'
+    description = 'HTTP client and server for Netty'
+    inceptionYear = '2012'
+    url = 'https://github.com/' + user + '/' + name
+    scmUrl = 'https://github.com/' + user + '/' + name
+    scmConnection = 'scm:git:git://github.com/' + user + '/' + name + '.git'
+    scmDeveloperConnection = 'scm:git:ssh://git@github.com:' + user + '/' + name + '.git'
+    issueManagementSystem = 'Github'
+    issueManagementUrl = ext.scmUrl + '/issues'
+    licenseName = 'The Apache License, Version 2.0'
+    licenseUrl = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+}
 
 subprojects {
-    apply plugin: 'java'
-    apply plugin: "com.github.spotbugs"
-
-    dependencies {
-        testCompile "org.junit.jupiter:junit-jupiter-api:${project.property('junit.version')}"
-        testCompile "org.junit.jupiter:junit-jupiter-params:${project.property('junit.version')}"
-        testCompile "org.junit.jupiter:junit-jupiter-engine:${project.property('junit.version')}"
-        testCompile "org.junit.vintage:junit-vintage-engine:${project.property('junit.version')}"
-        testCompile "junit:junit:${project.property('junit4.version')}"
-    }
-
-    compileJava {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-
-    compileTestJava {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-
-    tasks.withType(JavaCompile) {
-        options.compilerArgs << "-Xlint:all,-fallthrough"
-        if (!options.compilerArgs.contains("-processor")) {
-            options.compilerArgs << '-proc:none'
-        }
-    }
-
-    jar {
-        manifest {
-            attributes('Implementation-Title': project.name)
-            attributes('Implementation-Version': project.version)
-            attributes('Implementation-Vendor': 'Jörg Prante')
-        }
-    }
-
-    test {
-        useJUnitPlatform()
-        failFast = false
-        testLogging {
-            events 'STARTED', 'PASSED', 'FAILED', 'SKIPPED'
-            showStandardStreams = false
-        }
-        afterSuite { desc, result ->
-            if (!desc.parent) {
-                println "\nTest result: ${result.resultType}"
-                println "Test summary: ${result.testCount} tests, " +
-                        "${result.successfulTestCount} succeeded, " +
-                        "${result.failedTestCount} failed, " +
-                        "${result.skippedTestCount} skipped"
-            }
-        }
-    }
-
-    clean {
-        delete 'out'
-    }
-
-    asciidoctor {
-        attributes toc: 'left',
-                doctype: 'book',
-                icons: 'font',
-                encoding: 'utf-8',
-                sectlink: true,
-                sectanchors: true,
-                linkattrs: true,
-                imagesdir: 'img',
-                'source-highlighter': 'coderay'
-    }
-
-    spotbugs {
-        toolVersion = '3.1.12'
-        sourceSets = [sourceSets.main]
-        ignoreFailures = true
-        effort = "max"
-        reportLevel = "high"
-        // includeFilter = file("config/findbugs/findbugs-include.xml")
-        // excludeFilter = file("config/findbugs/findbugs-excludes.xml")
-    }
-
-    tasks.withType(com.github.spotbugs.SpotBugsTask) {
-        reports.xml.enabled = false
-        reports.html.enabled = true
-    }
-
-    /*javadoc {
-        options.docletpath = configurations.asciidoclet.files.asType(List)
-        options.doclet = "org.xbib.asciidoclet.Asciidoclet"
-        options.overview = "src/docs/asciidoclet/overview.adoc"
-        options.addStringOption "-base-dir", "${projectDir}"
-        options.addStringOption "-attribute",
-                "name=${project.name},version=${project.version},title-link=https://github.com/jprante/${project.name}"
-        configure(options) {
-            noTimestamp = true
-        }
-    }*/
-
-    task javadocJar(type: Jar, dependsOn: classes) {
-        from javadoc
-        into "build/tmp"
-        archiveClassifier.set('javadoc')
-    }
-
-    task sourcesJar(type: Jar, dependsOn: classes) {
-        from sourceSets.main.allSource
-        into "build/tmp"
-        archiveClassifier.set('sources')
-    }
-
-    artifacts {
-        archives javadocJar, sourcesJar
-    }
-
-    ext {
-        user = 'jprante'
-        name = 'netty-http'
-        projectDescription = 'HTTP client and server for Netty'
-        scmUrl = 'https://github.com/jprante/netty-http'
-        scmConnection = 'scm:git:git://github.com/jprante/netty-http.git'
-        scmDeveloperConnection = 'scm:git:git://github.com/jprante/netty-http.git'
-        inceptionDate = '2012'
-        organizationName = 'xbib'
-        organizationUrl = 'http://xbib.org'
-        licenseName = 'The Apache License, Version 2.0'
-        licenseUrl = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-    }
-
-    /*publishing {
-        publications {
-            mavenJava(MavenPublication) {
-                from components.java
-                groupId project.group
-                artifactId project.name
-                version project.version
-                artifact sourcesJar
-                artifact javadocJar
-                pom {
-                    name = project.name
-                    description = projectDescription
-                    inceptionYear = inceptionDate
-                    url = scmUrl
-                    organization {
-                        name = organizationName
-                        url = organizationUrl
-                    }
-                    scm {
-                        url = scmUrl
-                        connection = scmConnection
-                        developerConnection = scmDeveloperConnection
-                    }
-                    licenses {
-                        license {
-                            name = licenseName
-                            url = licenseUrl
-                        }
-                    }
-                    developers {
-                        developer {
-                            id = user
-                            name = 'Jörg Prante'
-                            email = 'joergprante@gmail.com'
-                            url = 'https://github.com/jprante'
-                        }
-                    }
-                }
-            }
-        }
-        repositories {
-            maven {
-                url "https://oss.sonatype.org/service/local/staging/deploy/maven2"
-                credentials {
-                    username ossrhUsername
-                    password ossrhPassword
-                }
-            }
-        }
-    }
-
-    signing {
-        sign publishing.publications.mavenJava
-    }*/
-
-
-    task sonaTypeUpload(type: Upload) {
-        group = 'publish'
-        configuration = configurations.archives
-        uploadDescriptor = true
-        repositories {
-            if (project.hasProperty('ossrhUsername')) {
-                mavenDeployer {
-                    beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
-                    repository(url: 'https://oss.sonatype.org/service/local/staging/deploy/maven2') {
-                        authentication(userName: ossrhUsername, password: ossrhPassword)
-                    }
-                    snapshotRepository(url: 'https://oss.sonatype.org/content/repositories/snapshots') {
-                        authentication(userName: ossrhUsername, password: ossrhPassword)
-                    }
-                    pom.project {
-                        groupId project.group
-                        artifactId project.name
-                        version project.version
-                        name project.name
-                        description description
-                        packaging 'jar'
-                        inceptionYear inceptionDate
-                        url scmUrl
-                        organization {
-                            name organizationName
-                            url organizationUrl
-                        }
-                        developers {
-                            developer {
-                                id user
-                                name 'Jörg Prante'
-                                email 'joergprante@gmail.com'
-                                url 'https://github.com/jprante'
-                            }
-                        }
-                        scm {
-                            url scmUrl
-                            connection scmConnection
-                            developerConnection scmDeveloperConnection
-                        }
-                        licenses {
-                            license {
-                                name licenseName
-                                url licenseUrl
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    nexusStaging {
-        packageGroup = "org.xbib"
-    }
+    apply plugin: 'java-library'
+    apply from: rootProject.file('gradle/ide/idea.gradle')
+    apply from: rootProject.file('gradle/compile/java.gradle')
+    apply from: rootProject.file('gradle/test/junit5.gradle')
+    apply from: rootProject.file('gradle/publishing/publication.gradle')
 }
+
+apply from: rootProject.file('gradle/publishing/sonatype.gradle')

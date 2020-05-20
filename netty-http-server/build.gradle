@@ -1,15 +1,13 @@
 import org.apache.tools.ant.taskdefs.condition.Os
 
 dependencies {
-    compile project(":netty-http-common")
-    compile project(":netty-http-server-api")
+    api project(":netty-http-server-api")
+    testImplementation project(":netty-http-client")
+    testImplementation project(":netty-http-bouncycastle")
+    testRuntimeOnly "org.bouncycastle:bcpkix-jdk15on:${project.property('bouncycastle.version')}"
     if (Os.isFamily(Os.FAMILY_MAC)) {
-        testRuntime "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative-legacy-macosx.version')}"
-        //runtime project(':netty-http-kqueue')
+        testRuntimeOnly "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative-legacy-macosx.version')}"
     } else if (Os.isFamily(Os.FAMILY_UNIX)) {
-        testRuntime "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
-        //testRuntime project(':netty-http-epoll')
+        testRuntimeOnly "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
     }
-    testCompile project(":netty-http-client")
-    testCompile project(":netty-http-bouncycastle")
 }

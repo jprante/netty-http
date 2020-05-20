@@ -1,0 +1,55 @@
+apply plugin: 'org.xbib.gradle.plugin.asciidoctor'
+
+configurations {
+    asciidoclet
+}
+
+dependencies {
+    asciidoclet "org.asciidoctor:asciidoclet:${project.property('asciidoclet.version')}"
+}
+
+
+asciidoctor {
+    backends 'html5'
+    outputDir = file("${rootProject.projectDir}/docs")
+    separateOutputDirs = false
+    attributes 'source-highlighter': 'coderay',
+            idprefix: '',
+            idseparator: '-',
+            toc: 'left',
+            doctype: 'book',
+            icons: 'font',
+            encoding: 'utf-8',
+            sectlink: true,
+            sectanchors: true,
+            linkattrs: true,
+            imagesdir: 'img',
+            stylesheet: "${projectDir}/src/docs/asciidoc/css/foundation.css"
+}
+
+
+/*javadoc {
+options.docletpath = configurations.asciidoclet.files.asType(List)
+options.doclet = 'org.asciidoctor.Asciidoclet'
+//options.overview = "src/docs/asciidoclet/overview.adoc"
+options.addStringOption "-base-dir", "${projectDir}"
+options.addStringOption "-attribute",
+        "name=${project.name},version=${project.version},title-link=https://github.com/xbib/${project.name}"
+configure(options) {
+    noTimestamp = true
+}
+}*/
+
+
+/*javadoc {
+    options.docletpath = configurations.asciidoclet.files.asType(List)
+    options.doclet = 'org.asciidoctor.Asciidoclet'
+    options.overview = "${rootProject.projectDir}/src/docs/asciidoclet/overview.adoc"
+    options.addStringOption "-base-dir", "${projectDir}"
+    options.addStringOption "-attribute",
+            "name=${project.name},version=${project.version},title-link=https://github.com/xbib/${project.name}"
+    options.destinationDirectory(file("${projectDir}/docs/javadoc"))
+    configure(options) {
+        noTimestamp = true
+    }
+}*/

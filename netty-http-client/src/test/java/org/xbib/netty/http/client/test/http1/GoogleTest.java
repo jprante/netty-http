@@ -1,7 +1,7 @@
 package org.xbib.netty.http.client.test.http1;
 
 import io.netty.handler.codec.http.HttpMethod;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;

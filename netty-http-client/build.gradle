@@ -1,16 +1,14 @@
 import org.apache.tools.ant.taskdefs.condition.Os
 
 dependencies {
-    compile project(":netty-http-client-api")
-    compile "io.netty:netty-handler-proxy:${project.property('netty.version')}"
-    runtime "org.bouncycastle:bcpkix-jdk15on:${project.property('bouncycastle.version')}"
+    api project(":netty-http-client-api")
+    implementation "io.netty:netty-handler-proxy:${project.property('netty.version')}"
+    testImplementation "com.fasterxml.jackson.core:jackson-databind:${project.property('jackson.version')}"
+    testImplementation "org.conscrypt:conscrypt-openjdk-uber:${project.property('conscrypt.version')}"
+    testRuntimeOnly "org.bouncycastle:bcpkix-jdk15on:${project.property('bouncycastle.version')}"
     if (Os.isFamily(Os.FAMILY_MAC)) {
-        runtime "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative-legacy-macosx.version')}"
-        //runtime project(':netty-http-kqueue')
+        testRuntimeOnly "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative-legacy-macosx.version')}"
     } else if (Os.isFamily(Os.FAMILY_UNIX)) {
-        runtime "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
-        //runtime project(':netty-http-epoll')
+        testRuntimeOnly "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
     }
-    testCompile "org.conscrypt:conscrypt-openjdk-uber:${project.property('conscrypt.version')}"
-    testCompile "com.fasterxml.jackson.core:jackson-databind:${project.property('jackson.version')}"
 }

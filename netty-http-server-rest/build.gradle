@@ -1,4 +1,4 @@
 dependencies {
-    compile project(":netty-http-server")
-    compile "org.xbib:guice:${project.property('xbib-guice.version')}"
+    api project(":netty-http-server")
+    implementation "org.xbib:guice:${project.property('xbib-guice.version')}"
 }
