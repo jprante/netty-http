@@ -100,6 +100,7 @@ public class CollectBytes implements Transformer<ByteBuf, ByteBuf> {
             .cast(ByteBuf.class);
     }
 
+    @SuppressWarnings("serial")
     public static class TooMuchDataException extends RuntimeException {
         public TooMuchDataException(String message) {
             super(message);

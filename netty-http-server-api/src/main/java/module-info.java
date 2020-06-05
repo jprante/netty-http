@@ -1,8 +1,8 @@
 module org.xbib.netty.http.server.api {
     exports org.xbib.netty.http.server.api;
     exports org.xbib.netty.http.server.api.annotation;
+    requires transitive org.xbib.netty.http.common;
     requires org.xbib.net.url;
-    requires org.xbib.netty.http.common;
     requires io.netty.buffer;
     requires io.netty.common;
     requires io.netty.handler;

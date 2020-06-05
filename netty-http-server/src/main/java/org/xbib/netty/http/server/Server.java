@@ -11,10 +11,9 @@ import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.logging.LoggingHandler;
-import io.netty.handler.ssl.OpenSsl;
 import io.netty.handler.ssl.SslContext;
-import io.netty.util.DomainNameMapping;
-import io.netty.util.DomainNameMappingBuilder;
+import io.netty.util.DomainWildcardMappingBuilder;
+import io.netty.util.Mapping;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.NetworkUtils;
 import org.xbib.netty.http.common.TransportProvider;
@@ -140,10 +139,10 @@ public final class Server implements AutoCloseable {
         if (serverConfig.getDefaultDomain() == null) {
             throw new IllegalStateException("no default named server (with name '*') configured, unable to continue");
         }
-        DomainNameMapping<SslContext> domainNameMapping = null;
+        Mapping<String, SslContext> domainNameMapping = null;
         if (serverConfig.getAddress().isSecure() && serverConfig.getDefaultDomain().getSslContext() != null) {
-            DomainNameMappingBuilder<SslContext> mappingBuilder =
-                    new DomainNameMappingBuilder<>(serverConfig.getDefaultDomain().getSslContext());
+            DomainWildcardMappingBuilder<SslContext> mappingBuilder =
+                    new DomainWildcardMappingBuilder<>(serverConfig.getDefaultDomain().getSslContext());
             for (Domain domain : serverConfig.getDomains()) {
                 String name = domain.getName();
                 if (!"*".equals(name)) {
@@ -229,20 +228,6 @@ public final class Server implements AutoCloseable {
         return executor;
     }
 
-    public void logDiagnostics(Level level) {
-        logger.log(level, () -> "JDK ciphers: " + SecurityUtil.Defaults.JDK_CIPHERS);
-        logger.log(level, () -> "OpenSSL ciphers: " + SecurityUtil.Defaults.OPENSSL_CIPHERS);
-        logger.log(level, () -> "OpenSSL available: " + OpenSsl.isAvailable());
-        logger.log(level, () -> "Installed ciphers on default server: " +
-                (serverConfig.getAddress().isSecure() ? serverConfig.getDefaultDomain().getSslContext().cipherSuites() : ""));
-        logger.log(level, () -> "Local host name: " + NetworkUtils.getLocalHostName("localhost"));
-        logger.log(level, () -> "Parent event loop group: " + parentEventLoopGroup + " threads=" + serverConfig.getParentThreadCount());
-        logger.log(level, () -> "Child event loop group: " + childEventLoopGroup + " threads=" +serverConfig.getChildThreadCount());
-        logger.log(level, () -> "Socket: " + socketChannelClass.getName());
-        logger.log(level, () -> "Allocator: " + byteBufAllocator.getClass().getName());
-        logger.log(level, NetworkUtils::displayNetworkInterfaces);
-    }
-
     public AtomicLong getRequestCounter() {
         return requestCounter;
     }
@@ -306,12 +291,12 @@ public final class Server implements AutoCloseable {
 
     private HttpChannelInitializer findChannelInitializer(int majorVersion,
                                                           HttpAddress httpAddress,
-                                                          DomainNameMapping<SslContext> domainNameMapping) {
+                                                          Mapping<String, SslContext> domainNameMapping) {
         for (ProtocolProvider<HttpChannelInitializer, Transport> protocolProvider : protocolProviders) {
             if (protocolProvider.supportsMajorVersion(majorVersion)) {
                 try {
                     return protocolProvider.initializerClass()
-                            .getConstructor(Server.class, HttpAddress.class, DomainNameMapping.class)
+                            .getConstructor(Server.class, HttpAddress.class, Mapping.class)
                             .newInstance(this, httpAddress, domainNameMapping);
                 } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
                     throw new IllegalStateException();

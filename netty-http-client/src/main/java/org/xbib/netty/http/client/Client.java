@@ -16,7 +16,6 @@ import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.CipherSuiteFilter;
-import io.netty.handler.ssl.OpenSsl;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslHandler;
@@ -214,18 +213,6 @@ public final class Client implements AutoCloseable {
 
     public boolean hasPooledConnections() {
         return pool != null && !clientConfig.getPoolNodes().isEmpty();
-    }
-
-    public void logDiagnostics(Level level) {
-        logger.log(level, () -> "JDK ciphers: " + SecurityUtil.Defaults.JDK_CIPHERS);
-        logger.log(level, () -> "OpenSSL ciphers: " + SecurityUtil.Defaults.OPENSSL_CIPHERS);
-        logger.log(level, () -> "OpenSSL available: " + OpenSsl.isAvailable());
-        logger.log(level, () -> "Candidate ciphers on client: " + clientConfig.getCiphers());
-        logger.log(level, () -> "Local host name: " + NetworkUtils.getLocalHostName("localhost"));
-        logger.log(level, () -> "Event loop group: " + eventLoopGroup + " threads=" + clientConfig.getThreadCount());
-        logger.log(level, () -> "Socket: " + socketChannelClass.getName());
-        logger.log(level, () -> "Allocator: " + byteBufAllocator.getClass().getName());
-        logger.log(level, NetworkUtils::displayNetworkInterfaces);
     }
 
     public AtomicLong getRequestCounter() {

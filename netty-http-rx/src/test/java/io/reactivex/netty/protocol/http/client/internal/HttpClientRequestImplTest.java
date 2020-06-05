@@ -313,7 +313,7 @@ public class HttpClientRequestImplTest {
     }
 
     @Test(timeout = 60000)
-    public void testSetDateHeader() throws Exception {
+    public void testSetDateHeader() {
         String headerName = "date";
         Date date1 = new Date();
 
@@ -754,7 +754,7 @@ public class HttpClientRequestImplTest {
 
         public void assertHeaderAdded(HttpClientRequestImpl<Object, ByteBuf> newReq, String headerName,
                                       Date... dates) {
-            SimpleDateFormat sdf = new SimpleDateFormat("E, d MMM yyyy HH:mm:ss z", Locale.ENGLISH);
+            SimpleDateFormat sdf = new SimpleDateFormat("E, dd MMM yyyy HH:mm:ss z", Locale.US);
             sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
 
             String[] expectedValues = new String[dates.length];

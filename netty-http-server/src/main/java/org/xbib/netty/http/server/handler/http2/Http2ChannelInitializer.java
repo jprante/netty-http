@@ -30,7 +30,7 @@ import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.util.AsciiString;
-import io.netty.util.DomainNameMapping;
+import io.netty.util.Mapping;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.ServerConfig;
@@ -55,11 +55,11 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel>
 
     private final HttpAddress httpAddress;
 
-    private final DomainNameMapping<SslContext> domainNameMapping;
+    private final Mapping<String, SslContext> domainNameMapping;
 
     public Http2ChannelInitializer(Server server,
                                    HttpAddress httpAddress,
-                                   DomainNameMapping<SslContext> domainNameMapping) {
+                                   Mapping<String, SslContext> domainNameMapping) {
         this.server = server;
         this.serverConfig = server.getServerConfig();
         this.httpAddress = httpAddress;
