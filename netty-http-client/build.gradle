@@ -2,7 +2,7 @@ import org.apache.tools.ant.taskdefs.condition.Os
 
 dependencies {
     api project(":netty-http-client-api")
-    implementation "io.netty:netty-handler-proxy:${project.property('netty.version')}"
+    api "io.netty:netty-handler-proxy:${project.property('netty.version')}"
     testImplementation "com.fasterxml.jackson.core:jackson-databind:${project.property('jackson.version')}"
     testImplementation "org.conscrypt:conscrypt-openjdk-uber:${project.property('conscrypt.version')}"
     testRuntimeOnly "org.bouncycastle:bcpkix-jdk15on:${project.property('bouncycastle.version')}"

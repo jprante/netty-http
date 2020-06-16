@@ -7,7 +7,6 @@ module org.xbib.netty.http.client {
     exports org.xbib.netty.http.client.retry;
     exports org.xbib.netty.http.client.transport;
     requires transitive org.xbib.netty.http.client.api;
-    requires org.xbib.net.url;
     requires io.netty.buffer;
     requires io.netty.common;
     requires io.netty.codec.http;
