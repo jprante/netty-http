@@ -51,5 +51,4 @@ public class SecurityUtil {
         CipherSuiteFilter DEFAULT_CIPHER_SUITE_FILTER = SupportedCipherSuiteFilter.INSTANCE;
 
     }
-
 }

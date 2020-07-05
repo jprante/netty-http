@@ -2,13 +2,11 @@ package org.xbib.netty.http.server.transport;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpRequest;
-import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.api.ServerResponse;
-import org.xbib.netty.http.server.Domain;
 
 import java.io.IOException;
 import java.util.logging.Level;
@@ -24,15 +22,14 @@ public class Http2Transport extends BaseTransport {
 
     @Override
     public void requestReceived(ChannelHandlerContext ctx, FullHttpRequest fullHttpRequest, Integer sequenceId) throws IOException {
-        Domain domain = server.getNamedServer(fullHttpRequest.headers().get(HttpHeaderNames.HOST));
         HttpServerRequest serverRequest = new HttpServerRequest(server, fullHttpRequest, ctx);
         serverRequest.setSequenceId(sequenceId);
         serverRequest.setRequestId(server.getRequestCounter().incrementAndGet());
         serverRequest.setStreamId(fullHttpRequest.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text()));
         ServerResponse serverResponse = new Http2ServerResponse(server, serverRequest, ctx);
-        if (acceptRequest(domain, serverRequest, serverResponse)) {
+        if (acceptRequest(server.getServerConfig().getAddress().getVersion(), serverRequest, serverResponse)) {
             serverRequest.handleParameters();
-            server.handle(domain, serverRequest, serverResponse);
+            server.handle(serverRequest, serverResponse);
         } else {
             ServerResponse.write(serverResponse, HttpResponseStatus.NOT_ACCEPTABLE);
         }

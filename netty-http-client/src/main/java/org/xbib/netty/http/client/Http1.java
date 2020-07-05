@@ -1,10 +1,10 @@
 package org.xbib.netty.http.client;
 
-import org.xbib.netty.http.client.api.ProtocolProvider;
+import org.xbib.netty.http.client.api.ClientProtocolProvider;
 import org.xbib.netty.http.client.handler.http.Http1ChannelInitializer;
 import org.xbib.netty.http.client.transport.Http1Transport;
 
-public class Http1Provider implements ProtocolProvider<Http1ChannelInitializer, Http1Transport> {
+public class Http1 implements ClientProtocolProvider<Http1ChannelInitializer, Http1Transport> {
 
     @Override
     public boolean supportsMajorVersion(int majorVersion) {

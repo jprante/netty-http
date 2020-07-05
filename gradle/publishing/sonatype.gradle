@@ -1,3 +1,4 @@
+import java.time.Duration
 
 if (project.hasProperty('ossrhUsername') && project.hasProperty('ossrhPassword')) {
 

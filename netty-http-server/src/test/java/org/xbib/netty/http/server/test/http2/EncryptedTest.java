@@ -6,14 +6,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.client.api.ResponseListener;
-import org.xbib.netty.http.client.api.Transport;
+import org.xbib.netty.http.client.api.ClientTransport;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.Domain;
 import org.xbib.netty.http.server.test.NettyHttpTestExtension;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -52,7 +51,7 @@ class EncryptedTest {
             counter.incrementAndGet();
         };
         try {
-            Transport transport = client.newTransport(httpAddress);
+            ClientTransport transport = client.newTransport(httpAddress);
             String payload = 0 + "/" + 0;
             Request request = Request.get()
                     .setVersion("HTTP/2.0")
@@ -99,7 +98,7 @@ class EncryptedTest {
         };
         try {
             // single transport, single thread
-            Transport transport = client.newTransport();
+            ClientTransport transport = client.newTransport();
             for (int i = 0; i < loop; i++) {
                 String payload = 0 + "/" + i;
                 Request request = Request.get().setVersion("HTTP/2.0")
@@ -124,7 +123,7 @@ class EncryptedTest {
 
     @Test
     void testMultithreadPooledSecureHttp2() throws Exception {
-        int threads = 2;
+        int threads = 4;
         int loop = 1024;
         HttpAddress httpAddress = HttpAddress.secureHttp2("localhost", 8143);
         Server server = Server.builder(Domain.builder(httpAddress)
@@ -147,7 +146,7 @@ class EncryptedTest {
         final ResponseListener<HttpResponse> responseListener = resp -> counter.incrementAndGet();
         try {
             // note: for HTTP/2 only, we can use a single shared transport
-            final Transport transport = client.newTransport();
+            final ClientTransport transport = client.newTransport();
             ExecutorService executorService = Executors.newFixedThreadPool(threads);
             for (int n = 0; n < threads; n++) {
                 final int t = n;
@@ -166,8 +165,8 @@ class EncryptedTest {
                                 break;
                             }
                         }
-                    } catch (IOException e) {
-                        logger.log(Level.WARNING, e.getMessage(), e);
+                    } catch (Exception e) {
+                        logger.log(Level.SEVERE, e.getMessage(), e);
                     }
                 });
             }
@@ -175,6 +174,7 @@ class EncryptedTest {
             boolean terminated = executorService.awaitTermination(20, TimeUnit.SECONDS);
             executorService.shutdownNow();
             logger.log(Level.INFO, "terminated = " + terminated + ", now waiting for transport to complete");
+            Thread.sleep(2000L);
             transport.get(20, TimeUnit.SECONDS);
         } finally {
             client.shutdownGracefully(20, TimeUnit.SECONDS);

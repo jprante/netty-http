@@ -7,7 +7,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.client.api.ResponseListener;
-import org.xbib.netty.http.client.api.Transport;
+import org.xbib.netty.http.client.api.ClientTransport;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.server.Server;
@@ -86,7 +86,7 @@ class EncryptedTest {
                         .content(Integer.toString(i), "text/plain")
                         .setResponseListener(responseListener)
                         .build();
-                Transport transport = client.newTransport();
+                ClientTransport transport = client.newTransport();
                 transport.execute(request);
                 if (transport.isFailed()) {
                     logger.log(Level.WARNING, transport.getFailure().getMessage(), transport.getFailure());
@@ -137,7 +137,7 @@ class EncryptedTest {
                                     .setResponseListener(responseListener)
                                     .build();
                             // note: a new transport is created per execution
-                            final Transport transport = client.newTransport();
+                            final ClientTransport transport = client.newTransport();
                             transport.execute(request);
                             if (transport.isFailed()) {
                                 logger.log(Level.WARNING, transport.getFailure().getMessage(), transport.getFailure());

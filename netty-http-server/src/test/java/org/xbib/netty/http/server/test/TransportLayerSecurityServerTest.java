@@ -8,7 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.client.api.ResponseListener;
-import org.xbib.netty.http.client.api.Transport;
+import org.xbib.netty.http.client.api.ClientTransport;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.server.Domain;
@@ -33,7 +33,7 @@ class TransportLayerSecurityServerTest {
                                 .withContentType("text/plain")
                                 .write(request.getContent().retain()))
                 .build())
-                .setTransportLayerSecurityProtocols(new String[]{ "TLSv1.2"})
+                .setTransportLayerSecurityProtocols("TLSv1.2")
                 .build();
         Client client = Client.builder()
                 .trustInsecure()
@@ -51,8 +51,8 @@ class TransportLayerSecurityServerTest {
                     .content("Hello Jörg", "text/plain")
                     .setResponseListener(responseListener)
                     .build();
-            Transport transport = client.execute(request).get();
-            logger.log(Level.INFO, "HTTP 1.1 TLS protocol = " + transport.getSession().getProtocol());
+            ClientTransport transport = client.execute(request).get();
+            logger.log(Level.INFO, "TLS protocol = " + transport.getSession().getProtocol());
             assertEquals("TLSv1.2", transport.getSession().getProtocol());
         } finally {
             client.shutdownGracefully();
@@ -71,7 +71,7 @@ class TransportLayerSecurityServerTest {
                                 .withContentType("text/plain")
                                 .write(request.getContent().retain()))
                 .build())
-                .setTransportLayerSecurityProtocols(new String[]{ "TLSv1.3"})
+                .setTransportLayerSecurityProtocols("TLSv1.3")
                 .build();
         Client client = Client.builder()
                 .trustInsecure()
@@ -90,8 +90,8 @@ class TransportLayerSecurityServerTest {
                     .content("Hello Jörg", "text/plain")
                     .setResponseListener(responseListener)
                     .build();
-            Transport transport = client.execute(request).get();
-            logger.log(Level.INFO, "HTTP/2 TLS protocol = " + transport.getSession().getProtocol());
+            ClientTransport transport = client.execute(request).get();
+            logger.log(Level.INFO, "TLS protocol = " + transport.getSession().getProtocol());
             assertEquals("TLSv1.3", transport.getSession().getProtocol());
         } finally {
             client.shutdownGracefully();

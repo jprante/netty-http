@@ -1,4 +1,4 @@
-package org.xbib.netty.http.common;
+package org.xbib.netty.http.server.api.security;
 
 import java.io.InputStream;
 
@@ -28,5 +28,4 @@ public interface ServerCertificateProvider {
      * @return key password
      */
     String getKeyPassword();
-
 }

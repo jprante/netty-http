@@ -28,8 +28,6 @@ import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.SecureRandom;
 import java.util.Date;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Generates a temporary self-signed certificate for testing purposes.
@@ -131,11 +129,6 @@ public final class SelfSignedCertificate {
     public void exportPEM(OutputStream outputStream) throws IOException {
         outputStream.write(keyBytes);
         outputStream.write(certBytes);
-    }
-
-    public void exportPEM(Logger logger) {
-        logger.log(Level.INFO, new String(keyBytes, StandardCharsets.US_ASCII) +
-                new String(certBytes, StandardCharsets.US_ASCII));
     }
 
     private void writeEncoded(byte[] bytes, OutputStream outputStream) throws IOException {

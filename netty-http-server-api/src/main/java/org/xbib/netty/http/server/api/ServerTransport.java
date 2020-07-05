@@ -4,12 +4,12 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.util.AttributeKey;
-
+import org.xbib.netty.http.common.Transport;
 import java.io.IOException;
 
-public interface Transport {
+public interface ServerTransport extends Transport {
 
-    AttributeKey<Transport> TRANSPORT_ATTRIBUTE_KEY = AttributeKey.valueOf("transport");
+    AttributeKey<ServerTransport> TRANSPORT_ATTRIBUTE_KEY = AttributeKey.valueOf("transport");
 
     void requestReceived(ChannelHandlerContext ctx, FullHttpRequest fullHttpRequest, Integer sequenceId) throws IOException;
 

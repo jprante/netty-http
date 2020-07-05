@@ -7,7 +7,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.client.api.ResponseListener;
-import org.xbib.netty.http.client.api.Transport;
+import org.xbib.netty.http.client.api.ClientTransport;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.server.Server;
@@ -92,7 +92,7 @@ class CleartextTest {
                         .content(Integer.toString(i), "text/plain")
                         .setResponseListener(responseListener)
                         .build();
-                Transport transport = client.newTransport();
+                ClientTransport transport = client.newTransport();
                 transport.execute(request);
                 if (transport.isFailed()) {
                     logger.log(Level.WARNING, transport.getFailure().getMessage(), transport.getFailure());
@@ -109,7 +109,7 @@ class CleartextTest {
 
     @Test
     void testMultithreadPooledClearTextHttp1() throws Exception {
-        int threads = 2;
+        int threads = 4;
         int loop = 1024;
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         Domain domain = Domain.builder(httpAddress)
@@ -144,7 +144,7 @@ class CleartextTest {
                                     .setResponseListener(responseListener)
                                     .build();
                             // note: in HTTP 1, a new transport is created per execution
-                            Transport transport = client.newTransport();
+                            ClientTransport transport = client.newTransport();
                             transport.execute(request);
                             if (transport.isFailed()) {
                                 logger.log(Level.WARNING, "transport failed: " + transport.getFailure().getMessage(), transport.getFailure());

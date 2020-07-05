@@ -10,14 +10,13 @@ import org.xbib.net.PercentDecoder;
 import org.xbib.net.URL;
 import org.xbib.net.URLSyntaxException;
 import org.xbib.netty.http.client.Client;
-import org.xbib.netty.http.client.api.Transport;
+import org.xbib.netty.http.client.api.ClientTransport;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.client.api.BackOff;
 import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.common.cookie.Cookie;
 import org.xbib.netty.http.common.cookie.CookieBox;
-
 import javax.net.ssl.SSLSession;
 import java.io.IOException;
 import java.net.ConnectException;
@@ -38,7 +37,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
-public abstract class BaseTransport implements Transport {
+public abstract class BaseTransport implements ClientTransport {
 
     private static final Logger logger = Logger.getLogger(BaseTransport.class.getName());
 
@@ -54,15 +53,15 @@ public abstract class BaseTransport implements Transport {
 
     private SSLSession sslSession;
 
-    final Map<String, Flow> flowMap;
+    public final Map<String, Flow> flowMap;
 
-    final SortedMap<String, Request> requests;
+    protected final SortedMap<String, Request> requests;
 
     private CookieBox cookieBox;
 
     protected HttpDataFactory httpDataFactory;
 
-    BaseTransport(Client client, HttpAddress httpAddress) {
+    public BaseTransport(Client client, HttpAddress httpAddress) {
         this.client = client;
         this.httpAddress = httpAddress;
         this.channels = new ConcurrentHashMap<>();
@@ -103,9 +102,7 @@ public abstract class BaseTransport implements Transport {
     @Override
     public void close() {
         // channels are present, maybe forgot a get() to receive responses?
-        if (!channels.isEmpty()) {
-            get();
-        }
+        get();
         cancel();
     }
 
@@ -120,50 +117,55 @@ public abstract class BaseTransport implements Transport {
     }
 
     /**
-     * The underlying network layer failed, not possible to know the request.
+     * The underlying network layer failed.
      * So we fail all (open) promises.
      * @param throwable the exception
      */
     @Override
-    public void fail(Throwable throwable) {
+    public void fail(Channel channel, Throwable throwable) {
         // do not fail more than once
         if (this.throwable != null) {
             return;
         }
-        logger.log(Level.SEVERE, "failing: " + throwable.getMessage(), throwable);
         this.throwable = throwable;
+        logger.log(Level.SEVERE, "channel " + channel + " failing: " + throwable.getMessage(), throwable);
         for (Flow flow : flowMap.values()) {
             flow.fail(throwable);
         }
     }
 
     @Override
-    public Transport get() {
+    public void inactive(Channel channel) {
+        // do nothing
+    }
+
+    @Override
+    public ClientTransport get() {
         return get(client.getClientConfig().getReadTimeoutMillis(), TimeUnit.MILLISECONDS);
     }
 
     @Override
-    public Transport get(long value, TimeUnit timeUnit) {
-        if (channels.isEmpty()) {
-            return this;
-        }
-        for (Map.Entry<String, Flow> entry : flowMap.entrySet()) {
-            Flow flow = entry.getValue();
-            if (!flow.isClosed()) {
-                for (Integer key : flow.keys()) {
-                    String requestKey = getRequestKey(entry.getKey(), key);
-                    try {
-                        flow.get(key).get(value, timeUnit);
-                        completeRequest(requestKey);
-                    } catch (Exception e) {
-                        completeRequestExceptionally(requestKey, e);
-                        flow.fail(e);
-                    } finally {
-                        flow.remove(key);
+    public ClientTransport get(long value, TimeUnit timeUnit) {
+        if (!flowMap.isEmpty()) {
+            for (Map.Entry<String, Flow> entry : flowMap.entrySet()) {
+                Flow flow = entry.getValue();
+                if (!flow.isClosed()) {
+                    for (Integer key : flow.keys()) {
+                        String requestKey = getRequestKey(entry.getKey(), key);
+                        try {
+                            flow.get(key).get(value, timeUnit);
+                            completeRequest(requestKey);
+                        } catch (Exception e) {
+                            completeRequestExceptionally(requestKey, e);
+                            flow.fail(e);
+                        } finally {
+                            flow.remove(key);
+                        }
                     }
+                    flow.close();
                 }
-                flow.close();
             }
+            flowMap.clear();
         }
         channels.values().forEach(channel -> {
             try {
@@ -177,26 +179,21 @@ public abstract class BaseTransport implements Transport {
 
     @Override
     public void cancel() {
-        if (channels.isEmpty()) {
-            return;
-        }
-        for (Map.Entry<String, Flow> entry : flowMap.entrySet()) {
-            Flow flow = entry.getValue();
-            for (Integer key : flow.keys()) {
-                try {
-                    flow.get(key).cancel(true);
-                } catch (Exception e) {
-                    String requestKey = getRequestKey(entry.getKey(), key);
-                    Request request = requests.get(requestKey);
-                    if (request != null && request.getCompletableFuture() != null) {
-                        request.getCompletableFuture().completeExceptionally(e);
+        if (!flowMap.isEmpty()) {
+            for (Map.Entry<String, Flow> entry : flowMap.entrySet()) {
+                Flow flow = entry.getValue();
+                for (Integer key : flow.keys()) {
+                    try {
+                        flow.get(key).cancel(true);
+                    } catch (Exception e) {
+                        completeRequestExceptionally(getRequestKey(entry.getKey(), key), e);
+                        flow.fail(e);
+                    } finally {
+                        flow.remove(key);
                     }
-                    flow.fail(e);
-                } finally {
-                    flow.remove(key);
                 }
+                flow.close();
             }
-            flow.close();
         }
         channels.values().forEach(channel -> {
             try {

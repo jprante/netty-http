@@ -12,12 +12,13 @@ import java.io.IOException;
 import java.net.BindException;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 
 class BindExceptionTest {
 
     @Test
     void testDoubleServer() throws IOException {
-        Domain domain = Domain.builder(HttpAddress.http1("localhost", 8008), "*")
+        Domain domain = Domain.builder(HttpAddress.http1("localhost", 8008))
                 .singleEndpoint("/", (request, response) -> ServerResponse.write(response, "Hello World"))
                 .build();
         Server server1 = Server.builder(domain).build();
@@ -29,6 +30,7 @@ class BindExceptionTest {
                 assertNotNull(channelFuture1);
                 ChannelFuture channelFuture2 = server2.accept();
                 // should crash with BindException
+                fail();
             });
         } finally {
             server1.shutdownGracefully();

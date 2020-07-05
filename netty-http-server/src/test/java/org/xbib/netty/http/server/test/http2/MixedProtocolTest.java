@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.api.Request;
-import org.xbib.netty.http.client.api.Transport;
+import org.xbib.netty.http.client.api.ClientTransport;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Domain;
 import org.xbib.netty.http.server.Server;
@@ -76,7 +76,7 @@ class MixedProtocolTest {
                     .build();
             for (int i = 0; i < max; i++) {
                 // HTTP 2 breaks transport
-                Transport transport = client.execute(request).get();
+                ClientTransport transport = client.execute(request).get();
                 if (transport.isFailed()) {
                     count.incrementAndGet();
                 }
@@ -100,7 +100,7 @@ class MixedProtocolTest {
                 .build();
         Server server = Server.builder(domain)
                 //.enableDebug()
-                .setTransportLayerSecurityProtocols(new String[]{"TLSv1.2"})
+                .setTransportLayerSecurityProtocols("TLSv1.2")
                 .build();
         Client client = Client.builder()
                 //.enableDebug()
@@ -119,7 +119,7 @@ class MixedProtocolTest {
                     })
                     .build();
             for (int i = 0; i < max; i++) {
-                Transport transport = client.execute(request).get();
+                ClientTransport transport = client.execute(request).get();
                 if (transport.isFailed()) {
                     count.incrementAndGet();
                 }

@@ -6,13 +6,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-class Flow {
+public class Flow {
 
     private final AtomicInteger counter;
 
     private final SortedMap<Integer, CompletableFuture<Boolean>> map;
 
-    Flow() {
+    public Flow() {
         this.counter = new AtomicInteger(3);
         this.map = new ConcurrentSkipListMap<>();
     }

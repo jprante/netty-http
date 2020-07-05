@@ -8,13 +8,12 @@ import io.netty.handler.codec.http.HttpVersion;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.api.ServerRequest;
 import org.xbib.netty.http.server.api.ServerResponse;
-import org.xbib.netty.http.server.Domain;
-import org.xbib.netty.http.server.api.Transport;
+import org.xbib.netty.http.server.api.ServerTransport;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-abstract class BaseTransport implements Transport {
+abstract class BaseTransport implements ServerTransport {
 
     private static final Logger logger = Logger.getLogger(BaseTransport.class.getName());
 
@@ -34,14 +33,13 @@ abstract class BaseTransport implements Transport {
      * and required special header handling, possibly returning an
      * appropriate response.
      *
-     * @param domain the named server
+     * @param version the HTTP version of the server
      * @param serverRequest  the request
      * @param serverResponse the response
      * @return whether further processing should be performed
      */
-    static boolean acceptRequest(Domain domain, ServerRequest serverRequest, ServerResponse serverResponse) {
+    static boolean acceptRequest(HttpVersion version, ServerRequest serverRequest, ServerResponse serverResponse) {
         HttpHeaders reqHeaders = serverRequest.getHeaders();
-        HttpVersion version = domain.getHttpAddress().getVersion();
         if (version.majorVersion() == 1 || version.majorVersion() == 2) {
             if (!reqHeaders.contains(HttpHeaderNames.HOST)) {
                 // RFC2616#14.23: missing Host header gets 400

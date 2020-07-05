@@ -14,18 +14,23 @@ import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.util.DomainWildcardMappingBuilder;
 import io.netty.util.Mapping;
+import org.xbib.net.URL;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.NetworkUtils;
+import org.xbib.netty.http.common.HttpChannelInitializer;
 import org.xbib.netty.http.common.TransportProvider;
-import org.xbib.netty.http.server.api.HttpChannelInitializer;
-import org.xbib.netty.http.server.api.ProtocolProvider;
+import org.xbib.netty.http.server.api.ServerProtocolProvider;
+import org.xbib.netty.http.server.api.ServerRequest;
 import org.xbib.netty.http.server.api.ServerResponse;
-import org.xbib.netty.http.common.security.SecurityUtil;
+import org.xbib.netty.http.server.api.ServerTransport;
+import org.xbib.netty.http.server.security.CertificateUtils;
 import org.xbib.netty.http.server.transport.HttpServerRequest;
-import org.xbib.netty.http.server.api.Transport;
-
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.security.cert.CertificateExpiredException;
+import java.security.cert.CertificateNotYetValidException;
+import java.security.cert.CertificateParsingException;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -68,8 +73,6 @@ public final class Server implements AutoCloseable {
 
     private final ServerConfig serverConfig;
 
-    private final ByteBufAllocator byteBufAllocator;
-
     private final EventLoopGroup parentEventLoopGroup;
 
     private final EventLoopGroup childEventLoopGroup;
@@ -79,17 +82,14 @@ public final class Server implements AutoCloseable {
      */
     private final BlockingThreadPoolExecutor executor;
 
-    private final Class<? extends ServerSocketChannel> socketChannelClass;
-
     private final ServerBootstrap bootstrap;
 
     private ChannelFuture channelFuture;
 
-    private final List<ProtocolProvider<HttpChannelInitializer, Transport>> protocolProviders;
+    private final List<ServerProtocolProvider<HttpChannelInitializer, ServerTransport>> protocolProviders;
 
     /**
      * Create a new HTTP server.
-     * Use {@link #builder(HttpAddress)} to build HTTP instance.
      *
      * @param serverConfig server configuration
      * @param byteBufAllocator byte buf allocator
@@ -106,13 +106,13 @@ public final class Server implements AutoCloseable {
                    BlockingThreadPoolExecutor executor) {
         Objects.requireNonNull(serverConfig);
         this.serverConfig = serverConfig;
-        this.byteBufAllocator = byteBufAllocator != null ? byteBufAllocator : ByteBufAllocator.DEFAULT;
+        ByteBufAllocator byteBufAllocator1 = byteBufAllocator != null ? byteBufAllocator : ByteBufAllocator.DEFAULT;
         this.parentEventLoopGroup = createParentEventLoopGroup(serverConfig, parentEventLoopGroup);
         this.childEventLoopGroup = createChildEventLoopGroup(serverConfig, childEventLoopGroup);
-        this.socketChannelClass = createSocketChannelClass(serverConfig, socketChannelClass);
+        Class<? extends ServerSocketChannel> socketChannelClass1 = createSocketChannelClass(serverConfig, socketChannelClass);
         this.executor = executor;
         this.protocolProviders =new ArrayList<>();
-        for (ProtocolProvider<HttpChannelInitializer, Transport> provider : ServiceLoader.load(ProtocolProvider.class)) {
+        for (ServerProtocolProvider<HttpChannelInitializer, ServerTransport> provider : ServiceLoader.load(ServerProtocolProvider.class)) {
             protocolProviders.add(provider);
             if (logger.isLoggable(Level.FINEST)) {
                 logger.log(Level.FINEST, "protocol provider up: " + provider.transportClass());
@@ -120,13 +120,13 @@ public final class Server implements AutoCloseable {
         }
         this.bootstrap = new ServerBootstrap()
                 .group(this.parentEventLoopGroup, this.childEventLoopGroup)
-                .channel(this.socketChannelClass)
-                .option(ChannelOption.ALLOCATOR, this.byteBufAllocator)
+                .channel(socketChannelClass1)
+                .option(ChannelOption.ALLOCATOR, byteBufAllocator1)
                 .option(ChannelOption.SO_REUSEADDR, serverConfig.isReuseAddr())
                 .option(ChannelOption.SO_RCVBUF, serverConfig.getTcpReceiveBufferSize())
                 .option(ChannelOption.SO_BACKLOG, serverConfig.getBackLogSize())
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, serverConfig.getConnectTimeoutMillis())
-                .childOption(ChannelOption.ALLOCATOR, this.byteBufAllocator)
+                .childOption(ChannelOption.ALLOCATOR, byteBufAllocator1)
                 .childOption(ChannelOption.SO_REUSEADDR, serverConfig.isReuseAddr())
                 .childOption(ChannelOption.TCP_NODELAY, serverConfig.isTcpNodelay())
                 .childOption(ChannelOption.SO_SNDBUF, serverConfig.getTcpSendBufferSize())
@@ -137,34 +137,39 @@ public final class Server implements AutoCloseable {
             bootstrap.handler(new LoggingHandler("bootstrap-server", serverConfig.getTrafficDebugLogLevel()));
         }
         if (serverConfig.getDefaultDomain() == null) {
-            throw new IllegalStateException("no default named server (with name '*') configured, unable to continue");
+            throw new IllegalStateException("no default domain configured, unable to continue");
         }
+        // translate domains into Netty mapping
         Mapping<String, SslContext> domainNameMapping = null;
-        if (serverConfig.getAddress().isSecure() && serverConfig.getDefaultDomain().getSslContext() != null) {
+        Domain defaultDomain = serverConfig.getDefaultDomain();
+        if (serverConfig.getAddress().isSecure() &&
+                defaultDomain != null &&
+                defaultDomain.getSslContext() != null) {
             DomainWildcardMappingBuilder<SslContext> mappingBuilder =
-                    new DomainWildcardMappingBuilder<>(serverConfig.getDefaultDomain().getSslContext());
+                    new DomainWildcardMappingBuilder<>(defaultDomain.getSslContext());
             for (Domain domain : serverConfig.getDomains()) {
-                String name = domain.getName();
-                if (!"*".equals(name)) {
-                    mappingBuilder.add(name, domain.getSslContext());
+                if (!domain.getName().equals(defaultDomain.getName())) {
+                    mappingBuilder.add(domain.getName(), domain.getSslContext());
                 }
             }
             domainNameMapping = mappingBuilder.build();
+            logger.log(Level.INFO, "domain name mapping: " + domainNameMapping);
         }
         bootstrap.childHandler(findChannelInitializer(serverConfig.getAddress().getVersion().majorVersion(),
                 serverConfig.getAddress(), domainNameMapping));
     }
 
-    public static Builder builder() {
-        return builder(HttpAddress.http1("localhost", 8008));
+    @Override
+    public void close() {
+        try {
+            shutdownGracefully();
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, e.getMessage(), e);
+        }
     }
 
-    public static Builder builder(HttpAddress httpAddress) {
-        return new Builder(httpAddress);
-    }
-
-    public static Builder builder(Domain domain) {
-        return new Builder(domain);
+    public static Builder builder(Domain defaultDomain) {
+        return new Builder(defaultDomain);
     }
 
     public ServerConfig getServerConfig() {
@@ -189,22 +194,64 @@ public final class Server implements AutoCloseable {
     }
 
     /**
-     * Returns the named server with the given name.
+     * Returns the domain with the given host name.
      *
-     * @param name the name of the virtual host to return or null for the
+     * @param dnsName the name of the virtual host with optional port to return or null for the
      *             default domain
      * @return the virtual host with the given name or the default domain
      */
-    public Domain getNamedServer(String name) {
-        Domain domain = serverConfig.getDomain(name);
-        if (domain == null) {
-            domain = serverConfig.getDefaultDomain();
-        }
-        return domain;
+    public Domain getDomain(String dnsName) {
+       return serverConfig.getDomain(dnsName);
     }
 
-    public void handle(Domain domain, HttpServerRequest serverRequest, ServerResponse serverResponse)
-            throws IOException {
+    public Domain getDomain(URL url) {
+        return getDomain(url.getHost());
+    }
+
+    public URL getPublishURL() {
+        return getPublishURL(null);
+    }
+
+    public URL getPublishURL(ServerRequest serverRequest) {
+        Domain domain = serverRequest != null ? getDomain(serverRequest.getURL()) : serverConfig.getDefaultDomain();
+        URL bindURL = domain.getHttpAddress().base();
+        String scheme = serverRequest != null ? serverRequest.getHeaders().get("x-forwarded-proto") : null;
+        if (scheme == null) {
+            scheme = bindURL.getScheme();
+        }
+        String host = serverRequest != null ? serverRequest.getHeaders().get("x-forwarded-host") : null;
+        if (host == null) {
+            host = serverRequest != null ? serverRequest.getHeaders().get("host") : null;
+            if (host == null) {
+                host = bindURL.getHost();
+            }
+        }
+        String port = null;
+        if (host != null) {
+            host = stripPort(host);
+            port = extractPort(host);
+            if (port == null) {
+                port = bindURL.getPort() != null ? Integer.toString(bindURL.getPort()) : null;
+            }
+        }
+        String path = serverRequest != null ? serverRequest.getHeaders().get("x-forwarded-path") : null;
+        URL.Builder builder = URL.builder().scheme(scheme).host(host);
+        if (port != null) {
+            if (path != null) {
+                return builder.port(Integer.parseInt(port)).path(path).build();
+            } else {
+                return builder.port(Integer.parseInt(port)).build();
+            }
+        }
+        if (path != null) {
+            return builder.path(path).build();
+        } else {
+            return builder.build();
+        }
+    }
+
+    public void handle(HttpServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
+        Domain domain = getDomain(serverRequest.getURL());
         if (executor != null) {
             executor.submit(() -> {
                 try {
@@ -224,10 +271,6 @@ public final class Server implements AutoCloseable {
         }
     }
 
-    public BlockingThreadPoolExecutor getExecutor() {
-        return executor;
-    }
-
     public AtomicLong getRequestCounter() {
         return requestCounter;
     }
@@ -236,8 +279,8 @@ public final class Server implements AutoCloseable {
         return responseCounter;
     }
 
-    public Transport newTransport(HttpVersion httpVersion) {
-        for (ProtocolProvider<HttpChannelInitializer, Transport> protocolProvider : protocolProviders) {
+    public ServerTransport newTransport(HttpVersion httpVersion) {
+        for (ServerProtocolProvider<HttpChannelInitializer, ServerTransport> protocolProvider : protocolProviders) {
             if (protocolProvider.supportsMajorVersion(httpVersion.majorVersion())) {
                 try {
                     return protocolProvider.transportClass()
@@ -249,15 +292,6 @@ public final class Server implements AutoCloseable {
             }
         }
         throw new IllegalStateException("no channel initializer found for major version " + httpVersion.majorVersion());
-    }
-
-    @Override
-    public void close() {
-        try {
-            shutdownGracefully();
-        } catch (IOException e) {
-            logger.log(Level.SEVERE, e.getMessage(), e);
-        }
     }
 
     public void shutdownGracefully() throws IOException {
@@ -289,10 +323,26 @@ public final class Server implements AutoCloseable {
         }
     }
 
+    private static String stripPort(String hostMaybePort) {
+        if (hostMaybePort == null) {
+            return null;
+        }
+        int i = hostMaybePort.lastIndexOf(':');
+        return i >= 0 ? hostMaybePort.substring(0, i) : hostMaybePort;
+    }
+
+    private static String extractPort(String hostMaybePort) {
+        if (hostMaybePort == null) {
+            return null;
+        }
+        int i = hostMaybePort.lastIndexOf(':');
+        return i >= 0 ? hostMaybePort.substring(i + 1) : null;
+    }
+
     private HttpChannelInitializer findChannelInitializer(int majorVersion,
                                                           HttpAddress httpAddress,
                                                           Mapping<String, SslContext> domainNameMapping) {
-        for (ProtocolProvider<HttpChannelInitializer, Transport> protocolProvider : protocolProviders) {
+        for (ServerProtocolProvider<HttpChannelInitializer, ServerTransport> protocolProvider : protocolProviders) {
             if (protocolProvider.supportsMajorVersion(majorVersion)) {
                 try {
                     return protocolProvider.initializerClass()
@@ -449,11 +499,7 @@ public final class Server implements AutoCloseable {
 
         private Class<? extends ServerSocketChannel> socketChannelClass;
 
-        private ServerConfig serverConfig;
-
-        private Builder(HttpAddress httpAddress) {
-            this(Domain.builder(httpAddress, "*").build());
-        }
+        private final ServerConfig serverConfig;
 
         private Builder(Domain defaultDomain) {
             this.serverConfig = new ServerConfig();
@@ -596,14 +642,13 @@ public final class Server implements AutoCloseable {
             return this;
         }
 
-        public Builder setTransportLayerSecurityProtocols(String[] protocols) {
+        public Builder setTransportLayerSecurityProtocols(String... protocols) {
             this.serverConfig.setProtocols(protocols);
             return this;
         }
 
         public Builder addDomain(Domain domain) {
-            this.serverConfig.putDomain(domain);
-            logger.log(Level.FINE, "adding named server: " + domain);
+            this.serverConfig.checkAndAddDomain(domain);
             return this;
         }
 
@@ -616,6 +661,45 @@ public final class Server implements AutoCloseable {
                 executor.setRejectedExecutionHandler((runnable, threadPoolExecutor) ->
                         logger.log(Level.SEVERE, "rejected: " + runnable));
             }
+            if (serverConfig.isAutoDomain()) {
+                // unpack subject alternative names into separate domains
+                for (Domain domain : serverConfig.getDomains()) {
+                    try {
+                        CertificateUtils.processSubjectAlternativeNames(domain.getCertificateChain(),
+                                new CertificateUtils.SubjectAlternativeNamesProcessor() {
+                                    @Override
+                                    public void setServerName(String serverName) {
+                                    }
+
+                                    @Override
+                                    public void setSubjectAlternativeName(String subjectAlternativeName) {
+                                        Domain alternativeDomain = Domain.builder(domain)
+                                                .setServerName(subjectAlternativeName)
+                                                .build();
+                                        addDomain(alternativeDomain);
+                                    }
+                                });
+                    } catch (CertificateParsingException e) {
+                        logger.log(Level.SEVERE, "domain " + domain + ": unable to parse certificate: " + e.getMessage(), e);
+                    }
+                }
+            }
+            for (Domain domain : serverConfig.getDomains()) {
+                if (domain.getCertificateChain() != null) {
+                    for (X509Certificate certificate : domain.getCertificateChain()) {
+                        try {
+                            certificate.checkValidity();
+                            logger.log(Level.INFO, "certificate " + certificate.getSubjectDN().getName() + " for " + domain + " is valid");
+                        } catch (CertificateNotYetValidException | CertificateExpiredException e) {
+                            logger.log(Level.SEVERE, "certificate " + certificate.getSubjectDN().getName() + " for " + domain + " is not valid: " + e.getMessage(), e);
+                            if (!serverConfig.isAcceptInvalidCertificates()) {
+                                throw new IllegalArgumentException(e);
+                            }
+                        }
+                    }
+                }
+            }
+            logger.log(Level.INFO, "configured domains: " + serverConfig.getDomains());
             return new Server(serverConfig, byteBufAllocator,
                     parentEventLoopGroup, childEventLoopGroup, socketChannelClass,
                     executor);

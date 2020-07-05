@@ -22,17 +22,16 @@ import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.util.concurrent.Future;
-import org.xbib.netty.http.client.api.HttpChannelInitializer;
-import org.xbib.netty.http.client.api.ProtocolProvider;
+import org.xbib.netty.http.client.api.ClientProtocolProvider;
 import org.xbib.netty.http.client.api.Request;
+import org.xbib.netty.http.client.api.ClientTransport;
 import org.xbib.netty.http.client.pool.BoundedChannelPool;
-import org.xbib.netty.http.client.api.Transport;
 import org.xbib.netty.http.common.HttpAddress;
+import org.xbib.netty.http.common.HttpChannelInitializer;
 import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.common.NetworkUtils;
 import org.xbib.netty.http.common.TransportProvider;
 import org.xbib.netty.http.common.security.SecurityUtil;
-
 import javax.net.ssl.SNIHostName;
 import javax.net.ssl.SNIServerName;
 import javax.net.ssl.SSLEngine;
@@ -89,9 +88,9 @@ public final class Client implements AutoCloseable {
 
     private final Bootstrap bootstrap;
 
-    private final Queue<Transport> transports;
+    private final Queue<ClientTransport> transports;
 
-    private final List<ProtocolProvider<HttpChannelInitializer, Transport>> protocolProviders;
+    private final List<ClientProtocolProvider<HttpChannelInitializer, ClientTransport>> protocolProviders;
 
     private final AtomicBoolean closed;
 
@@ -118,7 +117,7 @@ public final class Client implements AutoCloseable {
         this.closed = new AtomicBoolean(false);
         this.clientConfig = clientConfig;
         this.protocolProviders = new ArrayList<>();
-        for (ProtocolProvider<HttpChannelInitializer, Transport> provider : ServiceLoader.load(ProtocolProvider.class)) {
+        for (ClientProtocolProvider<HttpChannelInitializer, ClientTransport> provider : ServiceLoader.load(ClientProtocolProvider.class)) {
             protocolProviders.add(provider);
             if (logger.isLoggable(Level.FINEST)) {
                 logger.log(Level.FINEST, "protocol provider: " + provider.transportClass());
@@ -199,7 +198,7 @@ public final class Client implements AutoCloseable {
         return new Builder();
     }
 
-    public List<ProtocolProvider<HttpChannelInitializer, Transport>> getProtocolProviders() {
+    public List<ClientProtocolProvider<HttpChannelInitializer, ClientTransport>> getProtocolProviders() {
         return protocolProviders;
     }
 
@@ -223,14 +222,14 @@ public final class Client implements AutoCloseable {
         return responseCounter;
     }
 
-    public Transport newTransport() {
+    public ClientTransport newTransport() {
         return newTransport(null);
     }
 
-    public Transport newTransport(HttpAddress httpAddress) {
-        Transport transport = null;
+    public ClientTransport newTransport(HttpAddress httpAddress) {
+        ClientTransport transport = null;
         if (httpAddress != null) {
-            for (ProtocolProvider<HttpChannelInitializer, Transport> protocolProvider : protocolProviders) {
+            for (ClientProtocolProvider<HttpChannelInitializer, ClientTransport> protocolProvider : protocolProviders) {
                 if (protocolProvider.supportsMajorVersion(httpAddress.getVersion().majorVersion())) {
                     try {
                         transport = protocolProvider.transportClass()
@@ -245,7 +244,7 @@ public final class Client implements AutoCloseable {
                 throw new UnsupportedOperationException("no protocol support for " + httpAddress);
             }
         } else if (hasPooledConnections()) {
-            for (ProtocolProvider<HttpChannelInitializer, Transport> protocolProvider : protocolProviders) {
+            for (ClientProtocolProvider<HttpChannelInitializer, ClientTransport> protocolProvider : protocolProviders) {
                 if (protocolProvider.supportsMajorVersion(pool.getVersion().majorVersion())) {
                     try {
                         transport = protocolProvider.transportClass()
@@ -311,7 +310,7 @@ public final class Client implements AutoCloseable {
         }
     }
 
-    public Transport execute(Request request) throws IOException {
+    public ClientTransport execute(Request request) throws IOException {
         return newTransport(HttpAddress.of(request.url(), request.httpVersion()))
                 .execute(request);
     }
@@ -337,8 +336,8 @@ public final class Client implements AutoCloseable {
      * @param request the new request for continuing the request.
      * @throws IOException if continuation fails
      */
-    public void continuation(Transport transport, Request request) throws IOException {
-        Transport nextTransport = newTransport(HttpAddress.of(request.url(), request.httpVersion()));
+    public void continuation(ClientTransport transport, Request request) throws IOException {
+        ClientTransport nextTransport = newTransport(HttpAddress.of(request.url(), request.httpVersion()));
         nextTransport.setCookieBox(transport.getCookieBox());
         nextTransport.execute(request);
         nextTransport.get();
@@ -352,7 +351,7 @@ public final class Client implements AutoCloseable {
      * @param request the request to retry
      * @throws IOException if retry failed
      */
-    public void retry(Transport transport, Request request) throws IOException {
+    public void retry(ClientTransport transport, Request request) throws IOException {
         transport.execute(request);
         transport.get();
         closeAndRemove(transport);
@@ -370,7 +369,7 @@ public final class Client implements AutoCloseable {
     public void shutdownGracefully(long amount, TimeUnit timeUnit) throws IOException {
         if (closed.compareAndSet(false, true)) {
             try {
-                for (Transport transport : transports) {
+                for (ClientTransport transport : transports) {
                     transport.close();
                 }
                 transports.clear();
@@ -386,7 +385,7 @@ public final class Client implements AutoCloseable {
         }
     }
 
-    private void closeAndRemove(Transport transport) throws IOException {
+    private void closeAndRemove(ClientTransport transport) throws IOException {
         try {
             transport.close();
         } catch (Exception e) {
@@ -400,7 +399,7 @@ public final class Client implements AutoCloseable {
                                                           HttpAddress httpAddress,
                                                           SslHandlerFactory sslHandlerFactory,
                                                           HttpChannelInitializer helper) {
-        for (ProtocolProvider<HttpChannelInitializer, Transport> protocolProvider : protocolProviders) {
+        for (ClientProtocolProvider<HttpChannelInitializer, ClientTransport> protocolProvider : protocolProviders) {
             if (protocolProvider.supportsMajorVersion(majorVersion)) {
                 try {
                     return protocolProvider.initializerClass()

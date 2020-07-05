@@ -1,10 +1,10 @@
-package org.xbib.netty.http.server;
+package org.xbib.netty.http.client;
 
-import org.xbib.netty.http.server.api.ProtocolProvider;
-import org.xbib.netty.http.server.handler.http2.Http2ChannelInitializer;
-import org.xbib.netty.http.server.transport.Http2Transport;
+import org.xbib.netty.http.client.api.ClientProtocolProvider;
+import org.xbib.netty.http.client.handler.http2.Http2ChannelInitializer;
+import org.xbib.netty.http.client.transport.Http2Transport;
 
-public class Http2Provider implements ProtocolProvider<Http2ChannelInitializer, Http2Transport> {
+public class Http2 implements ClientProtocolProvider<Http2ChannelInitializer, Http2Transport> {
 
     @Override
     public boolean supportsMajorVersion(int majorVersion) {

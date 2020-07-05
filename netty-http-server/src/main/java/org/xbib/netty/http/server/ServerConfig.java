@@ -262,6 +262,10 @@ public class ServerConfig {
 
     private KeyStore trustManagerKeyStore = null;
 
+    private boolean autoDomain = false;
+
+    private boolean acceptInvalidCertificates = false;
+
     public ServerConfig() {
         this.domains = new LinkedHashMap<>();
     }
@@ -596,7 +600,28 @@ public class ServerConfig {
         return cipherSuiteFilter;
     }
 
-    public ServerConfig putDomain(Domain domain) {
+    public ServerConfig setAutoDomain(boolean autoDomain) {
+        this.autoDomain = autoDomain;
+        return this;
+    }
+
+    public boolean isAutoDomain() {
+        return autoDomain;
+    }
+
+    public ServerConfig setAcceptInvalidCertificates(boolean acceptInvalidCertificates) {
+        this.acceptInvalidCertificates = acceptInvalidCertificates;
+        return this;
+    }
+
+    public boolean isAcceptInvalidCertificates() {
+        return acceptInvalidCertificates;
+    }
+
+    public ServerConfig checkAndAddDomain(Domain domain) {
+        if (domains.containsKey(domain.getName())) {
+            return this;
+        }
         domains.put(domain.getName(), domain);
         for (String alias : domain.getAliases()) {
             domains.put(alias, domain);
@@ -621,12 +646,14 @@ public class ServerConfig {
         return this;
     }
 
-    public Domain getDefaultDomain() {
-        return getDomain("*");
-    }
-
     public Domain getDomain(String name) {
-        return domains.get(name);
+        Domain domain = domains.get(name);
+        return domain != null ? domain : getDefaultDomain();
     }
 
+    public Domain getDefaultDomain() {
+        Domain defaultDomain = domains.get("*");
+        return defaultDomain != null ? defaultDomain :
+                !domains.isEmpty() ? domains.values().iterator().next() : null;
+    }
 }

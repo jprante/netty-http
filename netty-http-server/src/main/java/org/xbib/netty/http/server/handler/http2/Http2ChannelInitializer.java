@@ -34,11 +34,11 @@ import io.netty.util.Mapping;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.ServerConfig;
-import org.xbib.netty.http.server.api.HttpChannelInitializer;
+import org.xbib.netty.http.common.HttpChannelInitializer;
 import org.xbib.netty.http.server.handler.ExtendedSNIHandler;
 import org.xbib.netty.http.server.handler.IdleTimeoutHandler;
 import org.xbib.netty.http.server.handler.TrafficLoggingHandler;
-import org.xbib.netty.http.server.api.Transport;
+import org.xbib.netty.http.server.api.ServerTransport;
 
 import java.io.IOException;
 import java.util.logging.Level;
@@ -68,8 +68,8 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel>
 
     @Override
     public void initChannel(Channel channel) {
-        Transport transport = server.newTransport(httpAddress.getVersion());
-        channel.attr(Transport.TRANSPORT_ATTRIBUTE_KEY).set(transport);
+        ServerTransport transport = server.newTransport(httpAddress.getVersion());
+        channel.attr(ServerTransport.TRANSPORT_ATTRIBUTE_KEY).set(transport);
         if (serverConfig.isTrafficDebug()) {
             channel.pipeline().addLast(new TrafficLoggingHandler(LogLevel.DEBUG));
         }
@@ -94,8 +94,8 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel>
         ChannelHandler channelHandler = new ChannelInitializer<Channel>() {
             @Override
             protected void initChannel(Channel channel) {
-                Transport transport = server.newTransport(httpAddress.getVersion());
-                channel.attr(Transport.TRANSPORT_ATTRIBUTE_KEY).set(transport);
+                ServerTransport transport = server.newTransport(httpAddress.getVersion());
+                channel.attr(ServerTransport.TRANSPORT_ATTRIBUTE_KEY).set(transport);
                 ChannelPipeline pipeline = channel.pipeline();
                 pipeline.addLast("server-frame-converter",
                         new Http2StreamFrameToHttpObjectCodec(true));
@@ -137,7 +137,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel>
 
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest fullHttpRequest) throws IOException {
-            Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
+            ServerTransport transport = ctx.channel().attr(ServerTransport.TRANSPORT_ATTRIBUTE_KEY).get();
             transport.requestReceived(ctx, fullHttpRequest, null);
         }
     }
@@ -148,7 +148,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel>
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
             if (msg instanceof DefaultHttp2SettingsFrame) {
                 DefaultHttp2SettingsFrame http2SettingsFrame = (DefaultHttp2SettingsFrame) msg;
-                Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
+                ServerTransport transport = ctx.channel().attr(ServerTransport.TRANSPORT_ATTRIBUTE_KEY).get();
                 transport.settingsReceived(ctx, http2SettingsFrame.settings());
             } else if (msg instanceof DefaultHttpRequest) {
                 DefaultHttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1,
@@ -159,13 +159,13 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel>
 
         @Override
         public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
-            Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
+            ServerTransport transport = ctx.channel().attr(ServerTransport.TRANSPORT_ATTRIBUTE_KEY).get();
             ctx.fireUserEventTriggered(evt);
         }
 
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws IOException {
-            Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
+            ServerTransport transport = ctx.channel().attr(ServerTransport.TRANSPORT_ATTRIBUTE_KEY).get();
             transport.exceptionReceived(ctx, cause);
         }
     }

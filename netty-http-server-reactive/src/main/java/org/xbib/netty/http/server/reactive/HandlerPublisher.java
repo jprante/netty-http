@@ -320,6 +320,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
             case DEMANDING:
             case IDLE:
                 cancelled();
+                // fall through
             case DRAINING:
                 state = DONE;
                 break;

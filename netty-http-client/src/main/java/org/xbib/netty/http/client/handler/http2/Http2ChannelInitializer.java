@@ -14,11 +14,10 @@ import io.netty.handler.codec.http2.Http2MultiplexCodecBuilder;
 import io.netty.handler.logging.LogLevel;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.ClientConfig;
-import org.xbib.netty.http.client.api.HttpChannelInitializer;
 import org.xbib.netty.http.client.handler.http.TrafficLoggingHandler;
-import org.xbib.netty.http.client.api.Transport;
+import org.xbib.netty.http.client.api.ClientTransport;
 import org.xbib.netty.http.common.HttpAddress;
-
+import org.xbib.netty.http.common.HttpChannelInitializer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -86,7 +85,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> impleme
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
             if (msg instanceof DefaultHttp2SettingsFrame) {
                 DefaultHttp2SettingsFrame settingsFrame = (DefaultHttp2SettingsFrame) msg;
-                Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
+                ClientTransport transport = ctx.channel().attr(ClientTransport.TRANSPORT_ATTRIBUTE_KEY).get();
                 if (transport != null) {
                     transport.settingsReceived(settingsFrame.settings());
                 }
@@ -100,7 +99,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> impleme
             if (evt instanceof Http2ConnectionPrefaceAndSettingsFrameWrittenEvent) {
                 Http2ConnectionPrefaceAndSettingsFrameWrittenEvent event =
                         (Http2ConnectionPrefaceAndSettingsFrameWrittenEvent)evt;
-                Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
+                ClientTransport transport = ctx.channel().attr(ClientTransport.TRANSPORT_ATTRIBUTE_KEY).get();
                 if (transport != null) {
                     transport.settingsReceived(null);
                 }
@@ -110,9 +109,9 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> impleme
 
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-            Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
+            ClientTransport transport = ctx.channel().attr(ClientTransport.TRANSPORT_ATTRIBUTE_KEY).get();
             if (transport != null) {
-                transport.fail(cause);
+                transport.fail(ctx.channel(), cause);
             }
         }
     }
@@ -126,7 +125,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel> impleme
         public void logPushPromise(Direction direction, ChannelHandlerContext ctx, int streamId, int promisedStreamId,
                                    Http2Headers headers, int padding) {
             super.logPushPromise(direction, ctx, streamId, promisedStreamId, headers, padding);
-            Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
+            ClientTransport transport = ctx.channel().attr(ClientTransport.TRANSPORT_ATTRIBUTE_KEY).get();
             if (transport != null) {
                 transport.pushPromiseReceived(ctx.channel(), streamId, promisedStreamId, headers);
             }

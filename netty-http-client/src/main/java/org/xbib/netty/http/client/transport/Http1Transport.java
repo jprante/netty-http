@@ -1,7 +1,6 @@
 package org.xbib.netty.http.client.transport;
 
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
@@ -12,17 +11,17 @@ import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import org.xbib.net.URLSyntaxException;
 import org.xbib.netty.http.client.Client;
-import org.xbib.netty.http.client.api.Transport;
+import org.xbib.netty.http.client.api.ClientTransport;
 import org.xbib.netty.http.client.cookie.ClientCookieDecoder;
 import org.xbib.netty.http.client.cookie.ClientCookieEncoder;
 import org.xbib.netty.http.common.DefaultHttpResponse;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.common.cookie.Cookie;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.NoSuchElementException;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -36,7 +35,7 @@ public class Http1Transport extends BaseTransport {
     }
 
     @Override
-    public Transport execute(Request request) throws IOException {
+    public ClientTransport execute(Request request) throws IOException {
         Channel channel = mapChannel(request);
         if (throwable != null) {
             return this;
@@ -175,6 +174,11 @@ public class Http1Transport extends BaseTransport {
 
     @Override
     protected String getRequestKey(String channelId, Integer streamId) {
-        return requests.isEmpty() ? null : requests.lastKey();
+        try {
+            return requests.isEmpty() ? null : requests.lastKey();
+        } catch (NoSuchElementException e) {
+            // ConcurrentSkipListMap is not thread-safe, can be emptied before lastKey() is called
+            return null;
+        }
     }
 }

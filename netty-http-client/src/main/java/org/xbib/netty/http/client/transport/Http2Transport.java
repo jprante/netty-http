@@ -19,7 +19,7 @@ import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.util.AsciiString;
 import org.xbib.net.URLSyntaxException;
 import org.xbib.netty.http.client.Client;
-import org.xbib.netty.http.client.api.Transport;
+import org.xbib.netty.http.client.api.ClientTransport;
 import org.xbib.netty.http.client.cookie.ClientCookieDecoder;
 import org.xbib.netty.http.client.cookie.ClientCookieEncoder;
 import org.xbib.netty.http.client.handler.http2.Http2ResponseHandler;
@@ -49,7 +49,7 @@ public class Http2Transport extends BaseTransport {
     public Http2Transport(Client client, HttpAddress httpAddress) {
         super(client, httpAddress);
         this.settingsPromise = httpAddress != null ? new CompletableFuture<>() : null;
-        final Transport transport = this;
+        final ClientTransport transport = this;
         this.initializer = new ChannelInitializer<>() {
             @Override
             protected void initChannel(Channel ch)  {
@@ -68,7 +68,7 @@ public class Http2Transport extends BaseTransport {
     }
 
     @Override
-    public Transport execute(Request request) throws IOException {
+    public ClientTransport execute(Request request) throws IOException {
         Channel channel = mapChannel(request);
         if (throwable != null) {
             return this;

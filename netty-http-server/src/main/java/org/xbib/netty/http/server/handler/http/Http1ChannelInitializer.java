@@ -22,11 +22,11 @@ import io.netty.util.Mapping;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.ServerConfig;
-import org.xbib.netty.http.server.api.HttpChannelInitializer;
+import org.xbib.netty.http.common.HttpChannelInitializer;
 import org.xbib.netty.http.server.handler.ExtendedSNIHandler;
 import org.xbib.netty.http.server.handler.IdleTimeoutHandler;
 import org.xbib.netty.http.server.handler.TrafficLoggingHandler;
-import org.xbib.netty.http.server.api.Transport;
+import org.xbib.netty.http.server.api.ServerTransport;
 
 import java.nio.charset.StandardCharsets;
 import java.util.logging.Level;
@@ -56,8 +56,8 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel>
 
     @Override
     public void initChannel(Channel channel) {
-        Transport transport = server.newTransport(httpAddress.getVersion());
-        channel.attr(Transport.TRANSPORT_ATTRIBUTE_KEY).set(transport);
+        ServerTransport transport = server.newTransport(httpAddress.getVersion());
+        channel.attr(ServerTransport.TRANSPORT_ATTRIBUTE_KEY).set(transport);
         if (serverConfig.isTrafficDebug()) {
             channel.pipeline().addLast(new TrafficLoggingHandler(LogLevel.DEBUG));
         }
@@ -125,7 +125,7 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel>
                                 HttpResponseStatus.HTTP_VERSION_NOT_SUPPORTED);
                         ctx.channel().writeAndFlush(response);
                     } else {
-                        Transport transport = server.newTransport(fullHttpRequest.protocolVersion());
+                        ServerTransport transport = server.newTransport(fullHttpRequest.protocolVersion());
                         transport.requestReceived(ctx, fullHttpRequest, httpPipelinedRequest.getSequenceId());
                     }
                     fullHttpRequest.release();

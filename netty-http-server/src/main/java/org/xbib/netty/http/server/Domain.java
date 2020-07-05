@@ -8,22 +8,31 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
 import org.xbib.netty.http.common.HttpAddress;
-import org.xbib.netty.http.common.ServerCertificateProvider;
+import org.xbib.netty.http.server.api.security.ServerCertificateProvider;
 import org.xbib.netty.http.common.security.SecurityUtil;
 import org.xbib.netty.http.server.api.ServerRequest;
 import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.endpoint.HttpEndpoint;
 import org.xbib.netty.http.server.endpoint.HttpEndpointResolver;
 import org.xbib.netty.http.server.api.Filter;
-
+import org.xbib.netty.http.server.security.CertificateUtils;
+import org.xbib.netty.http.server.security.PrivateKeyUtils;
+import javax.crypto.NoSuchPaddingException;
 import javax.net.ssl.TrustManagerFactory;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.KeyException;
 import java.security.KeyStore;
+import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
 import java.security.Provider;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
+import java.security.spec.InvalidKeySpecException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
@@ -49,6 +58,8 @@ public class Domain {
 
     private final List<HttpEndpointResolver> httpEndpointResolvers;
 
+    private final Collection<? extends X509Certificate> certificates;
+
     /**
      * Constructs a {@code NamedServer} with the given name.
      *
@@ -58,29 +69,41 @@ public class Domain {
      * @param httpEndpointResolvers the endpoint resolvers
      * @param sslContext SSL context or null
      */
-    protected Domain(String name, Set<String> aliases,
+    private Domain(String name,
+                     Set<String> aliases,
                      HttpAddress httpAddress,
                      List<HttpEndpointResolver> httpEndpointResolvers,
-                     SslContext sslContext) {
+                     SslContext sslContext,
+                     Collection<? extends X509Certificate> certificates) {
         this.httpAddress = httpAddress;
         this.name = name;
-        this.sslContext = sslContext;
-        this.aliases = Collections.unmodifiableSet(aliases);
+        this.aliases = aliases;
         this.httpEndpointResolvers = httpEndpointResolvers;
-    }
-
-    public static Builder builder() {
-        return builder(HttpAddress.http1("localhost", 8008));
+        this.sslContext = sslContext;
+        this.certificates = certificates;
+        Objects.requireNonNull(httpEndpointResolvers);
+        if (httpEndpointResolvers.isEmpty()) {
+            throw new IllegalArgumentException("domain must have at least one endpoint resolver");
+        }
     }
 
     public static Builder builder(HttpAddress httpAddress) {
-        return builder(httpAddress, "*");
+        return builder(httpAddress, httpAddress.getInetSocketAddress().getHostString());
     }
 
     public static Builder builder(HttpAddress httpAddress, String serverName) {
-        return new Builder(httpAddress, serverName);
+        return new Builder(httpAddress).setServerName(serverName);
     }
 
+    public static Builder builder(Domain domain) {
+        return new Builder(domain);
+    }
+
+    /**
+     * The address this domain binds to.
+     *
+     * @return the HTTP address
+     */
     public HttpAddress getHttpAddress() {
         return httpAddress;
     }
@@ -94,10 +117,6 @@ public class Domain {
         return name;
     }
 
-    public SslContext getSslContext() {
-        return sslContext;
-    }
-
     /**
      * Returns the aliases.
      *
@@ -108,44 +127,60 @@ public class Domain {
     }
 
     /**
+     * Returns SSL context.
+     * @return the SSL context
+     */
+    public SslContext getSslContext() {
+        return sslContext;
+    }
+
+    /**
+     * Get certificate chain.
+     * @return the certificate chain or null if not secure
+     */
+    public Collection<? extends X509Certificate> getCertificateChain() {
+        return certificates;
+    }
+
+    /**
      * Handle server requests.
      * @param serverRequest the server request
      * @param serverResponse the server response
      * @throws IOException if handling server request fails
      */
     public void handle(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
-        if (httpEndpointResolvers != null) {
-            boolean found = false;
-            for (HttpEndpointResolver httpEndpointResolver : httpEndpointResolvers) {
-                List<HttpEndpoint> matchingEndpoints = httpEndpointResolver.matchingEndpointsFor(serverRequest);
-                if (matchingEndpoints != null && !matchingEndpoints.isEmpty()) {
-                    httpEndpointResolver.handle(matchingEndpoints, serverRequest, serverResponse);
-                    found = true;
-                    break;
-                }
+        boolean found = false;
+        for (HttpEndpointResolver httpEndpointResolver : httpEndpointResolvers) {
+            List<HttpEndpoint> matchingEndpoints = httpEndpointResolver.matchingEndpointsFor(serverRequest);
+            if (matchingEndpoints != null && !matchingEndpoints.isEmpty()) {
+                httpEndpointResolver.handle(matchingEndpoints, serverRequest, serverResponse);
+                found = true;
+                break;
             }
-            if (!found) {
-                ServerResponse.write(serverResponse, HttpResponseStatus.NOT_IMPLEMENTED);
-            }
-        } else {
-            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_IMPLEMENTED);
+        }
+        if (!found) {
+            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_IMPLEMENTED,
+                    "text/plain", "No endpoint match for request " + serverRequest +
+                            " endpoints = " + httpEndpointResolvers);
         }
     }
 
     @Override
     public String toString() {
-        return name + " (" + httpAddress + ") " + aliases;
+        return name + " (" + httpAddress + ") aliases=" + aliases;
     }
 
     public static class Builder {
 
-        private HttpAddress httpAddress;
+        private final HttpAddress httpAddress;
 
         private String serverName;
 
-        private Set<String> aliases;
+        private final Set<String> aliases;
 
-        private List<HttpEndpointResolver> httpEndpointResolvers;
+        private final List<HttpEndpointResolver> httpEndpointResolvers;
+
+        private SslContext sslContext;
 
         private TrustManagerFactory trustManagerFactory;
 
@@ -159,23 +194,39 @@ public class Domain {
 
         private CipherSuiteFilter cipherSuiteFilter;
 
-        private InputStream keyCertChainInputStream;
+        private Collection<? extends X509Certificate> keyCertChain;
 
-        private InputStream keyInputStream;
+        private PrivateKey privateKey;
 
-        private String keyPassword;
-
-        Builder(HttpAddress httpAddress, String serverName) {
+        private Builder(HttpAddress httpAddress) {
             Objects.requireNonNull(httpAddress);
-            Objects.requireNonNull(serverName);
             this.httpAddress = httpAddress;
-            this.serverName = serverName;
             this.aliases = new LinkedHashSet<>();
             this.httpEndpointResolvers = new ArrayList<>();
             this.trustManagerFactory = SecurityUtil.Defaults.DEFAULT_TRUST_MANAGER_FACTORY;
             this.sslProvider = SecurityUtil.Defaults.DEFAULT_SSL_PROVIDER;
             this.ciphers = SecurityUtil.Defaults.DEFAULT_CIPHERS;
             this.cipherSuiteFilter = SecurityUtil.Defaults.DEFAULT_CIPHER_SUITE_FILTER;
+        }
+
+        private Builder(Domain domain) {
+            this.httpAddress = domain.httpAddress;
+            this.aliases = new LinkedHashSet<>();
+            this.httpEndpointResolvers = new ArrayList<>(domain.httpEndpointResolvers);
+            this.sslContext = domain.sslContext;
+            this.keyCertChain = domain.certificates;
+        }
+
+        public Builder setServerName(String serverName) {
+            if (this.serverName == null) {
+                this.serverName = serverName;
+            }
+            return this;
+        }
+
+        public Builder setSslContext(SslContext sslContext) {
+            this.sslContext = sslContext;
+            return this;
         }
 
         public Builder setTrustManagerFactory(TrustManagerFactory trustManagerFactory) {
@@ -226,56 +277,36 @@ public class Domain {
             return this;
         }
 
-        public Builder setKeyCertChainInputStream(InputStream keyCertChainInputStream) {
+        public Builder setKeyCertChain(InputStream keyCertChainInputStream)
+                throws CertificateException {
             Objects.requireNonNull(keyCertChainInputStream);
-            this.keyCertChainInputStream = keyCertChainInputStream;
+            this.keyCertChain = CertificateUtils.toCertificate(keyCertChainInputStream);
             return this;
         }
 
-        public Builder setKeyInputStream(InputStream keyInputStream) {
+        public Builder setKey(InputStream keyInputStream, String keyPassword)
+                throws NoSuchPaddingException, NoSuchAlgorithmException, IOException,
+                KeyException, InvalidAlgorithmParameterException, InvalidKeySpecException {
             Objects.requireNonNull(keyInputStream);
-            this.keyInputStream = keyInputStream;
+            this.privateKey = PrivateKeyUtils.toPrivateKey(keyInputStream, keyPassword);
             return this;
         }
 
-        public Builder setKeyPassword(String keyPassword) {
-            // null in keyPassword allowed, it means no password
-            this.keyPassword = keyPassword;
-            return this;
-        }
-
-        public Builder setKeyCert(InputStream keyCertChainInputStream, InputStream keyInputStream) {
-            Objects.requireNonNull(keyCertChainInputStream);
-            Objects.requireNonNull(keyInputStream);
-            setKeyCertChainInputStream(keyCertChainInputStream);
-            setKeyInputStream(keyInputStream);
-            return this;
-        }
-
-        public Builder setKeyCert(InputStream keyCertChainInputStream, InputStream keyInputStream,
-                                  String keyPassword) {
-            Objects.requireNonNull(keyCertChainInputStream);
-            Objects.requireNonNull(keyInputStream);
-            Objects.requireNonNull(keyPassword);
-            setKeyCertChainInputStream(keyCertChainInputStream);
-            setKeyInputStream(keyInputStream);
-            setKeyPassword(keyPassword);
-            return this;
-        }
-
-        public Builder setSelfCert() {
-            ServiceLoader<ServerCertificateProvider> serverCertificateProviders = ServiceLoader.load(ServerCertificateProvider.class);
+        public Builder setSelfCert() throws CertificateException, NoSuchPaddingException,
+                NoSuchAlgorithmException, IOException, KeyException, InvalidAlgorithmParameterException,
+                InvalidKeySpecException {
+            ServiceLoader<ServerCertificateProvider> serverCertificateProviders =
+                    ServiceLoader.load(ServerCertificateProvider.class);
             for (ServerCertificateProvider serverCertificateProvider : serverCertificateProviders) {
                 if ("org.xbib.netty.http.bouncycastle.BouncyCastleSelfSignedCertificateProvider".equals(serverCertificateProvider.getClass().getName())) {
                     serverCertificateProvider.prepare(serverName);
-                    setKeyCertChainInputStream(serverCertificateProvider.getCertificateChain());
-                    setKeyInputStream(serverCertificateProvider.getPrivateKey());
-                    setKeyPassword(serverCertificateProvider.getKeyPassword());
+                    setKeyCertChain(serverCertificateProvider.getCertificateChain());
+                    setKey(serverCertificateProvider.getPrivateKey(), serverCertificateProvider.getKeyPassword());
                     logger.log(Level.INFO, "self signed certificate installed");
                 }
             }
-            if (keyCertChainInputStream == null) {
-                logger.log(Level.WARNING, "unable to install self signed certificate. Is netty-http-bouncycastle present?");
+            if (keyCertChain == null) {
+                throw new CertificateException("unable to set self certificate");
             }
             return this;
         }
@@ -301,7 +332,8 @@ public class Domain {
         public Builder singleEndpoint(String path, Filter filter) {
             Objects.requireNonNull(path);
             Objects.requireNonNull(filter);
-            addEndpointResolver(HttpEndpointResolver.builder()
+            this.httpEndpointResolvers.clear();
+            this.httpEndpointResolvers.add(HttpEndpointResolver.builder()
                     .addEndpoint(HttpEndpoint.builder()
                             .setPath(path)
                             .build())
@@ -341,26 +373,33 @@ public class Domain {
         }
 
         public Domain build() {
-            if (httpAddress.isSecure()) {
+            if (httpAddress.isSecure() ) {
                 try {
-                    trustManagerFactory.init(trustManagerKeyStore);
-                    SslContextBuilder sslContextBuilder = SslContextBuilder
-                            .forServer(keyCertChainInputStream, keyInputStream, keyPassword)
-                            .trustManager(trustManagerFactory)
-                            .sslProvider(sslProvider)
-                            .ciphers(ciphers, cipherSuiteFilter);
-                    if (sslContextProvider != null) {
-                        sslContextBuilder.sslContextProvider(sslContextProvider);
+                    if (sslContext == null && privateKey != null && keyCertChain != null) {
+                        trustManagerFactory.init(trustManagerKeyStore);
+                        SslContextBuilder sslContextBuilder = SslContextBuilder
+                                .forServer(privateKey, keyCertChain)
+                                .trustManager(trustManagerFactory)
+                                .sslProvider(sslProvider)
+                                .ciphers(ciphers, cipherSuiteFilter);
+                        if (sslContextProvider != null) {
+                            sslContextBuilder.sslContextProvider(sslContextProvider);
+                        }
+                        if (httpAddress.getVersion().majorVersion() == 2) {
+                            sslContextBuilder.applicationProtocolConfig(newApplicationProtocolConfig());
+                        }
+                        this.sslContext = sslContextBuilder.build();
                     }
-                    if (httpAddress.getVersion().majorVersion() == 2) {
-                        sslContextBuilder.applicationProtocolConfig(newApplicationProtocolConfig());
-                    }
-                    return new Domain(serverName, aliases, httpAddress, httpEndpointResolvers, sslContextBuilder.build());
-                } catch (Throwable t) {
-                    throw new RuntimeException(t);
+                    return new Domain(serverName, aliases,
+                            httpAddress, httpEndpointResolvers,
+                            sslContext, keyCertChain);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
                 }
             } else {
-                return new Domain(serverName, aliases, httpAddress, httpEndpointResolvers, null);
+                return new Domain(serverName, aliases,
+                        httpAddress, httpEndpointResolvers,
+                        null, null);
             }
         }
 

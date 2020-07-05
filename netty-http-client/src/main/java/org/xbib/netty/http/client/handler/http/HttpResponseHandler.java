@@ -4,22 +4,25 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.FullHttpResponse;
-import org.xbib.netty.http.client.api.Transport;
+import org.xbib.netty.http.client.api.ClientTransport;
 
 @ChannelHandler.Sharable
 public class HttpResponseHandler extends SimpleChannelInboundHandler<FullHttpResponse> {
 
     @Override
     public void channelRead0(ChannelHandlerContext ctx, FullHttpResponse fullHttpResponse) throws Exception {
-        Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
-        transport.responseReceived(ctx.channel(), null, fullHttpResponse);
-        // do not close ctx here
+        ClientTransport transport = ctx.channel().attr(ClientTransport.TRANSPORT_ATTRIBUTE_KEY).get();
+        if (transport != null) {
+            transport.responseReceived(ctx.channel(), null, fullHttpResponse);
+        }
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        Transport transport = ctx.channel().attr(Transport.TRANSPORT_ATTRIBUTE_KEY).get();
-        transport.fail(cause);
-        // do not close ctx here
+        ctx.fireExceptionCaught(cause);
+        ClientTransport transport = ctx.channel().attr(ClientTransport.TRANSPORT_ATTRIBUTE_KEY).get();
+        if (transport != null) {
+            transport.fail(ctx.channel(), cause);
+        }
     }
 }

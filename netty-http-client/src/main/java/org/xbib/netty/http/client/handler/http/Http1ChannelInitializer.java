@@ -14,10 +14,9 @@ import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.ClientConfig;
-import org.xbib.netty.http.client.api.HttpChannelInitializer;
+import org.xbib.netty.http.common.HttpChannelInitializer;
 import org.xbib.netty.http.client.handler.http2.Http2ChannelInitializer;
 import org.xbib.netty.http.common.HttpAddress;
-
 import java.util.logging.Level;
 import java.util.logging.Logger;
 

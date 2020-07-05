@@ -6,7 +6,6 @@ import org.xbib.netty.http.server.api.ServerRequest;
 import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.api.annotation.Endpoint;
 import org.xbib.netty.http.server.endpoint.service.MethodService;
-
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -78,7 +77,7 @@ public class HttpEndpointResolver {
 
         private String prefix;
 
-        private List<HttpEndpoint> endpoints;
+        private final List<HttpEndpoint> endpoints;
 
         private EndpointDispatcher<HttpEndpoint> endpointDispatcher;
 
@@ -99,7 +98,7 @@ public class HttpEndpointResolver {
         }
 
         /**
-         * Add endpoint.
+         * Add endpoint under this endpoint.
          *
          * @param endpoint the endpoint
          * @return this builder

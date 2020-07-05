@@ -1,6 +1,8 @@
 package org.xbib.netty.http.client.api;
 
-public interface ProtocolProvider<C extends HttpChannelInitializer, T extends Transport> {
+import org.xbib.netty.http.common.HttpChannelInitializer;
+
+public interface ClientProtocolProvider<C extends HttpChannelInitializer, T extends ClientTransport> {
 
     boolean supportsMajorVersion(int majorVersion);
 
