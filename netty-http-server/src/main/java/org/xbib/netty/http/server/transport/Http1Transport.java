@@ -25,7 +25,7 @@ public class Http1Transport extends BaseTransport {
             serverRequest.setSession(sslHandler.engine().getSession());
         }
         HttpServerResponse serverResponse = new HttpServerResponse(server, serverRequest, ctx);
-        if (acceptRequest(server.getServerConfig().getAddress().getVersion(), serverRequest, serverResponse)) {
+        if (acceptRequest(server.getServerConfig(), serverRequest, serverResponse)) {
             serverRequest.handleParameters();
             server.handle(serverRequest, serverResponse);
         } else {

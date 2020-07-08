@@ -93,8 +93,8 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel>
             pipeline.addLast("http-server-decompressor",
                     new HttpContentDecompressor());
         }
-        HttpObjectAggregator httpObjectAggregator = new HttpObjectAggregator(serverConfig.getMaxContentLength(),
-                false);
+        HttpObjectAggregator httpObjectAggregator =
+                new HttpObjectAggregator(serverConfig.getMaxContentLength());
         httpObjectAggregator.setMaxCumulationBufferComponents(serverConfig.getMaxCompositeBufferComponents());
         pipeline.addLast("http-server-aggregator", httpObjectAggregator);
         pipeline.addLast("http-server-pipelining", new HttpPipeliningHandler(serverConfig.getPipeliningCapacity()));
@@ -142,7 +142,7 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel>
 
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-            logger.log(Level.WARNING, cause.getMessage(), cause);
+            logger.log(Level.SEVERE, cause.getMessage(), cause);
             ctx.writeAndFlush(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1,
                     HttpResponseStatus.INTERNAL_SERVER_ERROR,
                     Unpooled.copiedBuffer(cause.getMessage().getBytes(StandardCharsets.UTF_8))));

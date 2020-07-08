@@ -55,7 +55,9 @@ public abstract class ResourceService implements Filter {
     protected abstract int getMaxAgeSeconds();
 
     private void handleCachedResource(ServerRequest serverRequest, ServerResponse serverResponse, Resource resource) {
-        logger.log(Level.FINE, "resource = " + resource);
+        if (logger.isLoggable(Level.FINER)) {
+            logger.log(Level.FINER, "resource = " + resource);
+        }
         if (resource.isDirectory()) {
             if (!resource.getResourcePath().isEmpty() && !resource.getResourcePath().endsWith("/")) {
                 // external redirect to

@@ -27,7 +27,7 @@ public class Http2Transport extends BaseTransport {
         serverRequest.setRequestId(server.getRequestCounter().incrementAndGet());
         serverRequest.setStreamId(fullHttpRequest.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text()));
         ServerResponse serverResponse = new Http2ServerResponse(server, serverRequest, ctx);
-        if (acceptRequest(server.getServerConfig().getAddress().getVersion(), serverRequest, serverResponse)) {
+        if (acceptRequest(server.getServerConfig(), serverRequest, serverResponse)) {
             serverRequest.handleParameters();
             server.handle(serverRequest, serverResponse);
         } else {
