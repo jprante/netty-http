@@ -1,4 +1,3 @@
-import org.apache.tools.ant.taskdefs.condition.Os
 
 dependencies {
     api project(":netty-http-client-api")
@@ -6,9 +5,5 @@ dependencies {
     testImplementation "com.fasterxml.jackson.core:jackson-databind:${project.property('jackson.version')}"
     testImplementation "org.conscrypt:conscrypt-openjdk-uber:${project.property('conscrypt.version')}"
     testRuntimeOnly "org.bouncycastle:bcpkix-jdk15on:${project.property('bouncycastle.version')}"
-    if (Os.isFamily(Os.FAMILY_MAC)) {
-        testRuntimeOnly "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative-legacy-macosx.version')}"
-    } else if (Os.isFamily(Os.FAMILY_UNIX)) {
-        testRuntimeOnly "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
-    }
+    testRuntimeOnly "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
 }

@@ -1,13 +1,9 @@
-import org.apache.tools.ant.taskdefs.condition.Os
 
 dependencies {
     api project(":netty-http-server-api")
     testImplementation project(":netty-http-client")
     testImplementation project(":netty-http-bouncycastle")
+    testRuntimeOnly "org.javassist:javassist:${project.property('javassist.version')}"
     testRuntimeOnly "org.bouncycastle:bcpkix-jdk15on:${project.property('bouncycastle.version')}"
-    if (Os.isFamily(Os.FAMILY_MAC)) {
-        testRuntimeOnly "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative-legacy-macosx.version')}"
-    } else if (Os.isFamily(Os.FAMILY_UNIX)) {
-        testRuntimeOnly "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
-    }
+    testRuntimeOnly "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
 }
