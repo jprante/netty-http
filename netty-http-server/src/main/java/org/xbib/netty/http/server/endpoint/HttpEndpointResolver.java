@@ -50,21 +50,23 @@ public class HttpEndpointResolver {
     }
 
     public void handle(List<HttpEndpoint> matchingEndpoints,
-                       ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
+                       ServerRequest serverRequest,
+                       ServerResponse serverResponse,
+                       boolean dispatch) throws IOException {
         Objects.requireNonNull(matchingEndpoints);
         for (HttpEndpoint endpoint : matchingEndpoints) {
             endpoint.resolveUriTemplate(serverRequest);
             endpoint.before(serverRequest, serverResponse);
-            endpointDispatcher.dispatch(endpoint, serverRequest, serverResponse);
-            endpoint.after(serverRequest, serverResponse);
-            if (serverResponse.getStatus() != null) {
+            if (dispatch) {
+                endpointDispatcher.dispatch(endpoint, serverRequest, serverResponse);
+                endpoint.after(serverRequest, serverResponse);
+                if (serverResponse != null && serverResponse.getStatus() != null) {
+                    break;
+                }
+            } else {
                 break;
             }
         }
-    }
-
-    public Map<HttpEndpointDescriptor, List<HttpEndpoint>> getEndpointDescriptors() {
-        return endpointDescriptors;
     }
 
     public static Builder builder() {
@@ -73,11 +75,11 @@ public class HttpEndpointResolver {
 
     public static class Builder {
 
+        private final List<HttpEndpoint> endpoints;
+
         private int limit;
 
         private String prefix;
-
-        private final List<HttpEndpoint> endpoints;
 
         private EndpointDispatcher<HttpEndpoint> endpointDispatcher;
 
@@ -149,6 +151,9 @@ public class HttpEndpointResolver {
         }
 
         public HttpEndpointResolver build() {
+            if (endpoints.isEmpty()) {
+                throw new IllegalArgumentException("no endpoints configured");
+            }
             return new HttpEndpointResolver(endpoints, endpointDispatcher, limit);
         }
     }

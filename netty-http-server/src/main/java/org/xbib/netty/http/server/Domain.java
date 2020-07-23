@@ -35,6 +35,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.ServiceLoader;
 import java.util.Set;
@@ -47,6 +48,8 @@ import java.util.logging.Logger;
 public class Domain {
 
     private static final Logger logger = Logger.getLogger(Domain.class.getName());
+
+    private static final String EMPTY = "";
 
     private final String name;
 
@@ -75,16 +78,12 @@ public class Domain {
                      List<HttpEndpointResolver> httpEndpointResolvers,
                      SslContext sslContext,
                      Collection<? extends X509Certificate> certificates) {
-        this.httpAddress = httpAddress;
         this.name = name;
         this.aliases = aliases;
+        this.httpAddress = httpAddress;
         this.httpEndpointResolvers = httpEndpointResolvers;
         this.sslContext = sslContext;
         this.certificates = certificates;
-        Objects.requireNonNull(httpEndpointResolvers);
-        if (httpEndpointResolvers.isEmpty()) {
-            throw new IllegalArgumentException("domain must have at least one endpoint resolver");
-        }
     }
 
     public static Builder builder(HttpAddress httpAddress) {
@@ -143,26 +142,54 @@ public class Domain {
     }
 
     /**
-     * Handle server requests.
+     * Evaluate the context path of a given request.
+     * The request is not dispatched.
+     * URI request parameters are evaluated.
+     * @param serverRequest the server request
+     * @return the context path
+     * @throws IOException if handling fails
+     */
+    public String findContextOf(ServerRequest serverRequest) throws IOException {
+        if (serverRequest == null) {
+            return EMPTY;
+        }
+        Map.Entry<HttpEndpointResolver, List<HttpEndpoint>> resolved = resolve(serverRequest);
+        if (resolved != null) {
+            resolved.getKey().handle(resolved.getValue(), serverRequest, null, false);
+            return serverRequest.getContextPath();
+        }
+        return null;
+    }
+
+    /**
+     * Handle server requests by resolving and handling a server request.
      * @param serverRequest the server request
      * @param serverResponse the server response
      * @throws IOException if handling server request fails
      */
     public void handle(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
-        boolean found = false;
+        Map.Entry<HttpEndpointResolver, List<HttpEndpoint>> resolved = resolve(serverRequest);
+        if (resolved != null) {
+            resolved.getKey().handle(resolved.getValue(), serverRequest, serverResponse, true);
+        } else {
+            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_IMPLEMENTED,
+                    "text/plain", "No endpoint match for request " + serverRequest);
+        }
+    }
+
+    /**
+     * Just resolve a server request to a matching endpoint resolver with endpoints matched.
+     * @param serverRequest the server request
+     * @return the endpoint resolver together with the matching endpoints
+     */
+    public Map.Entry<HttpEndpointResolver, List<HttpEndpoint>> resolve(ServerRequest serverRequest) {
         for (HttpEndpointResolver httpEndpointResolver : httpEndpointResolvers) {
             List<HttpEndpoint> matchingEndpoints = httpEndpointResolver.matchingEndpointsFor(serverRequest);
-            if (matchingEndpoints != null && !matchingEndpoints.isEmpty()) {
-                httpEndpointResolver.handle(matchingEndpoints, serverRequest, serverResponse);
-                found = true;
-                break;
+            if (!matchingEndpoints.isEmpty()) {
+                return Map.entry(httpEndpointResolver, matchingEndpoints);
             }
         }
-        if (!found) {
-            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_IMPLEMENTED,
-                    "text/plain", "No endpoint match for request " + serverRequest +
-                            " endpoints = " + httpEndpointResolvers);
-        }
+        return null;
     }
 
     @Override
@@ -373,6 +400,9 @@ public class Domain {
         }
 
         public Domain build() {
+            if (httpEndpointResolvers.isEmpty()) {
+                throw new IllegalArgumentException("domain must have at least one endpoint resolver");
+            }
             if (httpAddress.isSecure() ) {
                 try {
                     if (sslContext == null && privateKey != null && keyCertChain != null) {

@@ -9,6 +9,7 @@ import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.api.ServerResponse;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -22,7 +23,9 @@ public class Http2Transport extends BaseTransport {
 
     @Override
     public void requestReceived(ChannelHandlerContext ctx, FullHttpRequest fullHttpRequest, Integer sequenceId) throws IOException {
-        HttpServerRequest serverRequest = new HttpServerRequest(server, fullHttpRequest, ctx);
+        HttpServerRequest serverRequest = new HttpServerRequest(fullHttpRequest,
+                (InetSocketAddress) ctx.channel().localAddress(),
+                (InetSocketAddress) ctx.channel().remoteAddress());
         serverRequest.setSequenceId(sequenceId);
         serverRequest.setRequestId(server.getRequestCounter().incrementAndGet());
         serverRequest.setStreamId(fullHttpRequest.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text()));

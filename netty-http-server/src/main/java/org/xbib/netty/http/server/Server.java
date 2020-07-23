@@ -194,27 +194,44 @@ public final class Server implements AutoCloseable {
     }
 
     /**
-     * Returns the domain with the given host name.
+     * Returns the domain for the given server request.
      *
-     * @param dnsName the name of the virtual host with optional port to return or null for the
+     * @param serverRequest the server request
+     * @return the domain
+     */
+    public Domain getDomain(ServerRequest serverRequest) {
+        return getDomain(getBaseURL(serverRequest));
+    }
+
+    /**
+     * Returns the domain of the given URL.
+     * @param url the URL
+     * @return the domain
+     */
+    public Domain getDomain(URL url) {
+        return getDomain(hostAndPort(url));
+    }
+
+    /**
+     * Returns the domain for the given host name.
+     *
+     * @param name the name of the virtual host with optional port, or null for the
      *             default domain
      * @return the virtual host with the given name or the default domain
      */
-    public Domain getDomain(String dnsName) {
-       return serverConfig.getDomain(dnsName);
+    public Domain getDomain(String name) {
+       return serverConfig.getDomain(name);
     }
 
-    public Domain getDomain(URL url) {
-        return getDomain(url.getHost());
-    }
-
-    public URL getPublishURL() {
-        return getPublishURL(null);
-    }
-
-    public URL getPublishURL(ServerRequest serverRequest) {
-        Domain domain = serverRequest != null ? getDomain(serverRequest.getURL()) : serverConfig.getDefaultDomain();
-        URL bindURL = domain.getHttpAddress().base();
+    /**
+     * Return the base URL regarding to a server request.
+     * The base URL depends on the host and port defined in a reqeust,
+     * if no request is defined, the bind URL is taken.
+     * @param serverRequest the server request
+     * @return the URL
+     */
+    public URL getBaseURL(ServerRequest serverRequest) {
+        URL bindURL = serverConfig.getDefaultDomain().getHttpAddress().base();
         String scheme = serverRequest != null ? serverRequest.getHeaders().get("x-forwarded-proto") : null;
         if (scheme == null) {
             scheme = bindURL.getScheme();
@@ -234,24 +251,40 @@ public final class Server implements AutoCloseable {
                 port = bindURL.getPort() != null ? Integer.toString(bindURL.getPort()) : null;
             }
         }
-        String path = serverRequest != null ? serverRequest.getHeaders().get("x-forwarded-path") : null;
         URL.Builder builder = URL.builder().scheme(scheme).host(host);
         if (port != null) {
-            if (path != null) {
-                return builder.port(Integer.parseInt(port)).path(path).build();
-            } else {
-                return builder.port(Integer.parseInt(port)).build();
-            }
+            builder.port(Integer.parseInt(port));
         }
-        if (path != null) {
-            return builder.path(path).build();
-        } else {
-            return builder.build();
-        }
+        return builder.build();
+    }
+
+    /**
+     * Return the context URL of this server. This is equivalent to the bindURL
+     * @return the context URL
+     * @throws IOException should not happen
+     */
+    public URL getContextURL() throws IOException {
+        return getContextURL(null);
+    }
+
+    /**
+     * Get context URL of this server regarding to a given request.
+     * The context URL is the base URL with the path given in the matching
+     * domain prefix setting of the endpoint resolver.
+     * @param serverRequest the server request
+     * @return the context URL
+     * @throws IOException if context path finding fails
+     */
+    public URL getContextURL(ServerRequest serverRequest) throws IOException {
+        URL baseURL = getBaseURL(serverRequest);
+        Domain domain = getDomain(baseURL);
+        String context = domain.findContextOf(serverRequest);
+        return baseURL.resolve(context);
     }
 
     public void handle(HttpServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
-        Domain domain = getDomain(serverRequest.getURL());
+        Domain domain = getDomain(serverRequest);
+        logger.log(Level.FINEST, () -> "found domain " + domain + " for " + serverRequest);
         if (executor != null) {
             executor.submit(() -> {
                 try {
@@ -337,6 +370,10 @@ public final class Server implements AutoCloseable {
         }
         int i = hostMaybePort.lastIndexOf(':');
         return i >= 0 ? hostMaybePort.substring(i + 1) : null;
+    }
+
+    private static String hostAndPort(URL url) {
+        return url == null ? null : url.getPort() != -1 ? url.getHost() + ":" + url.getPort() : url.getHost();
     }
 
     private HttpChannelInitializer findChannelInitializer(int majorVersion,

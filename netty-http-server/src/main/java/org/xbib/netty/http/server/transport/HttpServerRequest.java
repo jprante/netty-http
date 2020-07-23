@@ -2,7 +2,6 @@ package org.xbib.netty.http.server.transport;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
-import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpHeaders;
@@ -13,7 +12,6 @@ import org.xbib.net.PercentDecoder;
 import org.xbib.net.QueryParameters;
 import org.xbib.net.URL;
 import org.xbib.netty.http.common.HttpParameters;
-import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.api.ServerRequest;
 
 import javax.net.ssl.SSLSession;
@@ -40,13 +38,15 @@ public class HttpServerRequest implements ServerRequest {
 
     private final FullHttpRequest httpRequest;
 
-    private final ChannelHandlerContext ctx;
+    private final InetSocketAddress localAddress;
+
+    private final InetSocketAddress remoteAddress;
+
+    private final Map<String, String> pathParameters;
 
     private List<String> context;
 
     private String contextPath;
-
-    private Map<String, String> pathParameters;
 
     private HttpParameters parameters;
 
@@ -60,10 +60,16 @@ public class HttpServerRequest implements ServerRequest {
 
     private SSLSession sslSession;
 
-    HttpServerRequest(Server server, FullHttpRequest fullHttpRequest,
-                      ChannelHandlerContext ctx) {
-        this.httpRequest = fullHttpRequest.retainedDuplicate();
-        this.ctx = ctx;
+    public HttpServerRequest(FullHttpRequest fullHttpRequest) {
+        this( fullHttpRequest ,null, null);
+    }
+
+    public HttpServerRequest(FullHttpRequest fullHttpRequest,
+                             InetSocketAddress localAddress,
+                             InetSocketAddress remoteAddress) {
+        this.httpRequest = fullHttpRequest != null ? fullHttpRequest.retainedDuplicate() : null;
+        this.localAddress = localAddress;
+        this.remoteAddress = remoteAddress;
         this.pathParameters = new LinkedHashMap<>();
     }
 
@@ -204,12 +210,12 @@ public class HttpServerRequest implements ServerRequest {
 
     @Override
     public InetSocketAddress getLocalAddress() {
-        return (InetSocketAddress) ctx.channel().localAddress();
+        return localAddress;
     }
 
     @Override
     public InetSocketAddress getRemoteAddress() {
-        return (InetSocketAddress) ctx.channel().remoteAddress();
+        return remoteAddress;
     }
 
     @Override

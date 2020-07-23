@@ -96,16 +96,20 @@ public class HttpEndpoint implements Endpoint<HttpEndpointDescriptor> {
     @Override
     public void before(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
         serverRequest.setContext(pathMatcher.tokenizePath(getPrefix()));
-        for (Filter filter : beforeFilters) {
-            filter.handle(serverRequest, serverResponse);
+        if (serverResponse != null) {
+            for (Filter filter : beforeFilters) {
+                filter.handle(serverRequest, serverResponse);
+            }
         }
     }
 
     @Override
     public void after(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
         serverRequest.setContext(pathMatcher.tokenizePath(getPrefix()));
-        for (Filter filter : afterFilters) {
-            filter.handle(serverRequest, serverResponse);
+        if (serverResponse != null) {
+            for (Filter filter : afterFilters) {
+                filter.handle(serverRequest, serverResponse);
+            }
         }
     }
 
