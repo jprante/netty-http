@@ -11,7 +11,7 @@ import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.api.ServerResponse;
-import org.xbib.netty.http.server.Domain;
+import org.xbib.netty.http.server.HttpServerDomain;
 import org.xbib.netty.http.server.test.NettyHttpTestExtension;
 
 import java.nio.charset.StandardCharsets;
@@ -32,7 +32,7 @@ class CleartextTest {
     @Test
     void testSimpleCleartextHttp2() throws Exception {
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/", (request, response) ->
                         ServerResponse.write(response, HttpResponseStatus.OK, "text.plain",
                                 request.getContent().toString(StandardCharsets.UTF_8)))
@@ -77,7 +77,7 @@ class CleartextTest {
     void testPooledClearTextHttp2() throws Exception {
         int loop = 1024;
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/", (request, response) ->
                         response.withStatus(HttpResponseStatus.OK)
                                 .withContentType("text/plain")
@@ -129,7 +129,7 @@ class CleartextTest {
         int threads = 4;
         int loop = 1024;
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/**", (request, response) ->
                         ServerResponse.write(response, HttpResponseStatus.OK, "text/plain",
                                 request.getContent().toString(StandardCharsets.UTF_8)))
@@ -198,7 +198,7 @@ class CleartextTest {
         int loop = 1000;
         HttpAddress httpAddress1 = HttpAddress.http2("localhost", 8008);
         AtomicInteger counter1 = new AtomicInteger();
-        Domain domain1 = Domain.builder(httpAddress1)
+        HttpServerDomain domain1 = HttpServerDomain.builder(httpAddress1)
                 .singleEndpoint("/", (request, response) -> {
                     ServerResponse.write(response, HttpResponseStatus.OK, "text.plain",
                           request.getContent().toString(StandardCharsets.UTF_8));
@@ -210,7 +210,7 @@ class CleartextTest {
         server1.accept();
         HttpAddress httpAddress2 = HttpAddress.http2("localhost", 8009);
         AtomicInteger counter2 = new AtomicInteger();
-        Domain domain2 = Domain.builder(httpAddress2)
+        HttpServerDomain domain2 = HttpServerDomain.builder(httpAddress2)
                 .singleEndpoint("/", (request, response) -> {
                     ServerResponse.write(response, HttpResponseStatus.OK, "text/plain",
                             request.getContent().toString(StandardCharsets.UTF_8));

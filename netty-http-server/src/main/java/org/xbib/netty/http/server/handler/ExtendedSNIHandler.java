@@ -6,7 +6,7 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.Mapping;
 import org.xbib.netty.http.common.HttpAddress;
-import org.xbib.netty.http.server.ServerConfig;
+import org.xbib.netty.http.server.DefaultServerConfig;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.logging.Level;
@@ -18,12 +18,12 @@ public class ExtendedSNIHandler extends SniHandler {
 
     private static final Logger logger = Logger.getLogger(ExtendedSNIHandler.class.getName());
 
-    private final ServerConfig serverConfig;
+    private final DefaultServerConfig serverConfig;
 
     private final HttpAddress httpAddress;
 
     public ExtendedSNIHandler(Mapping<? super String, ? extends SslContext> mapping,
-                              ServerConfig serverConfig, HttpAddress httpAddress) {
+                              DefaultServerConfig serverConfig, HttpAddress httpAddress) {
         super(mapping);
         this.serverConfig = serverConfig;
         this.httpAddress = httpAddress;
@@ -35,7 +35,7 @@ public class ExtendedSNIHandler extends SniHandler {
     }
 
     private static SslHandler newSslHandler(SslContext sslContext,
-                                            ServerConfig serverConfig,
+                                            DefaultServerConfig serverConfig,
                                             ByteBufAllocator allocator,
                                             HttpAddress httpAddress) {
         InetSocketAddress peer = httpAddress.getInetSocketAddress();

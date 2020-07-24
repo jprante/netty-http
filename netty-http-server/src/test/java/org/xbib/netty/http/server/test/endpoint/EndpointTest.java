@@ -11,7 +11,7 @@ import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.endpoint.HttpEndpoint;
 import org.xbib.netty.http.server.endpoint.HttpEndpointResolver;
-import org.xbib.netty.http.server.Domain;
+import org.xbib.netty.http.server.HttpServerDomain;
 import org.xbib.netty.http.server.endpoint.service.FileService;
 import org.xbib.netty.http.server.test.NettyHttpTestExtension;
 
@@ -46,7 +46,7 @@ class EndpointTest {
                     fileService.handle(req, resp);
                 })
                 .build();
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .addEndpointResolver(httpEndpointResolver)
                 .build();
         Server server = Server.builder(domain)
@@ -87,7 +87,7 @@ class EndpointTest {
                     fileService.handle(req, resp);
                 })
                 .build();
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .addEndpointResolver(httpEndpointResolver)
                 .build();
         Server server = Server.builder(domain)
@@ -130,7 +130,7 @@ class EndpointTest {
                     fileService.handle(req, resp);
                 })
                 .build();
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .addEndpointResolver(httpEndpointResolver)
                 .build();
         Server server = Server.builder(domain)
@@ -196,7 +196,7 @@ class EndpointTest {
                     fileService.handle(req, resp);
                 })
                 .build();
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .addEndpointResolver(httpEndpointResolver)
                 .build();
         Server server = Server.builder(domain)
@@ -293,7 +293,7 @@ class EndpointTest {
                     fileService3.handle(req, resp);
                 })
                 .build();
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .addEndpointResolver(httpEndpointResolver1)
                 .addEndpointResolver(httpEndpointResolver2)
                 .addEndpointResolver(httpEndpointResolver3)
@@ -376,7 +376,7 @@ class EndpointTest {
                     .setPath("/" + i + "/**")
                     .build());
         }
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .addEndpointResolver(endpointResolverBuilder
                         .setDispatcher((endpoint,req, resp) -> ServerResponse.write(resp, HttpResponseStatus.OK))
                         .build())
@@ -415,7 +415,7 @@ class EndpointTest {
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         HttpEndpointResolver.Builder endpointResolverBuilder = HttpEndpointResolver.builder()
                 .setPrefix("/static");
-        Domain.Builder domainBuilder = Domain.builder(httpAddress);
+        HttpServerDomain.Builder domainBuilder = HttpServerDomain.builder(httpAddress);
         for (int i = 0; i < max; i++) {
             domainBuilder.addEndpointResolver(endpointResolverBuilder.addEndpoint(HttpEndpoint.builder()
                     .setPath("/" + i + "/**").build())

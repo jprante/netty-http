@@ -9,7 +9,7 @@ import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.api.ServerResponse;
-import org.xbib.netty.http.server.Domain;
+import org.xbib.netty.http.server.HttpServerDomain;
 import java.nio.charset.StandardCharsets;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -23,10 +23,10 @@ class MultiDomainServerTest {
     @Test
     void testServer() throws Exception {
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        Domain fl = Domain.builder(httpAddress, "fl.hbz-nrw.de")
+        HttpServerDomain fl = HttpServerDomain.builder(httpAddress, "fl.hbz-nrw.de")
                 .singleEndpoint("/", (request, response) -> ServerResponse.write(response, "Hello fl.hbz-nrw.de"))
                 .build();
-        Domain zfl2 = Domain.builder(fl)
+        HttpServerDomain zfl2 = HttpServerDomain.builder(fl)
                 .setServerName("zfl2.hbz-nrw.de")
                 .singleEndpoint("/", (request, response) -> ServerResponse.write(response, "Hello zfl2.hbz-nrw.de"))
                 .build();

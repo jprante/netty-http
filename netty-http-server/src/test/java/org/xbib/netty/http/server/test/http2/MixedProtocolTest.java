@@ -8,7 +8,7 @@ import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.client.api.ClientTransport;
 import org.xbib.netty.http.common.HttpAddress;
-import org.xbib.netty.http.server.Domain;
+import org.xbib.netty.http.server.HttpServerDomain;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.test.NettyHttpTestExtension;
@@ -21,7 +21,7 @@ class MixedProtocolTest {
     @Test
     void testHttp1ClientHttp2Server() throws Exception {
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/", (request, response) -> {
                     ServerResponse.write(response, HttpResponseStatus.OK);
                 })
@@ -55,7 +55,7 @@ class MixedProtocolTest {
     @Test
     void testHttp2ClientHttp1Server() throws Exception {
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/", (request, response) -> {
                     ServerResponse.write(response, HttpResponseStatus.OK);
                 })
@@ -92,7 +92,7 @@ class MixedProtocolTest {
     @Test
     void testHttp1ClientHttp2ServerWithNegotiation() throws Exception {
         HttpAddress httpAddress = HttpAddress.secureHttp2("localhost", 8143);
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .setSelfCert()
                 .singleEndpoint("/", (request, response) -> {
                     ServerResponse.write(response, HttpResponseStatus.OK);

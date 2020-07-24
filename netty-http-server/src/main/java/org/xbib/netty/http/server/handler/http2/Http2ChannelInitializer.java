@@ -29,11 +29,12 @@ import io.netty.handler.codec.http2.Http2StreamFrameToHttpObjectCodec;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.stream.ChunkedWriteHandler;
+import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.util.AsciiString;
 import io.netty.util.Mapping;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.ServerConfig;
+import org.xbib.netty.http.server.DefaultServerConfig;
 import org.xbib.netty.http.common.HttpChannelInitializer;
 import org.xbib.netty.http.server.handler.ExtendedSNIHandler;
 import org.xbib.netty.http.server.handler.IdleTimeoutHandler;
@@ -51,7 +52,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel>
 
     private final Server server;
 
-    private final ServerConfig serverConfig;
+    private final DefaultServerConfig serverConfig;
 
     private final HttpAddress httpAddress;
 
@@ -70,7 +71,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel>
     public void initChannel(Channel channel) {
         ServerTransport transport = server.newTransport(httpAddress.getVersion());
         channel.attr(ServerTransport.TRANSPORT_ATTRIBUTE_KEY).set(transport);
-        if (serverConfig.isTrafficDebug()) {
+        if (serverConfig.isDebug()) {
             channel.pipeline().addLast(new TrafficLoggingHandler(LogLevel.DEBUG));
         }
         if (httpAddress.isSecure()) {
@@ -78,7 +79,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel>
         } else {
             configureCleartext(channel);
         }
-        if (serverConfig.isTrafficDebug()) {
+        if (serverConfig.isDebug()) {
             logger.log(Level.FINE, "HTTP/2 server channel initialized: " +
                     " address=" + httpAddress + " pipeline=" + channel.pipeline().names());
         }
@@ -97,6 +98,8 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel>
                 ServerTransport transport = server.newTransport(httpAddress.getVersion());
                 channel.attr(ServerTransport.TRANSPORT_ATTRIBUTE_KEY).set(transport);
                 ChannelPipeline pipeline = channel.pipeline();
+                pipeline.addLast("server-read-timeout",
+                        new ReadTimeoutHandler(serverConfig.getReadTimeoutMillis()));
                 pipeline.addLast("server-frame-converter",
                         new Http2StreamFrameToHttpObjectCodec(true));
                 if (serverConfig.isCompressionEnabled()) {
@@ -114,7 +117,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel>
         };
         Http2MultiplexCodecBuilder multiplexCodecBuilder = Http2MultiplexCodecBuilder.forServer(channelHandler)
             .initialSettings(Http2Settings.defaultSettings());
-        if (serverConfig.isTrafficDebug()) {
+        if (serverConfig.isDebug()) {
             multiplexCodecBuilder.frameLogger(new Http2FrameLogger(LogLevel.DEBUG, "server"));
         }
         Http2MultiplexCodec multiplexCodec = multiplexCodecBuilder.build();
@@ -159,7 +162,6 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel>
 
         @Override
         public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
-            ServerTransport transport = ctx.channel().attr(ServerTransport.TRANSPORT_ATTRIBUTE_KEY).get();
             ctx.fireUserEventTriggered(evt);
         }
 

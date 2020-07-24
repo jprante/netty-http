@@ -8,7 +8,7 @@ import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.client.api.ResponseListener;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.HttpResponse;
-import org.xbib.netty.http.server.Domain;
+import org.xbib.netty.http.server.HttpServerDomain;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.test.NettyHttpTestExtension;
@@ -31,7 +31,7 @@ class PutTest {
         final AtomicBoolean success1 = new AtomicBoolean(false);
         final AtomicBoolean success2 = new AtomicBoolean(false);
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/put", "/**", (req, resp) -> {
                     logger.log(Level.INFO, "got request " +
                             req.getContent().toString(StandardCharsets.UTF_8));
@@ -80,7 +80,7 @@ class PutTest {
             outputStream.write(1);
         }
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/put", "/**", (req, resp) -> {
                     logger.log(Level.INFO, "got request, length = " +
                             req.getContent().readableBytes());

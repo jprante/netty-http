@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.api.ServerResponse;
-import org.xbib.netty.http.server.Domain;
+import org.xbib.netty.http.server.HttpServerDomain;
 
 import java.io.IOException;
 import java.net.BindException;
@@ -18,7 +18,7 @@ class BindExceptionTest {
 
     @Test
     void testDoubleServer() throws IOException {
-        Domain domain = Domain.builder(HttpAddress.http1("localhost", 8008))
+        HttpServerDomain domain = HttpServerDomain.builder(HttpAddress.http1("localhost", 8008))
                 .singleEndpoint("/", (request, response) -> ServerResponse.write(response, "Hello World"))
                 .build();
         Server server1 = Server.builder(domain).build();

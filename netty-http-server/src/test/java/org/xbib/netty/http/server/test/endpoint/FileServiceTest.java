@@ -8,7 +8,7 @@ import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.Domain;
+import org.xbib.netty.http.server.HttpServerDomain;
 import org.xbib.netty.http.server.endpoint.service.FileService;
 import org.xbib.netty.http.server.test.NettyHttpTestExtension;
 
@@ -32,7 +32,7 @@ class FileServiceTest {
     void testFileServiceHttp1() throws Exception {
         Path vartmp = Paths.get("/var/tmp/");
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/static", "/**", new FileService(vartmp))
                 .build();
         Server server = Server.builder(domain)
@@ -65,7 +65,7 @@ class FileServiceTest {
     void testFileServiceHttp2() throws Exception {
         Path vartmp = Paths.get("/var/tmp/");
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/static", "/**", new FileService(vartmp))
                 .build();
         Server server = Server.builder(domain)
@@ -101,7 +101,7 @@ class FileServiceTest {
         Files.createDirectories(vartmpforward);
         Files.write(vartmpforward.resolve("test.txt"), "Hello Jörg".getBytes(StandardCharsets.UTF_8));
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/static", "/**", new FileService(vartmp, "test.txt"))
                 .build();
         Server server = Server.builder(domain)
@@ -138,7 +138,7 @@ class FileServiceTest {
         Files.createDirectories(vartmpforward);
         Files.write(vartmpforward.resolve("test.txt"), "Hello Jörg".getBytes(StandardCharsets.UTF_8));
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/static", "/**", new FileService(vartmp, "test.txt"))
                 .build();
         Server server = Server.builder(domain)
@@ -178,7 +178,7 @@ class FileServiceTest {
         Files.createDirectories(vartmpforward);
         Files.write(vartmpforward.resolve("test.txt"), "Hello Jörg".getBytes(StandardCharsets.UTF_8));
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/static", "/**",
                         new FileService(vartmp, "test.txt"))
                 .build();

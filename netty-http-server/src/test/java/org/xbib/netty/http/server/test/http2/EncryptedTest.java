@@ -10,7 +10,7 @@ import org.xbib.netty.http.client.api.ClientTransport;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.Domain;
+import org.xbib.netty.http.server.HttpServerDomain;
 import org.xbib.netty.http.server.test.NettyHttpTestExtension;
 
 import java.nio.charset.StandardCharsets;
@@ -31,7 +31,7 @@ class EncryptedTest {
     @Test
     void testSimpleSecureHttp2() throws Exception {
         HttpAddress httpAddress = HttpAddress.secureHttp2("localhost", 8143);
-        Server server = Server.builder(Domain.builder(httpAddress)
+        Server server = Server.builder(HttpServerDomain.builder(httpAddress)
                 .setSelfCert()
                 .singleEndpoint("/", (request, response) ->
                                 response.withStatus(HttpResponseStatus.OK)
@@ -72,7 +72,7 @@ class EncryptedTest {
     void testPooledSecureHttp2() throws Exception {
         int loop = 1024;
         HttpAddress httpAddress = HttpAddress.secureHttp2("localhost", 8143);
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .setSelfCert()
                 .singleEndpoint("/", (request, response) ->
                         response.withStatus(HttpResponseStatus.OK)
@@ -126,7 +126,7 @@ class EncryptedTest {
         int threads = 4;
         int loop = 1024;
         HttpAddress httpAddress = HttpAddress.secureHttp2("localhost", 8143);
-        Server server = Server.builder(Domain.builder(httpAddress)
+        Server server = Server.builder(HttpServerDomain.builder(httpAddress)
                 .setSelfCert()
                 .singleEndpoint("/", (request, response) ->
                                 response.withStatus(HttpResponseStatus.OK)

@@ -6,7 +6,7 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.ServerConfig;
+import org.xbib.netty.http.server.DefaultServerConfig;
 import org.xbib.netty.http.server.api.ServerRequest;
 import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.api.ServerTransport;
@@ -39,7 +39,7 @@ abstract class BaseTransport implements ServerTransport {
      * @param serverResponse the response
      * @return whether further processing should be performed
      */
-    static boolean acceptRequest(ServerConfig serverConfig,
+    static boolean acceptRequest(DefaultServerConfig serverConfig,
                                  ServerRequest serverRequest,
                                  ServerResponse serverResponse) {
         HttpVersion version = serverConfig.getAddress().getVersion();

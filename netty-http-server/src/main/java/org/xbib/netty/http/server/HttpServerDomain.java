@@ -8,6 +8,8 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
 import org.xbib.netty.http.common.HttpAddress;
+import org.xbib.netty.http.server.api.Domain;
+import org.xbib.netty.http.server.api.EndpointResolver;
 import org.xbib.netty.http.server.api.security.ServerCertificateProvider;
 import org.xbib.netty.http.common.security.SecurityUtil;
 import org.xbib.netty.http.server.api.ServerRequest;
@@ -33,33 +35,29 @@ import java.security.spec.InvalidKeySpecException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.ServiceLoader;
-import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * The {@code Domain} class represents a virtual server with a name, with or without SSL.
+ * The {@code HttpServerDomain} class represents a virtual server with a name.
  */
-public class Domain {
+public class HttpServerDomain implements Domain<HttpEndpointResolver> {
 
-    private static final Logger logger = Logger.getLogger(Domain.class.getName());
+    private static final Logger logger = Logger.getLogger(HttpServerDomain.class.getName());
 
     private static final String EMPTY = "";
 
     private final String name;
 
-    private final Set<String> aliases;
-
     private final HttpAddress httpAddress;
 
     private final SslContext sslContext;
 
-    private final List<HttpEndpointResolver> httpEndpointResolvers;
+    private final Collection<HttpEndpointResolver> httpEndpointResolvers;
 
     private final Collection<? extends X509Certificate> certificates;
 
@@ -67,19 +65,16 @@ public class Domain {
      * Constructs a {@code NamedServer} with the given name.
      *
      * @param name the name, or null if it is the default server
-     * @param aliases alias names for the named server
      * @param httpAddress HTTP address, used for determining if named server is secure or not
      * @param httpEndpointResolvers the endpoint resolvers
      * @param sslContext SSL context or null
      */
-    private Domain(String name,
-                     Set<String> aliases,
-                     HttpAddress httpAddress,
-                     List<HttpEndpointResolver> httpEndpointResolvers,
-                     SslContext sslContext,
-                     Collection<? extends X509Certificate> certificates) {
+    private HttpServerDomain(String name,
+                             HttpAddress httpAddress,
+                             Collection<HttpEndpointResolver> httpEndpointResolvers,
+                             SslContext sslContext,
+                             Collection<? extends X509Certificate> certificates) {
         this.name = name;
-        this.aliases = aliases;
         this.httpAddress = httpAddress;
         this.httpEndpointResolvers = httpEndpointResolvers;
         this.sslContext = sslContext;
@@ -94,7 +89,7 @@ public class Domain {
         return new Builder(httpAddress).setServerName(serverName);
     }
 
-    public static Builder builder(Domain domain) {
+    public static Builder builder(Domain<? extends EndpointResolver<?>> domain) {
         return new Builder(domain);
     }
 
@@ -103,6 +98,7 @@ public class Domain {
      *
      * @return the HTTP address
      */
+    @Override
     public HttpAddress getHttpAddress() {
         return httpAddress;
     }
@@ -112,23 +108,21 @@ public class Domain {
      *
      * @return the name, or null if it is the default server
      */
+    @Override
     public String getName() {
         return name;
     }
 
-    /**
-     * Returns the aliases.
-     *
-     * @return the (unmodifiable) set of aliases (which may be empty)
-     */
-    public Set<String> getAliases() {
-        return aliases;
+    @Override
+    public Collection<HttpEndpointResolver> getHttpEndpointResolvers() {
+        return httpEndpointResolvers;
     }
 
     /**
      * Returns SSL context.
      * @return the SSL context
      */
+    @Override
     public SslContext getSslContext() {
         return sslContext;
     }
@@ -137,6 +131,7 @@ public class Domain {
      * Get certificate chain.
      * @return the certificate chain or null if not secure
      */
+    @Override
     public Collection<? extends X509Certificate> getCertificateChain() {
         return certificates;
     }
@@ -149,13 +144,14 @@ public class Domain {
      * @return the context path
      * @throws IOException if handling fails
      */
-    public String findContextOf(ServerRequest serverRequest) throws IOException {
+    @Override
+    public String findContextPathOf(ServerRequest serverRequest) throws IOException {
         if (serverRequest == null) {
             return EMPTY;
         }
         Map.Entry<HttpEndpointResolver, List<HttpEndpoint>> resolved = resolve(serverRequest);
         if (resolved != null) {
-            resolved.getKey().handle(resolved.getValue(), serverRequest, null, false);
+            resolved.getKey().resolve(resolved.getValue(), serverRequest);
             return serverRequest.getContextPath();
         }
         return null;
@@ -167,14 +163,20 @@ public class Domain {
      * @param serverResponse the server response
      * @throws IOException if handling server request fails
      */
+    @Override
     public void handle(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
         Map.Entry<HttpEndpointResolver, List<HttpEndpoint>> resolved = resolve(serverRequest);
         if (resolved != null) {
-            resolved.getKey().handle(resolved.getValue(), serverRequest, serverResponse, true);
+            resolved.getKey().handle(resolved.getValue(), serverRequest, serverResponse);
         } else {
-            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_IMPLEMENTED,
-                    "text/plain", "No endpoint match for request " + serverRequest);
+            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND,
+                    "text/plain", "No endpoint found to match request");
         }
+    }
+
+    @Override
+    public String toString() {
+        return name + " (" + httpAddress + ")";
     }
 
     /**
@@ -182,7 +184,7 @@ public class Domain {
      * @param serverRequest the server request
      * @return the endpoint resolver together with the matching endpoints
      */
-    public Map.Entry<HttpEndpointResolver, List<HttpEndpoint>> resolve(ServerRequest serverRequest) {
+    private Map.Entry<HttpEndpointResolver, List<HttpEndpoint>> resolve(ServerRequest serverRequest) {
         for (HttpEndpointResolver httpEndpointResolver : httpEndpointResolvers) {
             List<HttpEndpoint> matchingEndpoints = httpEndpointResolver.matchingEndpointsFor(serverRequest);
             if (!matchingEndpoints.isEmpty()) {
@@ -192,20 +194,13 @@ public class Domain {
         return null;
     }
 
-    @Override
-    public String toString() {
-        return name + " (" + httpAddress + ") aliases=" + aliases;
-    }
-
     public static class Builder {
 
         private final HttpAddress httpAddress;
 
         private String serverName;
 
-        private final Set<String> aliases;
-
-        private final List<HttpEndpointResolver> httpEndpointResolvers;
+        private final Collection<HttpEndpointResolver> httpEndpointResolvers;
 
         private SslContext sslContext;
 
@@ -228,7 +223,6 @@ public class Domain {
         private Builder(HttpAddress httpAddress) {
             Objects.requireNonNull(httpAddress);
             this.httpAddress = httpAddress;
-            this.aliases = new LinkedHashSet<>();
             this.httpEndpointResolvers = new ArrayList<>();
             this.trustManagerFactory = SecurityUtil.Defaults.DEFAULT_TRUST_MANAGER_FACTORY;
             this.sslProvider = SecurityUtil.Defaults.DEFAULT_SSL_PROVIDER;
@@ -236,12 +230,12 @@ public class Domain {
             this.cipherSuiteFilter = SecurityUtil.Defaults.DEFAULT_CIPHER_SUITE_FILTER;
         }
 
-        private Builder(Domain domain) {
-            this.httpAddress = domain.httpAddress;
-            this.aliases = new LinkedHashSet<>();
-            this.httpEndpointResolvers = new ArrayList<>(domain.httpEndpointResolvers);
-            this.sslContext = domain.sslContext;
-            this.keyCertChain = domain.certificates;
+        @SuppressWarnings("unchecked")
+        private Builder(Domain<? extends EndpointResolver<?>> domain) {
+            this.httpAddress = domain.getHttpAddress();
+            this.httpEndpointResolvers = new ArrayList<>((List<HttpEndpointResolver>) domain.getHttpEndpointResolvers());
+            this.sslContext = domain.getSslContext();
+            this.keyCertChain = domain.getCertificateChain();
         }
 
         public Builder setServerName(String serverName) {
@@ -338,18 +332,6 @@ public class Domain {
             return this;
         }
 
-        /**
-         * Adds an alias for this virtual server.
-         *
-         * @param alias the alias
-         * @return this builder
-         */
-        public Builder addAlias(String alias) {
-            Objects.requireNonNull(alias);
-            aliases.add(alias);
-            return this;
-        }
-
         public Builder addEndpointResolver(HttpEndpointResolver httpEndpointResolver) {
             Objects.requireNonNull(httpEndpointResolver);
             this.httpEndpointResolvers.add(httpEndpointResolver);
@@ -399,7 +381,7 @@ public class Domain {
             return this;
         }
 
-        public Domain build() {
+        public HttpServerDomain build() {
             if (httpEndpointResolvers.isEmpty()) {
                 throw new IllegalArgumentException("domain must have at least one endpoint resolver");
             }
@@ -420,14 +402,14 @@ public class Domain {
                         }
                         this.sslContext = sslContextBuilder.build();
                     }
-                    return new Domain(serverName, aliases,
+                    return new HttpServerDomain(serverName,
                             httpAddress, httpEndpointResolvers,
                             sslContext, keyCertChain);
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
             } else {
-                return new Domain(serverName, aliases,
+                return new HttpServerDomain(serverName,
                         httpAddress, httpEndpointResolvers,
                         null, null);
             }

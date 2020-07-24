@@ -12,7 +12,7 @@ import org.xbib.netty.http.common.HttpParameters;
 import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.api.ServerResponse;
-import org.xbib.netty.http.server.Domain;
+import org.xbib.netty.http.server.HttpServerDomain;
 import org.xbib.netty.http.server.test.NettyHttpTestExtension;
 
 import java.nio.charset.StandardCharsets;
@@ -33,7 +33,7 @@ class PostTest {
         final AtomicBoolean success2 = new AtomicBoolean(false);
         final AtomicBoolean success3 = new AtomicBoolean(false);
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/post", "/**", (req, resp) -> {
                     HttpParameters parameters = req.getParameters();
                     logger.log(Level.INFO, "got request " + parameters.toString() + " , sending, OK");
@@ -83,7 +83,7 @@ class PostTest {
         final AtomicBoolean success2 = new AtomicBoolean(false);
         final AtomicBoolean success3 = new AtomicBoolean(false);
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/post", "/**", (req, resp) -> {
                     HttpParameters parameters = req.getParameters();
                     logger.log(Level.INFO, "got request " + parameters.toString() + " , sending, OK");

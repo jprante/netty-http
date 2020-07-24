@@ -8,6 +8,7 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.stream.ChunkedNioStream;
 import org.xbib.netty.http.common.util.DateTimeUtil;
 import org.xbib.netty.http.server.api.Filter;
+import org.xbib.netty.http.server.api.FilterConfig;
 import org.xbib.netty.http.server.api.Resource;
 import org.xbib.netty.http.server.api.ServerRequest;
 import org.xbib.netty.http.server.api.ServerResponse;
@@ -38,6 +39,9 @@ import java.util.logging.Logger;
 public abstract class ResourceService implements Filter {
 
     private static final Logger logger = Logger.getLogger(ResourceService.class.getName());
+
+    public void initialize(FilterConfig filterConfig) {
+    }
 
     @Override
     public void handle(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {

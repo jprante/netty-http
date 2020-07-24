@@ -6,7 +6,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.common.HttpAddress;
-import org.xbib.netty.http.server.Domain;
+import org.xbib.netty.http.server.HttpServerDomain;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.test.NettyHttpTestExtension;
 import java.nio.charset.StandardCharsets;
@@ -14,7 +14,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufOutputStream;
 import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.HttpVersion;
 
 @ExtendWith(NettyHttpTestExtension.class)
 class StreamTest {
@@ -22,7 +21,7 @@ class StreamTest {
     @Test
     void testServerBodyInputStreamHttp2() throws Exception {
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/", (request, response) -> {
                     ByteBufInputStream inputStream = request.getInputStream();
                     String content = inputStream.readLine();

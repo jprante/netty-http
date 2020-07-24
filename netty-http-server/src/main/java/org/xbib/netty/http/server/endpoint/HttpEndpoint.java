@@ -9,7 +9,6 @@ import org.xbib.netty.http.server.api.Endpoint;
 import org.xbib.netty.http.server.api.ServerRequest;
 import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.api.Filter;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;

@@ -18,10 +18,11 @@ import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.stream.ChunkedWriteHandler;
+import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.util.Mapping;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.ServerConfig;
+import org.xbib.netty.http.server.DefaultServerConfig;
 import org.xbib.netty.http.common.HttpChannelInitializer;
 import org.xbib.netty.http.server.handler.ExtendedSNIHandler;
 import org.xbib.netty.http.server.handler.IdleTimeoutHandler;
@@ -39,7 +40,7 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel>
 
     private final Server server;
 
-    private final ServerConfig serverConfig;
+    private final DefaultServerConfig serverConfig;
 
     private final HttpAddress httpAddress;
 
@@ -58,7 +59,7 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel>
     public void initChannel(Channel channel) {
         ServerTransport transport = server.newTransport(httpAddress.getVersion());
         channel.attr(ServerTransport.TRANSPORT_ATTRIBUTE_KEY).set(transport);
-        if (serverConfig.isTrafficDebug()) {
+        if (serverConfig.isDebug()) {
             channel.pipeline().addLast(new TrafficLoggingHandler(LogLevel.DEBUG));
         }
         if (httpAddress.isSecure()) {
@@ -66,7 +67,7 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel>
         } else {
             configureCleartext(channel);
         }
-        if (serverConfig.isTrafficDebug()) {
+        if (serverConfig.isDebug()) {
             logger.log(Level.FINE, "HTTP 1.1 server channel initialized: " +
                     " address=" + httpAddress + " pipeline=" + channel.pipeline().names());
         }
@@ -80,7 +81,10 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel>
 
     private void configureCleartext(Channel channel) {
         ChannelPipeline pipeline = channel.pipeline();
-        pipeline.addLast("http-server-chunked-write", new ChunkedWriteHandler());
+        pipeline.addLast("http-server-read-timeout",
+                new ReadTimeoutHandler(serverConfig.getReadTimeoutMillis()));
+        pipeline.addLast("http-server-chunked-write",
+                new ChunkedWriteHandler());
         pipeline.addLast("http-server-codec",
                 new HttpServerCodec(serverConfig.getMaxInitialLineLength(),
                         serverConfig.getMaxHeadersSize(), serverConfig.getMaxChunkSize()));

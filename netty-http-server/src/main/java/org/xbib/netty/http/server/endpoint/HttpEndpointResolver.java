@@ -2,6 +2,7 @@ package org.xbib.netty.http.server.endpoint;
 
 import org.xbib.netty.http.common.util.LimitedConcurrentHashMap;
 import org.xbib.netty.http.server.api.EndpointDispatcher;
+import org.xbib.netty.http.server.api.EndpointResolver;
 import org.xbib.netty.http.server.api.ServerRequest;
 import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.api.annotation.Endpoint;
@@ -16,7 +17,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-public class HttpEndpointResolver {
+public class HttpEndpointResolver implements EndpointResolver<HttpEndpoint> {
 
     private static final int DEFAULT_LIMIT = 1024;
 
@@ -40,6 +41,7 @@ public class HttpEndpointResolver {
      * @param serverRequest the server request
      * @return a
      */
+    @Override
     public List<HttpEndpoint> matchingEndpointsFor(ServerRequest serverRequest) {
         HttpEndpointDescriptor httpEndpointDescriptor = new HttpEndpointDescriptor(serverRequest);
         endpointDescriptors.putIfAbsent(httpEndpointDescriptor, endpoints.stream()
@@ -49,21 +51,28 @@ public class HttpEndpointResolver {
         return endpointDescriptors.get(httpEndpointDescriptor);
     }
 
+    @Override
+    public void resolve(List<HttpEndpoint> matchingEndpoints,
+                       ServerRequest serverRequest) throws IOException {
+        Objects.requireNonNull(matchingEndpoints);
+        for (HttpEndpoint endpoint : matchingEndpoints) {
+            endpoint.resolveUriTemplate(serverRequest);
+            endpoint.before(serverRequest, null);
+            break;
+        }
+    }
+
+    @Override
     public void handle(List<HttpEndpoint> matchingEndpoints,
                        ServerRequest serverRequest,
-                       ServerResponse serverResponse,
-                       boolean dispatch) throws IOException {
+                       ServerResponse serverResponse) throws IOException {
         Objects.requireNonNull(matchingEndpoints);
         for (HttpEndpoint endpoint : matchingEndpoints) {
             endpoint.resolveUriTemplate(serverRequest);
             endpoint.before(serverRequest, serverResponse);
-            if (dispatch) {
-                endpointDispatcher.dispatch(endpoint, serverRequest, serverResponse);
-                endpoint.after(serverRequest, serverResponse);
-                if (serverResponse != null && serverResponse.getStatus() != null) {
-                    break;
-                }
-            } else {
+            endpointDispatcher.dispatch(endpoint, serverRequest, serverResponse);
+            endpoint.after(serverRequest, serverResponse);
+            if (serverResponse != null && serverResponse.getStatus() != null) {
                 break;
             }
         }

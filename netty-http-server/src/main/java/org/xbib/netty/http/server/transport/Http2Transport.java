@@ -5,6 +5,7 @@ import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.HttpConversionUtil;
+import io.netty.handler.ssl.SslHandler;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.api.ServerResponse;
 
@@ -29,6 +30,10 @@ public class Http2Transport extends BaseTransport {
         serverRequest.setSequenceId(sequenceId);
         serverRequest.setRequestId(server.getRequestCounter().incrementAndGet());
         serverRequest.setStreamId(fullHttpRequest.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text()));
+        SslHandler sslHandler = ctx.channel().pipeline().get(SslHandler.class);
+        if (sslHandler != null) {
+            serverRequest.setSession(sslHandler.engine().getSession());
+        }
         ServerResponse serverResponse = new Http2ServerResponse(server, serverRequest, ctx);
         if (acceptRequest(server.getServerConfig(), serverRequest, serverResponse)) {
             serverRequest.handleParameters();

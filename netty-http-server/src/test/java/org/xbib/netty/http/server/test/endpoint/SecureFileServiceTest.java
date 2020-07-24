@@ -8,7 +8,7 @@ import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.Domain;
+import org.xbib.netty.http.server.HttpServerDomain;
 import org.xbib.netty.http.server.endpoint.service.FileService;
 import org.xbib.netty.http.server.test.NettyHttpTestExtension;
 
@@ -32,7 +32,7 @@ class SecureFileServiceTest {
     void testSecureFileServerHttp1() throws Exception {
         Path vartmp = Paths.get("/var/tmp/");
         HttpAddress httpAddress = HttpAddress.secureHttp1("localhost", 8143);
-        Server server = Server.builder(Domain.builder(httpAddress, "*")
+        Server server = Server.builder(HttpServerDomain.builder(httpAddress, "*")
                   .setJdkSslProvider()
                   .setSelfCert()
                   .singleEndpoint("/static", "/**", new FileService(vartmp))
@@ -68,7 +68,7 @@ class SecureFileServiceTest {
     void testSecureFileServerHttp2() throws Exception {
         Path vartmp = Paths.get("/var/tmp/");
         HttpAddress httpAddress = HttpAddress.secureHttp2("localhost", 8143);
-        Server server = Server.builder(Domain.builder(httpAddress, "*")
+        Server server = Server.builder(HttpServerDomain.builder(httpAddress, "*")
                   .setOpenSSLSslProvider()
                   //.setJdkSslProvider()
                   .setSelfCert()
@@ -112,7 +112,7 @@ class SecureFileServiceTest {
     void testSecureFileServerMixHttp1Http2() throws Exception {
         Path vartmp = Paths.get("/var/tmp/");
         HttpAddress httpAddress = HttpAddress.secureHttp2("localhost", 8143);
-        Server server = Server.builder(Domain.builder(httpAddress, "*")
+        Server server = Server.builder(HttpServerDomain.builder(httpAddress, "*")
                 .setOpenSSLSslProvider()
                 .setSelfCert()
                 .singleEndpoint("/static", "/**", new FileService(vartmp))

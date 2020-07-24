@@ -8,7 +8,7 @@ import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.Domain;
+import org.xbib.netty.http.server.HttpServerDomain;
 import org.xbib.netty.http.server.endpoint.service.ClassLoaderService;
 import org.xbib.netty.http.server.test.NettyHttpTestExtension;
 
@@ -27,7 +27,7 @@ class ClassloaderServiceTest {
     @Test
     void testClassloaderFileResource() throws Exception {
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/classloader", "/**",
                         new ClassLoaderService(ClassloaderServiceTest.class, "/cl"))
                 .build();
@@ -65,7 +65,7 @@ class ClassloaderServiceTest {
     @Test
     void testClassloaderDirectoryResource() throws Exception {
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/classloader", "/**",
                         new ClassLoaderService(ClassloaderServiceTest.class, "/cl"))
                 .build();

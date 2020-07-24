@@ -19,10 +19,13 @@ import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.NetworkUtils;
 import org.xbib.netty.http.common.HttpChannelInitializer;
 import org.xbib.netty.http.common.TransportProvider;
+import org.xbib.netty.http.server.api.Domain;
+import org.xbib.netty.http.server.api.EndpointResolver;
 import org.xbib.netty.http.server.api.ServerProtocolProvider;
 import org.xbib.netty.http.server.api.ServerRequest;
 import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.api.ServerTransport;
+import org.xbib.netty.http.server.endpoint.HttpEndpointResolver;
 import org.xbib.netty.http.server.security.CertificateUtils;
 import org.xbib.netty.http.server.transport.HttpServerRequest;
 import java.io.IOException;
@@ -71,7 +74,7 @@ public final class Server implements AutoCloseable {
 
     private static final AtomicLong responseCounter = new AtomicLong(0);
 
-    private final ServerConfig serverConfig;
+    private final DefaultServerConfig serverConfig;
 
     private final EventLoopGroup parentEventLoopGroup;
 
@@ -98,7 +101,7 @@ public final class Server implements AutoCloseable {
      * @param socketChannelClass socket channel class
      */
     @SuppressWarnings("unchecked")
-    private Server(ServerConfig serverConfig,
+    private Server(DefaultServerConfig serverConfig,
                    ByteBufAllocator byteBufAllocator,
                    EventLoopGroup parentEventLoopGroup,
                    EventLoopGroup childEventLoopGroup,
@@ -133,7 +136,7 @@ public final class Server implements AutoCloseable {
                 .childOption(ChannelOption.SO_RCVBUF, serverConfig.getTcpReceiveBufferSize())
                 .childOption(ChannelOption.CONNECT_TIMEOUT_MILLIS, serverConfig.getConnectTimeoutMillis())
                 .childOption(ChannelOption.WRITE_BUFFER_WATER_MARK, serverConfig.getWriteBufferWaterMark());
-        if (serverConfig.isTrafficDebug()) {
+        if (serverConfig.isDebug()) {
             bootstrap.handler(new LoggingHandler("bootstrap-server", serverConfig.getTrafficDebugLogLevel()));
         }
         if (serverConfig.getDefaultDomain() == null) {
@@ -141,13 +144,13 @@ public final class Server implements AutoCloseable {
         }
         // translate domains into Netty mapping
         Mapping<String, SslContext> domainNameMapping = null;
-        Domain defaultDomain = serverConfig.getDefaultDomain();
+        Domain<? extends EndpointResolver<?>> defaultDomain = serverConfig.getDefaultDomain();
         if (serverConfig.getAddress().isSecure() &&
                 defaultDomain != null &&
                 defaultDomain.getSslContext() != null) {
             DomainWildcardMappingBuilder<SslContext> mappingBuilder =
                     new DomainWildcardMappingBuilder<>(defaultDomain.getSslContext());
-            for (Domain domain : serverConfig.getDomains()) {
+            for (Domain<? extends EndpointResolver<?>> domain : serverConfig.getDomains()) {
                 if (!domain.getName().equals(defaultDomain.getName())) {
                     mappingBuilder.add(domain.getName(), domain.getSslContext());
                 }
@@ -168,11 +171,11 @@ public final class Server implements AutoCloseable {
         }
     }
 
-    public static Builder builder(Domain defaultDomain) {
-        return new Builder(defaultDomain);
+    public static Builder builder(HttpServerDomain httpServerDomain) {
+        return new Builder(httpServerDomain);
     }
 
-    public ServerConfig getServerConfig() {
+    public DefaultServerConfig getServerConfig() {
         return serverConfig;
     }
 
@@ -199,7 +202,7 @@ public final class Server implements AutoCloseable {
      * @param serverRequest the server request
      * @return the domain
      */
-    public Domain getDomain(ServerRequest serverRequest) {
+    public Domain<? extends EndpointResolver<?>> getDomain(ServerRequest serverRequest) {
         return getDomain(getBaseURL(serverRequest));
     }
 
@@ -208,7 +211,7 @@ public final class Server implements AutoCloseable {
      * @param url the URL
      * @return the domain
      */
-    public Domain getDomain(URL url) {
+    public Domain<? extends EndpointResolver<?>> getDomain(URL url) {
         return getDomain(hostAndPort(url));
     }
 
@@ -219,7 +222,7 @@ public final class Server implements AutoCloseable {
      *             default domain
      * @return the virtual host with the given name or the default domain
      */
-    public Domain getDomain(String name) {
+    public Domain<? extends EndpointResolver<?>> getDomain(String name) {
        return serverConfig.getDomain(name);
     }
 
@@ -277,13 +280,16 @@ public final class Server implements AutoCloseable {
      */
     public URL getContextURL(ServerRequest serverRequest) throws IOException {
         URL baseURL = getBaseURL(serverRequest);
-        Domain domain = getDomain(baseURL);
-        String context = domain.findContextOf(serverRequest);
+        Domain<? extends EndpointResolver<?>> domain = getDomain(baseURL);
+        String context = domain.findContextPathOf(serverRequest);
+        if (!context.endsWith("/")) {
+            context = context + "/";
+        }
         return baseURL.resolve(context);
     }
 
     public void handle(HttpServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
-        Domain domain = getDomain(serverRequest);
+        Domain<? extends EndpointResolver<?>> domain = getDomain(serverRequest);
         logger.log(Level.FINEST, () -> "found domain " + domain + " for " + serverRequest);
         if (executor != null) {
             executor.submit(() -> {
@@ -393,7 +399,7 @@ public final class Server implements AutoCloseable {
         throw new IllegalStateException("no channel initializer found for major version " + majorVersion);
     }
 
-    private static EventLoopGroup createParentEventLoopGroup(ServerConfig serverConfig,
+    private static EventLoopGroup createParentEventLoopGroup(DefaultServerConfig serverConfig,
                                                              EventLoopGroup parentEventLoopGroup ) {
         EventLoopGroup eventLoopGroup = parentEventLoopGroup;
         if (eventLoopGroup == null) {
@@ -411,8 +417,8 @@ public final class Server implements AutoCloseable {
         return eventLoopGroup;
     }
 
-    private static EventLoopGroup createChildEventLoopGroup(ServerConfig serverConfig,
-                                                             EventLoopGroup childEventLoopGroup ) {
+    private static EventLoopGroup createChildEventLoopGroup(DefaultServerConfig serverConfig,
+                                                            EventLoopGroup childEventLoopGroup ) {
         EventLoopGroup eventLoopGroup = childEventLoopGroup;
         if (eventLoopGroup == null) {
             ServiceLoader<TransportProvider> transportProviders = ServiceLoader.load(TransportProvider.class);
@@ -429,7 +435,7 @@ public final class Server implements AutoCloseable {
         return eventLoopGroup;
     }
 
-    private static Class<? extends ServerSocketChannel> createSocketChannelClass(ServerConfig serverConfig,
+    private static Class<? extends ServerSocketChannel> createSocketChannelClass(DefaultServerConfig serverConfig,
                                                                                  Class<? extends ServerSocketChannel> socketChannelClass) {
         Class<? extends ServerSocketChannel> channelClass = socketChannelClass;
         if (channelClass == null) {
@@ -536,16 +542,21 @@ public final class Server implements AutoCloseable {
 
         private Class<? extends ServerSocketChannel> socketChannelClass;
 
-        private final ServerConfig serverConfig;
+        private final DefaultServerConfig serverConfig;
 
-        private Builder(Domain defaultDomain) {
-            this.serverConfig = new ServerConfig();
-            this.serverConfig.setAddress(defaultDomain.getHttpAddress());
-            addDomain(defaultDomain);
+        private Builder(HttpServerDomain httpServerDomain) {
+            this.serverConfig = new DefaultServerConfig();
+            this.serverConfig.setAddress(httpServerDomain.getHttpAddress());
+            addDomain(httpServerDomain);
         }
 
         public Builder enableDebug() {
-            this.serverConfig.enableDebug();
+            this.serverConfig.setDebug(true);
+            return this;
+        }
+
+        public Builder setDebug(boolean debug) {
+            this.serverConfig.setDebug(debug);
             return this;
         }
 
@@ -684,8 +695,8 @@ public final class Server implements AutoCloseable {
             return this;
         }
 
-        public Builder addDomain(Domain domain) {
-            this.serverConfig.checkAndAddDomain(domain);
+        public Builder addDomain(Domain<HttpEndpointResolver> domain) {
+            this.serverConfig.addDomain(domain);
             return this;
         }
 
@@ -700,7 +711,7 @@ public final class Server implements AutoCloseable {
             }
             if (serverConfig.isAutoDomain()) {
                 // unpack subject alternative names into separate domains
-                for (Domain domain : serverConfig.getDomains()) {
+                for (Domain<? extends EndpointResolver<?>> domain : serverConfig.getDomains()) {
                     try {
                         CertificateUtils.processSubjectAlternativeNames(domain.getCertificateChain(),
                                 new CertificateUtils.SubjectAlternativeNamesProcessor() {
@@ -710,7 +721,7 @@ public final class Server implements AutoCloseable {
 
                                     @Override
                                     public void setSubjectAlternativeName(String subjectAlternativeName) {
-                                        Domain alternativeDomain = Domain.builder(domain)
+                                        HttpServerDomain alternativeDomain = HttpServerDomain.builder(domain)
                                                 .setServerName(subjectAlternativeName)
                                                 .build();
                                         addDomain(alternativeDomain);
@@ -721,7 +732,7 @@ public final class Server implements AutoCloseable {
                     }
                 }
             }
-            for (Domain domain : serverConfig.getDomains()) {
+            for (Domain<? extends EndpointResolver<?>> domain : serverConfig.getDomains()) {
                 if (domain.getCertificateChain() != null) {
                     for (X509Certificate certificate : domain.getCertificateChain()) {
                         try {

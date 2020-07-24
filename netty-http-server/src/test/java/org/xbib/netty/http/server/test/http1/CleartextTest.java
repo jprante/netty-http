@@ -11,7 +11,7 @@ import org.xbib.netty.http.client.api.ClientTransport;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.Domain;
+import org.xbib.netty.http.server.HttpServerDomain;
 import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.test.NettyHttpTestExtension;
 
@@ -33,7 +33,7 @@ class CleartextTest {
     @Test
     void testSimpleClearTextHttp1() throws Exception {
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/**", (request, response) ->
                         ServerResponse.write(response, HttpResponseStatus.OK, "text/plain",
                                 request.getContent().toString(StandardCharsets.UTF_8)))
@@ -67,7 +67,7 @@ class CleartextTest {
     void testPooledClearTextHttp1() throws Exception {
         int loop = 1;
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/**", (request, response) ->
                         ServerResponse.write(response, HttpResponseStatus.OK, "text/plain",
                                 request.getContent().toString(StandardCharsets.UTF_8)))
@@ -112,7 +112,7 @@ class CleartextTest {
         int threads = 4;
         int loop = 1024;
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/**", (request, response) ->
                         ServerResponse.write(response, HttpResponseStatus.OK, "text/plain",
                                 request.getContent().toString(StandardCharsets.UTF_8)))

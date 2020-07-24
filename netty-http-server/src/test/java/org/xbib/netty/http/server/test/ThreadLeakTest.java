@@ -8,7 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.api.ServerResponse;
-import org.xbib.netty.http.server.Domain;
+import org.xbib.netty.http.server.HttpServerDomain;
 
 import java.io.IOException;
 import java.util.Set;
@@ -23,7 +23,7 @@ class ThreadLeakTest {
 
     @Test
     void testForLeaks() throws IOException {
-        Domain domain = Domain.builder(HttpAddress.http1("localhost", 8008))
+        HttpServerDomain domain = HttpServerDomain.builder(HttpAddress.http1("localhost", 8008))
                 .singleEndpoint("/", (request, response) -> ServerResponse.write(response, "Hello World"))
                 .build();
         Server server = Server.builder(domain)

@@ -1,6 +1,7 @@
 package org.xbib.netty.http.server.endpoint.service;
 
 import org.xbib.netty.http.server.api.Filter;
+import org.xbib.netty.http.server.api.FilterConfig;
 import org.xbib.netty.http.server.api.ServerRequest;
 import org.xbib.netty.http.server.api.ServerResponse;
 
@@ -28,6 +29,9 @@ public class MethodService implements Filter {
                 !int.class.isAssignableFrom(m.getReturnType())) {
             throw new IllegalArgumentException("invalid method signature: " + m);
         }
+    }
+
+    public void initialize(FilterConfig filterConfig) {
     }
 
     @Override

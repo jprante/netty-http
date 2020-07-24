@@ -9,7 +9,7 @@ import org.xbib.netty.http.client.api.ResponseListener;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.HttpParameters;
 import org.xbib.netty.http.common.HttpResponse;
-import org.xbib.netty.http.server.Domain;
+import org.xbib.netty.http.server.HttpServerDomain;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.test.NettyHttpTestExtension;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -30,7 +30,7 @@ class FlushTest {
     @Test
     void testFlushHttp2() throws Exception {
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/flush", "/**", (req, resp) -> {
                     HttpParameters parameters = req.getParameters();
                     logger.log(Level.INFO, "got request " + parameters.toString() + ", sending 302 Found");

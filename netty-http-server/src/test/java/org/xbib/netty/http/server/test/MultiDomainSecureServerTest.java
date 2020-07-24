@@ -7,7 +7,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.common.HttpAddress;
-import org.xbib.netty.http.server.Domain;
+import org.xbib.netty.http.server.HttpServerDomain;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.api.ServerResponse;
 import java.io.InputStream;
@@ -32,12 +32,12 @@ class MultiDomainSecureServerTest {
             return;
         }
         HttpAddress httpAddress = HttpAddress.secureHttp2("localhost", 8443);
-        Domain fl = Domain.builder(httpAddress, "fl.hbz-nrw.de")
+        HttpServerDomain fl = HttpServerDomain.builder(httpAddress, "fl.hbz-nrw.de")
                 .setKeyCertChain(certInputStream)
                 .setKey(keyInputStream, null)
                 .singleEndpoint("/", (request, response) -> ServerResponse.write(response, "Hello fl.hbz-nrw.de"))
                 .build();
-        Domain zfl2 = Domain.builder(fl)
+        HttpServerDomain zfl2 = HttpServerDomain.builder(fl)
                 .setServerName("zfl2.hbz-nrw.de")
                 .singleEndpoint("/", (request, response) -> ServerResponse.write(response, "Hello zfl2.hbz-nrw.de"))
                 .build();

@@ -7,15 +7,18 @@ import io.netty.handler.ssl.CipherSuiteFilter;
 import io.netty.handler.ssl.SslProvider;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.security.SecurityUtil;
-
+import org.xbib.netty.http.server.api.Domain;
+import org.xbib.netty.http.server.api.EndpointResolver;
+import org.xbib.netty.http.server.api.ServerConfig;
 import java.security.KeyStore;
 import java.security.Provider;
 import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.Deque;
+import java.util.LinkedList;
+import java.util.Optional;
 import javax.net.ssl.TrustManagerFactory;
 
-public class ServerConfig {
+public class DefaultServerConfig implements ServerConfig {
 
     interface Defaults {
 
@@ -246,7 +249,7 @@ public class ServerConfig {
 
     private boolean installHttp2Upgrade = Defaults.INSTALL_HTTP_UPGRADE2;
 
-    private final Map<String, Domain> domains;
+    private final Deque<Domain<? extends EndpointResolver<?>>> domains;
 
     private SslProvider sslProvider = Defaults.SSL_PROVIDER;
 
@@ -266,21 +269,17 @@ public class ServerConfig {
 
     private boolean acceptInvalidCertificates = false;
 
-    public ServerConfig() {
-        this.domains = new LinkedHashMap<>();
+    public DefaultServerConfig() {
+        this.domains = new LinkedList<>();
     }
 
-    public ServerConfig enableDebug() {
-        this.debug = true;
+    public ServerConfig setDebug(boolean debug) {
+        this.debug = debug;
         return this;
     }
 
-    public ServerConfig disableDebug() {
-        this.debug = false;
-        return this;
-    }
-
-    public boolean isTrafficDebug() {
+    @Override
+    public boolean isDebug() {
         return debug;
     }
 
@@ -618,42 +617,27 @@ public class ServerConfig {
         return acceptInvalidCertificates;
     }
 
-    public ServerConfig checkAndAddDomain(Domain domain) {
-        if (domains.containsKey(domain.getName())) {
-            return this;
-        }
-        domains.put(domain.getName(), domain);
-        for (String alias : domain.getAliases()) {
-            domains.put(alias, domain);
-        }
+    public ServerConfig addDomain(Domain<? extends EndpointResolver<?>> domain) {
+        domains.add(domain);
         return this;
     }
 
-    public Collection<Domain> getDomains() {
-        return domains.values();
+    @Override
+    public Collection<Domain<? extends EndpointResolver<?>>> getDomains() {
+        return domains;
     }
 
-    public ServerConfig removeDomain(String name) {
-        domains.remove(name);
-        return this;
+    @Override
+    public Domain<? extends EndpointResolver<?>> getDomain(String name) {
+        Optional<Domain<? extends EndpointResolver<?>>> domainOptional =
+                domains.stream().filter(d -> d.getName().equals(name)).findFirst();
+        return domainOptional.orElse(domains.getFirst());
     }
 
-    public ServerConfig removeDomain(Domain domain) {
-        domains.remove(domain.getName());
-        for (String alias : domain.getAliases()) {
-            domains.remove(alias, domain);
-        }
-        return this;
-    }
-
-    public Domain getDomain(String name) {
-        Domain domain = domains.get(name);
-        return domain != null ? domain : getDefaultDomain();
-    }
-
-    public Domain getDefaultDomain() {
-        Domain defaultDomain = domains.get("*");
-        return defaultDomain != null ? defaultDomain :
-                !domains.isEmpty() ? domains.values().iterator().next() : null;
+    @Override
+    public Domain<? extends EndpointResolver<?>> getDefaultDomain() {
+        Optional<Domain<? extends EndpointResolver<?>>> domainOptional =
+                domains.stream().filter(d -> d.getName().equals("*")).findFirst();
+        return domainOptional.orElse(domains.getFirst());
     }
 }

@@ -9,7 +9,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.common.HttpAddress;
-import org.xbib.netty.http.server.Domain;
+import org.xbib.netty.http.server.HttpServerDomain;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.test.NettyHttpTestExtension;
 
@@ -24,7 +24,7 @@ class StreamTest {
     @Test
     void testServerBodyInputStreamHttp1() throws Exception {
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
-        Domain domain = Domain.builder(httpAddress)
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/", (request, response) -> {
                     ByteBufInputStream inputStream = request.getInputStream();
                     String content = inputStream.readLine();
