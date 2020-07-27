@@ -1,4 +1,4 @@
-package org.xbib.netty.http.server.handler.http2;
+package org.xbib.netty.http.server.protocol.http2;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;

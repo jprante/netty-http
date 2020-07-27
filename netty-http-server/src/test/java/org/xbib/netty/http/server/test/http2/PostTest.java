@@ -11,7 +11,6 @@ import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.HttpParameters;
 import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.HttpServerDomain;
 import org.xbib.netty.http.server.test.NettyHttpTestExtension;
 
@@ -43,7 +42,7 @@ class PostTest {
                     if ("Jörg".equals(parameters.getFirst("name"))) {
                         success3.set(true);
                     }
-                    ServerResponse.write(resp, HttpResponseStatus.OK);
+                    resp.getBuilder().setStatus(HttpResponseStatus.OK).build().flush();
                 },  "POST")
                 .build();
         Server server = Server.builder(domain)
@@ -93,7 +92,7 @@ class PostTest {
                     if ("Jörg".equals(parameters.getFirst("name"))) {
                         success3.set(true);
                     }
-                    ServerResponse.write(resp, HttpResponseStatus.OK);
+                    resp.getBuilder().setStatus(HttpResponseStatus.OK).build().flush();
                 },  "POST")
                 .build();
         Server server = Server.builder(domain)

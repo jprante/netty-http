@@ -7,7 +7,9 @@ import io.netty.handler.ssl.CipherSuiteFilter;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
+import static io.netty.handler.codec.http.HttpHeaderNames.CONTENT_TYPE;
 import org.xbib.netty.http.common.HttpAddress;
+import org.xbib.netty.http.common.HttpMethod;
 import org.xbib.netty.http.server.api.Domain;
 import org.xbib.netty.http.server.api.EndpointResolver;
 import org.xbib.netty.http.server.api.security.ServerCertificateProvider;
@@ -36,20 +38,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.ServiceLoader;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * The {@code HttpServerDomain} class represents a virtual server with a name.
  */
 public class HttpServerDomain implements Domain<HttpEndpointResolver> {
-
-    private static final Logger logger = Logger.getLogger(HttpServerDomain.class.getName());
-
-    private static final String EMPTY = "";
 
     private final String name;
 
@@ -137,40 +132,41 @@ public class HttpServerDomain implements Domain<HttpEndpointResolver> {
     }
 
     /**
-     * Evaluate the context path of a given request.
-     * The request is not dispatched.
-     * URI request parameters are evaluated.
-     * @param serverRequest the server request
-     * @return the context path
-     * @throws IOException if handling fails
-     */
-    @Override
-    public String findContextPathOf(ServerRequest serverRequest) throws IOException {
-        if (serverRequest == null) {
-            return EMPTY;
-        }
-        Map.Entry<HttpEndpointResolver, List<HttpEndpoint>> resolved = resolve(serverRequest);
-        if (resolved != null) {
-            resolved.getKey().resolve(resolved.getValue(), serverRequest);
-            return serverRequest.getContextPath();
-        }
-        return null;
-    }
-
-    /**
-     * Handle server requests by resolving and handling a server request.
-     * @param serverRequest the server request
-     * @param serverResponse the server response
+     * Handle server requests by resolving and handling.
+     * @param serverRequestBuilder the server request
+     * @param serverResponseBuilder the server response
      * @throws IOException if handling server request fails
      */
     @Override
-    public void handle(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
-        Map.Entry<HttpEndpointResolver, List<HttpEndpoint>> resolved = resolve(serverRequest);
-        if (resolved != null) {
-            resolved.getKey().handle(resolved.getValue(), serverRequest, serverResponse);
+    public void handle(ServerRequest.Builder serverRequestBuilder,
+                       ServerResponse.Builder serverResponseBuilder) throws IOException {
+        String path = extractPath(serverRequestBuilder.getRequestURI());
+        HttpMethod method = Enum.valueOf(HttpMethod.class, serverRequestBuilder.getMethod().name());
+        String contentType = serverRequestBuilder.getHeaders().get(CONTENT_TYPE);
+        HttpEndpointResolver httpEndpointResolver = null;
+        List<HttpEndpoint> endpoints = null;
+        for (HttpEndpointResolver endpointResolver : httpEndpointResolvers) {
+            List<HttpEndpoint> matchingEndpoints = endpointResolver.matchingEndpointsFor(path, method, contentType);
+            if (!matchingEndpoints.isEmpty()) {
+                httpEndpointResolver = endpointResolver;
+                endpoints = matchingEndpoints;
+                break;
+            }
+        }
+        if (endpoints != null) {
+            for (HttpEndpoint httpEndpoint : endpoints) {
+                ServerRequest resolvedServerRequest = httpEndpoint.resolveRequest(serverRequestBuilder, this, httpEndpointResolver);
+                if (serverResponseBuilder != null) {
+                    httpEndpointResolver.handle(httpEndpoint, resolvedServerRequest, serverResponseBuilder.build());
+                }
+                break;
+            }
         } else {
-            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND,
-                    "text/plain", "No endpoint found to match request");
+            if (serverResponseBuilder != null) {
+                serverResponseBuilder.setStatus(HttpResponseStatus.NOT_FOUND)
+                        .setContentType("text/plain")
+                        .build().write("no endpoint found to match request");
+            }
         }
     }
 
@@ -179,19 +175,13 @@ public class HttpServerDomain implements Domain<HttpEndpointResolver> {
         return name + " (" + httpAddress + ")";
     }
 
-    /**
-     * Just resolve a server request to a matching endpoint resolver with endpoints matched.
-     * @param serverRequest the server request
-     * @return the endpoint resolver together with the matching endpoints
-     */
-    private Map.Entry<HttpEndpointResolver, List<HttpEndpoint>> resolve(ServerRequest serverRequest) {
-        for (HttpEndpointResolver httpEndpointResolver : httpEndpointResolvers) {
-            List<HttpEndpoint> matchingEndpoints = httpEndpointResolver.matchingEndpointsFor(serverRequest);
-            if (!matchingEndpoints.isEmpty()) {
-                return Map.entry(httpEndpointResolver, matchingEndpoints);
-            }
-        }
-        return null;
+    private static String extractPath(String uri) {
+        String path = uri;
+        int pos = uri.lastIndexOf('#');
+        path = pos >= 0 ? path.substring(0, pos) : path;
+        pos = uri.lastIndexOf('?');
+        path = pos >= 0 ? path.substring(0, pos) : path;
+        return path;
     }
 
     public static class Builder {
@@ -323,7 +313,6 @@ public class HttpServerDomain implements Domain<HttpEndpointResolver> {
                     serverCertificateProvider.prepare(serverName);
                     setKeyCertChain(serverCertificateProvider.getCertificateChain());
                     setKey(serverCertificateProvider.getPrivateKey(), serverCertificateProvider.getKeyPassword());
-                    logger.log(Level.INFO, "self signed certificate installed");
                 }
             }
             if (keyCertChain == null) {
@@ -346,7 +335,7 @@ public class HttpServerDomain implements Domain<HttpEndpointResolver> {
                     .addEndpoint(HttpEndpoint.builder()
                             .setPath(path)
                             .build())
-                    .setDispatcher((endpoint, req, resp) -> filter.handle(req, resp))
+                    .setDispatcher(filter::handle)
                     .build());
             return this;
         }
@@ -360,7 +349,7 @@ public class HttpServerDomain implements Domain<HttpEndpointResolver> {
                             .setPrefix(prefix)
                             .setPath(path)
                             .build())
-                    .setDispatcher((endpoint, req, resp) -> filter.handle(req, resp))
+                    .setDispatcher(filter::handle)
                     .build());
             return this;
         }
@@ -376,7 +365,7 @@ public class HttpServerDomain implements Domain<HttpEndpointResolver> {
                             .setPath(path)
                             .setMethods(Arrays.asList(methods))
                             .build())
-                    .setDispatcher((endpoint, req, resp) -> filter.handle(req, resp))
+                    .setDispatcher(filter::handle)
                     .build());
             return this;
         }

@@ -1,8 +1,6 @@
-package org.xbib.netty.http.server;
+package org.xbib.netty.http.server.protocol.http2;
 
 import org.xbib.netty.http.server.api.ServerProtocolProvider;
-import org.xbib.netty.http.server.handler.http2.Http2ChannelInitializer;
-import org.xbib.netty.http.server.transport.Http2Transport;
 
 public class Http2 implements ServerProtocolProvider<Http2ChannelInitializer, Http2Transport> {
 

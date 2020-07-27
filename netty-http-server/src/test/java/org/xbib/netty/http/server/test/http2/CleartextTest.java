@@ -10,10 +10,8 @@ import org.xbib.netty.http.client.api.ClientTransport;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.HttpServerDomain;
 import org.xbib.netty.http.server.test.NettyHttpTestExtension;
-
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -34,8 +32,8 @@ class CleartextTest {
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
         HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/", (request, response) ->
-                        ServerResponse.write(response, HttpResponseStatus.OK, "text.plain",
-                                request.getContent().toString(StandardCharsets.UTF_8)))
+                        response.getBuilder().setStatus(HttpResponseStatus.OK).setContentType("text/plain").build()
+                                .write(request.getContent().toString(StandardCharsets.UTF_8)))
                 .build();
         Server server = Server.builder(domain)
                 .build();
@@ -79,9 +77,8 @@ class CleartextTest {
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
         HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/", (request, response) ->
-                        response.withStatus(HttpResponseStatus.OK)
-                                .withContentType("text/plain")
-                                .write(request.getContent().retain()))
+                        response.getBuilder().setStatus(HttpResponseStatus.OK).setContentType("text/plain").build()
+                                .write(request.getContent().toString(StandardCharsets.UTF_8)))
                 .build();
         Server server = Server.builder(domain)
                 .build();
@@ -131,8 +128,8 @@ class CleartextTest {
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
         HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/**", (request, response) ->
-                        ServerResponse.write(response, HttpResponseStatus.OK, "text/plain",
-                                request.getContent().toString(StandardCharsets.UTF_8)))
+                        response.getBuilder().setStatus(HttpResponseStatus.OK).setContentType("text/plain").build()
+                                .write(request.getContent().toString(StandardCharsets.UTF_8)))
                 .build();
         Server server = Server.builder(domain).build();
         server.accept();
@@ -186,8 +183,6 @@ class CleartextTest {
         }
         logger.log(Level.INFO, "client requests = " + client.getRequestCounter() +
                 " client responses = " + client.getResponseCounter());
-        logger.log(Level.INFO, "server requests = " + server.getRequestCounter() +
-                " server responses = " + server.getResponseCounter());
         logger.log(Level.INFO, "expected=" + (threads * loop) + " counter=" + counter.get());
         assertEquals(threads * loop , counter.get());
     }
@@ -200,8 +195,8 @@ class CleartextTest {
         AtomicInteger counter1 = new AtomicInteger();
         HttpServerDomain domain1 = HttpServerDomain.builder(httpAddress1)
                 .singleEndpoint("/", (request, response) -> {
-                    ServerResponse.write(response, HttpResponseStatus.OK, "text.plain",
-                          request.getContent().toString(StandardCharsets.UTF_8));
+                    response.getBuilder().setStatus(HttpResponseStatus.OK).setContentType("text/plain").build()
+                            .write(request.getContent().toString(StandardCharsets.UTF_8));
                     counter1.incrementAndGet();
                 })
                 .build();
@@ -212,8 +207,8 @@ class CleartextTest {
         AtomicInteger counter2 = new AtomicInteger();
         HttpServerDomain domain2 = HttpServerDomain.builder(httpAddress2)
                 .singleEndpoint("/", (request, response) -> {
-                    ServerResponse.write(response, HttpResponseStatus.OK, "text/plain",
-                            request.getContent().toString(StandardCharsets.UTF_8));
+                    response.getBuilder().setStatus(HttpResponseStatus.OK).setContentType("text/plain").build()
+                            .write(request.getContent().toString(StandardCharsets.UTF_8));
                     counter2.incrementAndGet();
                 })
                 .build();
@@ -273,10 +268,6 @@ class CleartextTest {
             server2.shutdownGracefully();
             client.shutdownGracefully();
         }
-        logger.log(Level.INFO, "server1 requests = " + server1.getRequestCounter() +
-                " server1 responses = " + server1.getResponseCounter());
-        logger.log(Level.INFO, "server2 requests = " + server1.getRequestCounter() +
-                " server2 responses = " + server1.getResponseCounter());
         logger.log(Level.INFO, "client requests = " + client.getRequestCounter() +
                 " client responses = " + client.getResponseCounter());
         logger.log(Level.INFO, "counter1=" + counter1.get() + " counter2=" + counter2.get());

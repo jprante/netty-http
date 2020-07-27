@@ -10,7 +10,9 @@ public interface Endpoint<D extends EndpointDescriptor> {
 
     boolean matches(D descriptor);
 
-    void resolveUriTemplate(ServerRequest serverRequest) throws IOException;
+    ServerRequest resolveRequest(ServerRequest.Builder serverRequestBuilder,
+                                 Domain<? extends EndpointResolver<? extends Endpoint<?>>> domain,
+                                 EndpointResolver<? extends Endpoint<?>> endpointResolver);
 
     void before(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException;
 

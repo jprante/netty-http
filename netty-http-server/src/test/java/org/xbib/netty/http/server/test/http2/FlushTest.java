@@ -34,7 +34,7 @@ class FlushTest {
                 .singleEndpoint("/flush", "/**", (req, resp) -> {
                     HttpParameters parameters = req.getParameters();
                     logger.log(Level.INFO, "got request " + parameters.toString() + ", sending 302 Found");
-                    resp.withStatus(HttpResponseStatus.FOUND).flush();
+                    resp.getBuilder().setStatus(HttpResponseStatus.FOUND).build().flush();
                 })
                 .build();
         Server server = Server.builder(domain)

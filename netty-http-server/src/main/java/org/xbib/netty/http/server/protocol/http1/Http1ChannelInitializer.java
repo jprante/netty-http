@@ -1,4 +1,4 @@
-package org.xbib.netty.http.server.handler.http;
+package org.xbib.netty.http.server.protocol.http1;
 
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
@@ -28,7 +28,6 @@ import org.xbib.netty.http.server.handler.ExtendedSNIHandler;
 import org.xbib.netty.http.server.handler.IdleTimeoutHandler;
 import org.xbib.netty.http.server.handler.TrafficLoggingHandler;
 import org.xbib.netty.http.server.api.ServerTransport;
-
 import java.nio.charset.StandardCharsets;
 import java.util.logging.Level;
 import java.util.logging.Logger;

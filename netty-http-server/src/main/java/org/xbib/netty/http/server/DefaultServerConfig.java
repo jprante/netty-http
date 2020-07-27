@@ -45,19 +45,19 @@ public class DefaultServerConfig implements ServerConfig {
         int PARENT_THREAD_COUNT = 0;
 
         /**
-         * Child thread count. Let Netty decide.
+         * Let Netty decide about child thread count.
          */
         int CHILD_THREAD_COUNT = 0;
 
         /**
-         * Blocking thread pool count.
+         * Blocking thread pool count. Disabled by default, use Netty threads.
          */
-        int BLOCKING_THREAD_COUNT = Runtime.getRuntime().availableProcessors();
+        int BLOCKING_THREAD_COUNT = 0;
 
         /**
-         * Blocking thread pool queue count.
+         * Blocking thread pool queue count. Disabled by default, use Netty threads.
          */
-        int BLOCKING_QUEUE_COUNT = 1024;
+        int BLOCKING_QUEUE_COUNT = 0;
 
         /**
          * Default for SO_REUSEADDR.

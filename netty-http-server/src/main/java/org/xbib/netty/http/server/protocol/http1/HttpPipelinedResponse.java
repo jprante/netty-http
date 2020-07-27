@@ -1,4 +1,4 @@
-package org.xbib.netty.http.server.handler.http;
+package org.xbib.netty.http.server.protocol.http1;
 
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.HttpResponse;

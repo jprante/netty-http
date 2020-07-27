@@ -9,6 +9,7 @@ import io.netty.channel.WriteBufferWaterMark;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslContext;
@@ -27,7 +28,6 @@ import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.api.ServerTransport;
 import org.xbib.netty.http.server.endpoint.HttpEndpointResolver;
 import org.xbib.netty.http.server.security.CertificateUtils;
-import org.xbib.netty.http.server.transport.HttpServerRequest;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.security.cert.CertificateExpiredException;
@@ -70,10 +70,6 @@ public final class Server implements AutoCloseable {
         }
     }
 
-    private static final AtomicLong requestCounter = new AtomicLong(0);
-
-    private static final AtomicLong responseCounter = new AtomicLong(0);
-
     private final DefaultServerConfig serverConfig;
 
     private final EventLoopGroup parentEventLoopGroup;
@@ -81,7 +77,8 @@ public final class Server implements AutoCloseable {
     private final EventLoopGroup childEventLoopGroup;
 
     /**
-     * A thread pool for executing blocking tasks.
+     * An extra thread pool for handling requests. May be null
+     * for executing request on the Netty event pool threads.
      */
     private final BlockingThreadPoolExecutor executor;
 
@@ -90,6 +87,10 @@ public final class Server implements AutoCloseable {
     private ChannelFuture channelFuture;
 
     private final List<ServerProtocolProvider<HttpChannelInitializer, ServerTransport>> protocolProviders;
+
+    private static final AtomicLong requestCounter = new AtomicLong();
+
+    private static final AtomicLong responseCounter = new AtomicLong();
 
     /**
      * Create a new HTTP server.
@@ -196,52 +197,23 @@ public final class Server implements AutoCloseable {
         return channelFuture;
     }
 
-    /**
-     * Returns the domain for the given server request.
-     *
-     * @param serverRequest the server request
-     * @return the domain
-     */
-    public Domain<? extends EndpointResolver<?>> getDomain(ServerRequest serverRequest) {
-        return getDomain(getBaseURL(serverRequest));
+    public AtomicLong getRequestCounter() {
+        return requestCounter;
     }
 
-    /**
-     * Returns the domain of the given URL.
-     * @param url the URL
-     * @return the domain
-     */
-    public Domain<? extends EndpointResolver<?>> getDomain(URL url) {
-        return getDomain(hostAndPort(url));
+    public AtomicLong getResponseCounter() {
+        return responseCounter;
     }
 
-    /**
-     * Returns the domain for the given host name.
-     *
-     * @param name the name of the virtual host with optional port, or null for the
-     *             default domain
-     * @return the virtual host with the given name or the default domain
-     */
-    public Domain<? extends EndpointResolver<?>> getDomain(String name) {
-       return serverConfig.getDomain(name);
-    }
-
-    /**
-     * Return the base URL regarding to a server request.
-     * The base URL depends on the host and port defined in a reqeust,
-     * if no request is defined, the bind URL is taken.
-     * @param serverRequest the server request
-     * @return the URL
-     */
-    public URL getBaseURL(ServerRequest serverRequest) {
+    public URL getBaseURL(HttpHeaders headers) {
         URL bindURL = serverConfig.getDefaultDomain().getHttpAddress().base();
-        String scheme = serverRequest != null ? serverRequest.getHeaders().get("x-forwarded-proto") : null;
+        String scheme = headers != null ? headers.get("x-forwarded-proto") : null;
         if (scheme == null) {
             scheme = bindURL.getScheme();
         }
-        String host = serverRequest != null ? serverRequest.getHeaders().get("x-forwarded-host") : null;
+        String host = headers != null ? headers.get("x-forwarded-host") : null;
         if (host == null) {
-            host = serverRequest != null ? serverRequest.getHeaders().get("host") : null;
+            host = headers != null ? headers.get("host") : null;
             if (host == null) {
                 host = bindURL.getHost();
             }
@@ -262,60 +234,47 @@ public final class Server implements AutoCloseable {
     }
 
     /**
-     * Return the context URL of this server. This is equivalent to the bindURL
-     * @return the context URL
-     * @throws IOException should not happen
+     * Returns the domain of the given URL.
+     * @param url the URL
+     * @return the domain
      */
-    public URL getContextURL() throws IOException {
-        return getContextURL(null);
+    public Domain<? extends EndpointResolver<?>> getDomain(URL url) {
+        return getDomain(hostAndPort(url));
     }
 
     /**
-     * Get context URL of this server regarding to a given request.
-     * The context URL is the base URL with the path given in the matching
-     * domain prefix setting of the endpoint resolver.
-     * @param serverRequest the server request
-     * @return the context URL
-     * @throws IOException if context path finding fails
+     * Returns the domain for the given host name.
+     *
+     * @param name the name of the virtual host with optional port, or null for the
+     *             default domain
+     * @return the virtual host with the given name or the default domain
      */
-    public URL getContextURL(ServerRequest serverRequest) throws IOException {
-        URL baseURL = getBaseURL(serverRequest);
-        Domain<? extends EndpointResolver<?>> domain = getDomain(baseURL);
-        String context = domain.findContextPathOf(serverRequest);
-        if (!context.endsWith("/")) {
-            context = context + "/";
-        }
-        return baseURL.resolve(context);
+    public Domain<? extends EndpointResolver<?>> getDomain(String name) {
+        return serverConfig.getDomain(name);
     }
 
-    public void handle(HttpServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
-        Domain<? extends EndpointResolver<?>> domain = getDomain(serverRequest);
-        logger.log(Level.FINEST, () -> "found domain " + domain + " for " + serverRequest);
+    public void handle(ServerRequest.Builder serverRequestBuilder,
+                       ServerResponse.Builder serverResponseBuilder) throws IOException {
+        URL baseURL = getBaseURL(serverRequestBuilder.getHeaders());
+        serverRequestBuilder.setBaseURL(baseURL);
+        Domain<? extends EndpointResolver<?>> domain = getDomain(baseURL);
         if (executor != null) {
             executor.submit(() -> {
                 try {
-                    domain.handle(serverRequest, serverResponse);
+                    domain.handle(serverRequestBuilder, serverResponseBuilder);
                 } catch (IOException e) {
                     executor.afterExecute(null, e);
                 } finally {
-                    serverRequest.release();
+                    serverRequestBuilder.release();
                 }
             });
         } else {
             try {
-                domain.handle(serverRequest, serverResponse);
+                domain.handle(serverRequestBuilder, serverResponseBuilder);
             } finally {
-                serverRequest.release();
+                serverRequestBuilder.release();
             }
         }
-    }
-
-    public AtomicLong getRequestCounter() {
-        return requestCounter;
-    }
-
-    public AtomicLong getResponseCounter() {
-        return responseCounter;
     }
 
     public ServerTransport newTransport(HttpVersion httpVersion) {

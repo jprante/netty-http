@@ -18,7 +18,5 @@ public interface Domain<R extends EndpointResolver<?>> {
 
     Collection<? extends X509Certificate> getCertificateChain();
 
-    String findContextPathOf(ServerRequest serverRequest) throws IOException;
-
-    void handle(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException;
+    void handle(ServerRequest.Builder serverRequestBuilder, ServerResponse.Builder serverResponseBuilder) throws IOException;
 }

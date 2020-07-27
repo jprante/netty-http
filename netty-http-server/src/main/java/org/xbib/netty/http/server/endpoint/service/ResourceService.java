@@ -6,6 +6,7 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.stream.ChunkedNioStream;
+import io.netty.util.AsciiString;
 import org.xbib.netty.http.common.util.DateTimeUtil;
 import org.xbib.netty.http.server.api.Filter;
 import org.xbib.netty.http.server.api.FilterConfig;
@@ -58,24 +59,32 @@ public abstract class ResourceService implements Filter {
 
     protected abstract int getMaxAgeSeconds();
 
-    private void handleCachedResource(ServerRequest serverRequest, ServerResponse serverResponse, Resource resource) {
+    private void handleCachedResource(ServerRequest serverRequest, ServerResponse serverResponse, Resource resource) throws IOException {
         if (logger.isLoggable(Level.FINER)) {
             logger.log(Level.FINER, "resource = " + resource);
         }
         if (resource.isDirectory()) {
             if (!resource.getResourcePath().isEmpty() && !resource.getResourcePath().endsWith("/")) {
                 // external redirect to
-                serverResponse.withHeader(HttpHeaderNames.LOCATION, resource.getResourcePath() + "/");
-                ServerResponse.write(serverResponse, HttpResponseStatus.MOVED_PERMANENTLY);
+                serverResponse.getBuilder()
+                        .setHeader(HttpHeaderNames.LOCATION, resource.getResourcePath() + "/")
+                        .setStatus( HttpResponseStatus.MOVED_PERMANENTLY)
+                        .build()
+                        .flush();
                 return;
             } else if (resource.indexFileName() != null) {
                 // external redirect to default index file in this directory
-                serverResponse.withHeader(HttpHeaderNames.LOCATION, resource.indexFileName());
-                ServerResponse.write(serverResponse, HttpResponseStatus.MOVED_PERMANENTLY);
+                serverResponse.getBuilder()
+                        .setHeader(HttpHeaderNames.LOCATION, resource.indexFileName())
+                        .setStatus( HttpResponseStatus.MOVED_PERMANENTLY)
+                        .build()
+                        .flush();
                 return;
             } else {
                 // send forbidden, we do not allow directory access
-                ServerResponse.write(serverResponse, HttpResponseStatus.FORBIDDEN);
+                serverResponse.getBuilder()
+                        .setStatus(HttpResponseStatus.FORBIDDEN)
+                        .build().flush();
                 return;
             }
         }
@@ -88,8 +97,9 @@ public abstract class ResourceService implements Filter {
         String contentType = MimeTypeUtils.guessFromPath(resource.getResourcePath(), false);
         long expirationMillis = System.currentTimeMillis() + 1000 * getMaxAgeSeconds();
         if (isCacheResponseEnabled()) {
-            serverResponse.withHeader(HttpHeaderNames.EXPIRES, DateTimeUtil.formatRfc1123(expirationMillis))
-                    .withHeader(HttpHeaderNames.CACHE_CONTROL, "public, max-age=" + getMaxAgeSeconds());
+            serverResponse.getBuilder()
+                    .setHeader(HttpHeaderNames.EXPIRES, DateTimeUtil.formatRfc1123(expirationMillis))
+                    .setHeader(HttpHeaderNames.CACHE_CONTROL, "public, max-age=" + getMaxAgeSeconds());
         }
         boolean sent = false;
         if (isETagResponseEnabled()) {
@@ -98,38 +108,48 @@ public abstract class ResourceService implements Filter {
             Instant ifUnmodifiedSinceInstant = DateTimeUtil.parseDate(headers.get(HttpHeaderNames.IF_UNMODIFIED_SINCE));
             if (ifUnmodifiedSinceInstant != null &&
                     ifUnmodifiedSinceInstant.plusMillis(1000L).isAfter(lastModifiedInstant)) {
-                ServerResponse.write(serverResponse, HttpResponseStatus.PRECONDITION_FAILED);
+                serverResponse.getBuilder()
+                        .setStatus(HttpResponseStatus.PRECONDITION_FAILED)
+                        .build().flush();
                 return;
             }
             String ifMatch = headers.get(HttpHeaderNames.IF_MATCH);
             if (ifMatch != null && !matches(ifMatch, eTag)) {
-                ServerResponse.write(serverResponse, HttpResponseStatus.PRECONDITION_FAILED);
+                serverResponse.getBuilder()
+                        .setStatus(HttpResponseStatus.PRECONDITION_FAILED)
+                        .build().flush();
                 return;
             }
             String ifNoneMatch = headers.get(HttpHeaderNames.IF_NONE_MATCH);
             if (ifNoneMatch != null && matches(ifNoneMatch, eTag)) {
-                serverResponse.withHeader(HttpHeaderNames.ETAG, eTag)
-                        .withHeader(HttpHeaderNames.EXPIRES, DateTimeUtil.formatRfc1123(expirationMillis));
-                ServerResponse.write(serverResponse, HttpResponseStatus.NOT_MODIFIED);
+                serverResponse.getBuilder()
+                        .setHeader(HttpHeaderNames.ETAG, eTag)
+                        .setHeader(HttpHeaderNames.EXPIRES, DateTimeUtil.formatRfc1123(expirationMillis))
+                        .setStatus(HttpResponseStatus.NOT_MODIFIED)
+                        .build().flush();
                 return;
             }
             Instant ifModifiedSinceInstant = DateTimeUtil.parseDate(headers.get(HttpHeaderNames.IF_MODIFIED_SINCE));
             if (ifModifiedSinceInstant != null &&
                     ifModifiedSinceInstant.plusMillis(1000L).isAfter(lastModifiedInstant)) {
-                serverResponse.withHeader(HttpHeaderNames.ETAG, eTag)
-                        .withHeader(HttpHeaderNames.EXPIRES, DateTimeUtil.formatRfc1123(expirationMillis));
-                ServerResponse.write(serverResponse, HttpResponseStatus.NOT_MODIFIED);
+                serverResponse.getBuilder()
+                        .setHeader(HttpHeaderNames.ETAG, eTag)
+                        .setHeader(HttpHeaderNames.EXPIRES, DateTimeUtil.formatRfc1123(expirationMillis))
+                        .setStatus(HttpResponseStatus.NOT_MODIFIED)
+                        .build().flush();
                 return;
             }
-            serverResponse.withHeader(HttpHeaderNames.ETAG, eTag)
-                    .withHeader(HttpHeaderNames.LAST_MODIFIED, DateTimeUtil.formatRfc1123(lastModifiedInstant));
+            serverResponse.getBuilder()
+                    .setHeader(HttpHeaderNames.ETAG, eTag)
+                    .setHeader(HttpHeaderNames.LAST_MODIFIED, DateTimeUtil.formatRfc1123(lastModifiedInstant));
             if (isRangeResponseEnabled()) {
                 performRangeResponse(serverRequest, serverResponse, resource, contentType, eTag, headers);
                 sent = true;
             }
         }
         if (!sent) {
-            serverResponse.withHeader(HttpHeaderNames.CONTENT_LENGTH, Long.toString(resource.getLength()));
+            serverResponse.getBuilder()
+                    .setHeader(HttpHeaderNames.CONTENT_LENGTH, Long.toString(resource.getLength()));
             send(resource.getURL(), contentType, serverRequest, serverResponse);
         }
     }
@@ -137,16 +157,18 @@ public abstract class ResourceService implements Filter {
     private void performRangeResponse(ServerRequest serverRequest, ServerResponse serverResponse,
                                        Resource resource,
                                        String contentType, String eTag,
-                                       HttpHeaders headers) {
+                                       HttpHeaders headers) throws IOException {
         long length = resource.getLength();
-        serverResponse.withHeader(HttpHeaderNames.ACCEPT_RANGES, "bytes");
+        serverResponse.getBuilder().setHeader(HttpHeaderNames.ACCEPT_RANGES, "bytes");
         Range full = new Range(0, length - 1, length);
         List<Range> ranges = new ArrayList<>();
         String range = headers.get(HttpHeaderNames.RANGE);
         if (range != null) {
             if (!range.matches("^bytes=\\d*-\\d*(,\\d*-\\d*)*$")) {
-                serverResponse.withHeader(HttpHeaderNames.CONTENT_RANGE, "bytes */" + length);
-                ServerResponse.write(serverResponse, HttpResponseStatus.REQUESTED_RANGE_NOT_SATISFIABLE);
+                serverResponse.getBuilder()
+                        .setHeader(HttpHeaderNames.CONTENT_RANGE, "bytes */" + length)
+                        .setStatus(HttpResponseStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+                        .build().flush();
                 return;
             }
             String ifRange = headers.get(HttpHeaderNames.IF_RANGE);
@@ -171,8 +193,10 @@ public abstract class ResourceService implements Filter {
                         end = length - 1;
                     }
                     if (start > end) {
-                        serverResponse.withHeader(HttpHeaderNames.CONTENT_RANGE, "bytes */" + length);
-                        ServerResponse.write(serverResponse, HttpResponseStatus.REQUESTED_RANGE_NOT_SATISFIABLE);
+                        serverResponse.getBuilder()
+                                .setHeader(HttpHeaderNames.CONTENT_RANGE, "bytes */" + length)
+                                .setStatus(HttpResponseStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+                                .build().flush();
                         return;
                     }
                     ranges.add(new Range(start, end, length));
@@ -180,16 +204,19 @@ public abstract class ResourceService implements Filter {
             }
         }
         if (ranges.isEmpty() || ranges.get(0) == full) {
-            serverResponse.withHeader(HttpHeaderNames.CONTENT_RANGE, "bytes " + full.start + '-' + full.end + '/' + full.total)
-                    .withHeader(HttpHeaderNames.CONTENT_LENGTH, Long.toString(full.length));
+            serverResponse.getBuilder()
+                    .setHeader(HttpHeaderNames.CONTENT_RANGE, "bytes " + full.start + '-' + full.end + '/' + full.total)
+                    .setHeader(HttpHeaderNames.CONTENT_LENGTH, Long.toString(full.length));
             send(resource.getURL(), HttpResponseStatus.OK, contentType, serverRequest, serverResponse, full.start, full.length);
         } else if (ranges.size() == 1) {
             Range r = ranges.get(0);
-            serverResponse.withHeader(HttpHeaderNames.CONTENT_RANGE, "bytes " + r.start + '-' + r.end + '/' + r.total)
-                    .withHeader(HttpHeaderNames.CONTENT_LENGTH, Long.toString(r.length));
+            serverResponse.getBuilder()
+                    .setHeader(HttpHeaderNames.CONTENT_RANGE, "bytes " + r.start + '-' + r.end + '/' + r.total)
+                    .setHeader(HttpHeaderNames.CONTENT_LENGTH, Long.toString(r.length));
             send(resource.getURL(), HttpResponseStatus.PARTIAL_CONTENT, contentType, serverRequest, serverResponse, r.start, r.length);
         } else {
-            serverResponse.withHeader(HttpHeaderNames.CONTENT_TYPE, "multipart/byteranges; boundary=MULTIPART_BOUNDARY");
+            serverResponse.getBuilder()
+                    .setHeader(HttpHeaderNames.CONTENT_TYPE, "multipart/byteranges; boundary=MULTIPART_BOUNDARY");
             StringBuilder sb = new StringBuilder();
             for (Range r : ranges) {
                 try {
@@ -203,7 +230,11 @@ public abstract class ResourceService implements Filter {
                     logger.log(Level.FINEST, e.getMessage(), e);
                 }
             }
-            ServerResponse.write(serverResponse, HttpResponseStatus.OK, contentType, CharBuffer.wrap(sb), StandardCharsets.ISO_8859_1);
+            serverResponse.getBuilder()
+                    .setStatus(HttpResponseStatus.OK)
+                    .setContentType(contentType)
+                    .build()
+                    .write(CharBuffer.wrap(sb), StandardCharsets.ISO_8859_1);
         }
     }
 
@@ -219,37 +250,50 @@ public abstract class ResourceService implements Filter {
     }
 
     private void send(URL url, String contentType,
-                        ServerRequest serverRequest, ServerResponse serverResponse) {
+                      ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
         if (url == null) {
-            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
+            serverResponse.getBuilder()
+                    .setStatus( HttpResponseStatus.NOT_FOUND)
+                    .build().flush();
         } else if (serverRequest.getMethod() == HttpMethod.HEAD) {
-            ServerResponse.write(serverResponse, HttpResponseStatus.OK, contentType);
+            serverResponse.getBuilder()
+                    .setStatus( HttpResponseStatus.OK)
+                    .setContentType(contentType)
+                    .build().flush();
         } else {
             if ("file".equals(url.getProtocol())) {
                 try {
-                    send((FileChannel) Files.newByteChannel(Paths.get(url.toURI())),
-                            HttpResponseStatus.OK, contentType, serverResponse);
+                    send((FileChannel) Files.newByteChannel(Paths.get(url.toURI())), contentType, serverResponse);
                 } catch (URISyntaxException | IOException e) {
                     logger.log(Level.SEVERE, e.getMessage(), e);
-                    ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
+                    serverResponse.getBuilder()
+                            .setStatus( HttpResponseStatus.NOT_FOUND)
+                            .build().flush();
                 }
             } else {
                 try (InputStream inputStream = url.openStream()) {
-                    send(inputStream, HttpResponseStatus.OK, contentType, serverResponse);
+                    send(inputStream, contentType, serverResponse);
                 } catch (IOException e) {
                     logger.log(Level.SEVERE, e.getMessage(), e);
-                    ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
+                    serverResponse.getBuilder()
+                            .setStatus( HttpResponseStatus.NOT_FOUND)
+                            .build().flush();
                 }
             }
         }
     }
 
     private void send(URL url, HttpResponseStatus httpResponseStatus, String contentType,
-                        ServerRequest serverRequest, ServerResponse serverResponse, long offset, long size) {
+                        ServerRequest serverRequest, ServerResponse serverResponse, long offset, long size) throws IOException {
         if (url == null) {
-            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
+            serverResponse.getBuilder()
+                    .setStatus( HttpResponseStatus.NOT_FOUND)
+                    .build().flush();
         } else if (serverRequest.getMethod() == HttpMethod.HEAD) {
-            ServerResponse.write(serverResponse, HttpResponseStatus.OK, contentType);
+            serverResponse.getBuilder()
+                    .setStatus( HttpResponseStatus.OK)
+                    .setContentType(contentType)
+                    .build().flush();
         } else {
             if ("file".equals(url.getProtocol())) {
                 Path path = null;
@@ -259,52 +303,66 @@ public abstract class ResourceService implements Filter {
                             contentType, serverResponse, offset, size);
                 } catch (URISyntaxException | IOException e) {
                     logger.log(Level.SEVERE, e.getMessage() + " path=" + path, e);
-                    ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
+                    serverResponse.getBuilder()
+                            .setStatus( HttpResponseStatus.NOT_FOUND)
+                            .build().flush();
                 }
             } else {
                 try (InputStream inputStream = url.openStream()) {
                     send(inputStream, httpResponseStatus, contentType, serverResponse, offset, size);
                 } catch (IOException e) {
                     logger.log(Level.SEVERE, e.getMessage(), e);
-                    ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
+                    serverResponse.getBuilder()
+                            .setStatus( HttpResponseStatus.NOT_FOUND)
+                            .build().flush();
                 }
             }
         }
     }
 
-    private void send(FileChannel fileChannel, HttpResponseStatus httpResponseStatus, String contentType,
+    private void send(FileChannel fileChannel, String contentType,
                       ServerResponse serverResponse) throws IOException {
-        send(fileChannel, httpResponseStatus, contentType, serverResponse, 0L, fileChannel.size());
+        send(fileChannel, HttpResponseStatus.OK, contentType, serverResponse, 0L, fileChannel.size());
     }
 
     private void send(FileChannel fileChannel, HttpResponseStatus httpResponseStatus, String contentType,
-                      ServerResponse serverResponse, long offset, long size) {
+                      ServerResponse serverResponse, long offset, long size) throws IOException {
         if (fileChannel == null) {
-            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
+            serverResponse.getBuilder()
+                    .setStatus( HttpResponseStatus.NOT_FOUND)
+                    .build().flush();
         } else {
             MappedByteBuffer mappedByteBuffer = null;
             try {
                 mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, offset, size);
             } catch (IOException e) {
                 // resource is not a file that can be mapped
-                ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
+                serverResponse.getBuilder()
+                        .setStatus(HttpResponseStatus.NOT_FOUND)
+                        .build().flush();
             }
             if (mappedByteBuffer != null) {
-                serverResponse.withStatus(httpResponseStatus)
-                        .withContentType(contentType)
+                serverResponse.getBuilder()
+                        .setStatus(httpResponseStatus)
+                        .setContentType(contentType)
+                        .build()
                         .write(Unpooled.wrappedBuffer(mappedByteBuffer));
             }
         }
     }
 
-    private void send(InputStream inputStream, HttpResponseStatus httpResponseStatus, String contentType,
+    private void send(InputStream inputStream, String contentType,
                       ServerResponse serverResponse) throws IOException {
         if (inputStream == null) {
-            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
+            serverResponse.getBuilder()
+                    .setStatus(HttpResponseStatus.NOT_FOUND)
+                    .build().flush();
         } else {
             try (ReadableByteChannel channel = Channels.newChannel(inputStream)) {
-                serverResponse.withStatus(httpResponseStatus)
-                        .withContentType(contentType)
+                serverResponse.getBuilder()
+                        .setStatus(HttpResponseStatus.OK)
+                        .setContentType(contentType)
+                        .build()
                         .write(new ChunkedNioStream(channel));
             }
         }
@@ -313,10 +371,14 @@ public abstract class ResourceService implements Filter {
     private void send(InputStream inputStream, HttpResponseStatus httpResponseStatus, String contentType,
                       ServerResponse serverResponse, long offset, long size) throws IOException {
         if (inputStream == null) {
-            ServerResponse.write(serverResponse, HttpResponseStatus.NOT_FOUND);
+            serverResponse.getBuilder()
+                    .setStatus(HttpResponseStatus.NOT_FOUND)
+                    .build().flush();
         } else {
-            serverResponse.withStatus(httpResponseStatus)
-                    .withContentType(contentType)
+            serverResponse.getBuilder()
+                    .setStatus(httpResponseStatus)
+                    .setContentType(contentType)
+                    .build()
                     .write(Unpooled.wrappedBuffer(readBuffer(inputStream, offset, size)));
         }
     }
@@ -351,7 +413,7 @@ public abstract class ResourceService implements Filter {
         return buf;
     }
 
-    class Range {
+    static class Range {
         long start;
         long end;
         long length;

@@ -2,38 +2,34 @@ package org.xbib.netty.http.server.api;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufOutputStream;
-import io.netty.buffer.ByteBufUtil;
-import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.stream.ChunkedInput;
 import org.xbib.netty.http.common.cookie.Cookie;
-
+import java.io.Flushable;
+import java.io.IOException;
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 
 /**
  * HTTP server response.
  */
-public interface ServerResponse {
+public interface ServerResponse extends Flushable {
 
-    ChannelHandlerContext getChannelHandlerContext();
+    Builder getBuilder();
 
-    HttpResponseStatus getStatus();
+    Integer getStreamId();
 
-    ServerResponse withStatus(HttpResponseStatus httpResponseStatus);
+    Integer getSequenceId();
 
-    ServerResponse withHeader(CharSequence name, String value);
-
-    ServerResponse withContentType(String contentType);
-
-    ServerResponse withCharset(Charset charset);
-
-    ServerResponse withCookie(Cookie cookie);
+    Long getResponseId();
 
     ByteBufOutputStream getOutputStream();
 
-    void flush();
+    void flush() throws IOException;
+
+    void write(String content);
+
+    void write(CharBuffer charBuffer, Charset charset);
 
     void write(byte[] bytes);
 
@@ -43,56 +39,30 @@ public interface ServerResponse {
 
     void write(ChunkedInput<ByteBuf> chunkedInput);
 
-    static void write(ServerResponse serverResponse, int status) {
-        write(serverResponse, HttpResponseStatus.valueOf(status));
-    }
+    interface Builder {
 
-    static void write(ServerResponse serverResponse, HttpResponseStatus status) {
-        write(serverResponse, status, "application/octet-stream", EMPTY_STRING);
-    }
+        Builder setStatus(HttpResponseStatus httpResponseStatus);
 
-    /**
-     * Responses to  a HEAD request.
-     * @param serverResponse server response
-     * @param status status
-     * @param contentType content-type as if it were for a GET request (RFC 2616)
-     */
-    static void write(ServerResponse serverResponse, HttpResponseStatus status, String contentType) {
-        write(serverResponse, status, contentType, EMPTY_STRING);
-    }
+        Builder setContentType(CharSequence contentType);
 
-    static void write(ServerResponse serverResponse, String text) {
-        write(serverResponse, HttpResponseStatus.OK, "text/plain", text);
-    }
+        Builder setCharset(Charset charset);
 
-    static void write(ServerResponse serverResponse, HttpResponseStatus status, String contentType, String text) {
-        ByteBuf byteBuf = ByteBufUtil.writeUtf8(serverResponse.getChannelHandlerContext().alloc(), text);
-        serverResponse.withStatus(status)
-                .withContentType(contentType)
-                .withCharset(StandardCharsets.UTF_8)
-                .write(byteBuf);
-    }
+        Builder setHeader(CharSequence name, String value);
 
-    static void write(ServerResponse serverResponse, HttpResponseStatus status, String contentType, ByteBuf byteBuf) {
-        serverResponse.withStatus(status)
-                .withContentType(contentType)
-                .withCharset(StandardCharsets.UTF_8)
-                .write(byteBuf);
-    }
+        Builder setTrailingHeader(CharSequence name, String value);
 
-    static void write(ServerResponse serverResponse,
-                             HttpResponseStatus status, String contentType, String text, Charset charset) {
-        write(serverResponse, status, contentType, CharBuffer.allocate(text.length()).append(text), charset);
-    }
+        Builder addCookie(Cookie cookie);
 
-    static void write(ServerResponse serverResponse, HttpResponseStatus status, String contentType,
-                      CharBuffer charBuffer, Charset charset) {
-        ByteBuf byteBuf = ByteBufUtil.encodeString(serverResponse.getChannelHandlerContext().alloc(), charBuffer, charset);
-        serverResponse.withStatus(status)
-                .withContentType(contentType)
-                .withCharset(charset)
-                .write(byteBuf);
-    }
+        Builder shouldClose(boolean shouldClose);
 
-    String EMPTY_STRING = "";
+        Builder shouldAddServerName(boolean shouldAddServerName);
+
+        Builder setSequenceId(Integer sequenceId);
+
+        Builder setStreamId(Integer streamId);
+
+        Builder setResponseId(Long responseId);
+
+        ServerResponse build();
+    }
 }

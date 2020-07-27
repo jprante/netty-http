@@ -1,2 +1,2 @@
-org.xbib.netty.http.server.Http1
-org.xbib.netty.http.server.Http2
+org.xbib.netty.http.server.protocol.http1.Http1
+org.xbib.netty.http.server.protocol.http2.Http2

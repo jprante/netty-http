@@ -23,9 +23,9 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.xbib.netty.http.server.handler.http.HttpPipelinedRequest;
-import org.xbib.netty.http.server.handler.http.HttpPipelinedResponse;
-import org.xbib.netty.http.server.handler.http.HttpPipeliningHandler;
+import org.xbib.netty.http.server.protocol.http1.HttpPipelinedRequest;
+import org.xbib.netty.http.server.protocol.http1.HttpPipelinedResponse;
+import org.xbib.netty.http.server.protocol.http1.HttpPipeliningHandler;
 import org.xbib.netty.http.server.test.NettyHttpTestExtension;
 
 import java.nio.channels.ClosedChannelException;

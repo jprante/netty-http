@@ -1,4 +1,4 @@
-package org.xbib.netty.http.server.handler.http;
+package org.xbib.netty.http.server.protocol.http1;
 
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;

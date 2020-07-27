@@ -1,4 +1,4 @@
-package org.xbib.netty.http.server.util;
+package org.xbib.netty.http.common.util;
 
 public class HtmlUtils {
 

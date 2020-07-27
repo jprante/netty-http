@@ -5,7 +5,9 @@ import org.xbib.net.QueryParameters;
 import org.xbib.net.path.PathMatcher;
 import org.xbib.net.path.PathNormalizer;
 import org.xbib.netty.http.common.HttpMethod;
+import org.xbib.netty.http.server.api.Domain;
 import org.xbib.netty.http.server.api.Endpoint;
+import org.xbib.netty.http.server.api.EndpointResolver;
 import org.xbib.netty.http.server.api.ServerRequest;
 import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.api.Filter;
@@ -82,19 +84,27 @@ public class HttpEndpoint implements Endpoint<HttpEndpointDescriptor> {
     }
 
     @Override
-    public void resolveUriTemplate(ServerRequest serverRequest) throws IOException {
-        if (pathMatcher.match(prefix + path,  serverRequest.getEffectiveRequestPath())) {
-            QueryParameters queryParameters = pathMatcher.extractUriTemplateVariables(prefix + path,
-                    serverRequest.getEffectiveRequestPath());
+    public ServerRequest resolveRequest(ServerRequest.Builder serverRequestBuilder,
+                                        Domain<? extends EndpointResolver<? extends Endpoint<?>>> domain,
+                                        EndpointResolver<? extends Endpoint<?>> endpointResolver) {
+        List<String> context = pathMatcher.tokenizePath(getPrefix());
+        serverRequestBuilder.setDomain(domain)
+                .setEndpointResolver(endpointResolver)
+                .setEndpoint((this))
+                .setContext(context);
+        String pattern = prefix + path;
+        String effectiveRequestPath = serverRequestBuilder.getEffectiveRequestPath();
+        if (pathMatcher.match(pattern, effectiveRequestPath)) {
+            QueryParameters queryParameters = pathMatcher.extractUriTemplateVariables(pattern, effectiveRequestPath);
             for (Pair<String, String> pair : queryParameters) {
-                serverRequest.addPathParameter(pair.getFirst(), pair.getSecond());
+                serverRequestBuilder.addPathParameter(pair.getFirst(), pair.getSecond());
             }
         }
+        return serverRequestBuilder.build();
     }
 
     @Override
     public void before(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
-        serverRequest.setContext(pathMatcher.tokenizePath(getPrefix()));
         if (serverResponse != null) {
             for (Filter filter : beforeFilters) {
                 filter.handle(serverRequest, serverResponse);
@@ -104,7 +114,6 @@ public class HttpEndpoint implements Endpoint<HttpEndpointDescriptor> {
 
     @Override
     public void after(ServerRequest serverRequest, ServerResponse serverResponse) throws IOException {
-        serverRequest.setContext(pathMatcher.tokenizePath(getPrefix()));
         if (serverResponse != null) {
             for (Filter filter : afterFilters) {
                 filter.handle(serverRequest, serverResponse);

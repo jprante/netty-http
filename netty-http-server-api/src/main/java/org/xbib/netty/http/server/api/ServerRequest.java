@@ -6,22 +6,22 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 import org.xbib.net.URL;
 import org.xbib.netty.http.common.HttpParameters;
-
 import javax.net.ssl.SSLSession;
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
 
 public interface ServerRequest {
 
+    Builder getBuilder();
+
+    InetSocketAddress getLocalAddress();
+
+    InetSocketAddress getRemoteAddress();
+
     URL getURL();
 
-    void setContext(List<String> context);
-
     List<String> getContext();
-
-    void addPathParameter(String key, String value) throws IOException;
 
     Map<String, String> getPathParameters();
 
@@ -49,7 +49,40 @@ public interface ServerRequest {
 
     SSLSession getSession();
 
-    InetSocketAddress getLocalAddress();
+    URL getBaseURL();
 
-    InetSocketAddress getRemoteAddress();
+    URL getContextURL();
+
+    Domain<? extends EndpointResolver<? extends Endpoint<?>>> getDomain();
+
+    EndpointResolver<? extends Endpoint<?>> getEndpointResolver();
+
+    Endpoint<?> getEndpoint();
+
+    interface Builder {
+
+        String getRequestURI();
+
+        HttpMethod getMethod();
+
+        HttpHeaders getHeaders();
+
+        String getEffectiveRequestPath();
+
+        Builder setBaseURL(URL baseURL);
+
+        Builder setDomain(Domain<? extends EndpointResolver<? extends Endpoint<?>>> domain);
+
+        Builder setEndpointResolver(EndpointResolver<? extends Endpoint<?>> endpointResolver);
+
+        Builder setEndpoint(Endpoint<?> endpoint);
+
+        Builder setContext(List<String> context);
+
+        Builder addPathParameter(String key, String value);
+
+        ServerRequest build();
+
+        void release();
+    }
 }

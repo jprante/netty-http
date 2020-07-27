@@ -10,7 +10,6 @@ import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.server.HttpServerDomain;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.test.NettyHttpTestExtension;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -35,7 +34,7 @@ class PutTest {
                 .singleEndpoint("/put", "/**", (req, resp) -> {
                     logger.log(Level.INFO, "got request " +
                             req.getContent().toString(StandardCharsets.UTF_8));
-                    ServerResponse.write(resp, HttpResponseStatus.OK);
+                    resp.getBuilder().setStatus(HttpResponseStatus.OK).build().flush();
                     success1.set(true);
                 }, "PUT")
                 .build();
@@ -84,7 +83,7 @@ class PutTest {
                 .singleEndpoint("/put", "/**", (req, resp) -> {
                     logger.log(Level.INFO, "got request, length = " +
                             req.getContent().readableBytes());
-                    ServerResponse.write(resp, HttpResponseStatus.OK);
+                    resp.getBuilder().setStatus(HttpResponseStatus.OK).build().flush();
                     success1.set(true);
                 }, "PUT")
                 .build();

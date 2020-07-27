@@ -1,8 +1,6 @@
-package org.xbib.netty.http.server;
+package org.xbib.netty.http.server.protocol.http1;
 
 import org.xbib.netty.http.server.api.ServerProtocolProvider;
-import org.xbib.netty.http.server.handler.http.Http1ChannelInitializer;
-import org.xbib.netty.http.server.transport.Http1Transport;
 
 public class Http1 implements ServerProtocolProvider<Http1ChannelInitializer, Http1Transport> {
 

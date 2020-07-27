@@ -8,13 +8,11 @@ import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.endpoint.HttpEndpoint;
 import org.xbib.netty.http.server.endpoint.HttpEndpointResolver;
 import org.xbib.netty.http.server.HttpServerDomain;
 import org.xbib.netty.http.server.endpoint.service.FileService;
 import org.xbib.netty.http.server.test.NettyHttpTestExtension;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -24,7 +22,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -40,8 +37,8 @@ class EndpointTest {
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         HttpEndpointResolver httpEndpointResolver = HttpEndpointResolver.builder()
                 .addEndpoint(HttpEndpoint.builder().setPath("/**").build())
-                .setDispatcher((endpoint, req, resp) -> {
-                    logger.log(Level.FINE, "dispatching endpoint = " + endpoint +
+                .setDispatcher((req, resp) -> {
+                    logger.log(Level.FINE, "dispatching endpoint = " + req.getEndpoint() +
                             " req = " + req + " req context path = " + req.getContextPath());
                     fileService.handle(req, resp);
                 })
@@ -81,8 +78,8 @@ class EndpointTest {
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         HttpEndpointResolver httpEndpointResolver = HttpEndpointResolver.builder()
                 .addEndpoint(HttpEndpoint.builder().setPrefix("/").setPath("/**").build())
-                .setDispatcher((endpoint, req, resp) -> {
-                    logger.log(Level.FINE, "dispatching endpoint = " + endpoint +
+                .setDispatcher((req, resp) -> {
+                    logger.log(Level.FINE, "dispatching endpoint = " + req.getEndpoint() +
                             " req = " + req + " req context path = " + req.getContextPath());
                     fileService.handle(req, resp);
                 })
@@ -124,8 +121,8 @@ class EndpointTest {
                 .addEndpoint(HttpEndpoint.builder().setPrefix("/static1").setPath("/**").build())
                 .addEndpoint(HttpEndpoint.builder().setPrefix("/static2").setPath("/**").build())
                 .addEndpoint(HttpEndpoint.builder().setPrefix("/static3").setPath("/**").build())
-                .setDispatcher((endpoint, req, resp) -> {
-                    logger.log(Level.FINE, "dispatching endpoint = " + endpoint +
+                .setDispatcher(( req, resp) -> {
+                    logger.log(Level.FINE, "dispatching endpoint = " + req.getEndpoint() +
                             " req = " + req + " req context path = " + req.getContextPath());
                     fileService.handle(req, resp);
                 })
@@ -191,8 +188,8 @@ class EndpointTest {
                 .addEndpoint(HttpEndpoint.builder().setPrefix("/static1").setPath("/**").build())
                 .addEndpoint(HttpEndpoint.builder().setPrefix("/static2").setPath("/**").build())
                 .addEndpoint(HttpEndpoint.builder().setPrefix("/static3").setPath("/**").build())
-                .setDispatcher((endpoint, req, resp) -> {
-                    logger.log(Level.FINE, "dispatching endpoint = " + endpoint + " req = " + req);
+                .setDispatcher((req, resp) -> {
+                    logger.log(Level.FINE, "dispatching endpoint = " + req.getEndpoint() + " req = " + req);
                     fileService.handle(req, resp);
                 })
                 .build();
@@ -274,22 +271,22 @@ class EndpointTest {
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         HttpEndpointResolver httpEndpointResolver1 = HttpEndpointResolver.builder()
                 .addEndpoint(HttpEndpoint.builder().setPrefix("/static1").setPath("/**").build())
-                .setDispatcher((endpoint, req, resp) -> {
-                    logger.log(Level.FINE, "dispatching endpoint = " + endpoint + " context path = " + req.getContextPath());
+                .setDispatcher((req, resp) -> {
+                    logger.log(Level.FINE, "dispatching endpoint = " + req.getEndpoint() + " context path = " + req.getContextPath());
                     fileService1.handle(req, resp);
                 })
                 .build();
         HttpEndpointResolver httpEndpointResolver2 = HttpEndpointResolver.builder()
                 .addEndpoint(HttpEndpoint.builder().setPrefix("/static2").setPath("/**").build())
-                .setDispatcher((endpoint, req, resp) -> {
-                    logger.log(Level.FINE, "dispatching endpoint = " + endpoint + " context path = " + req.getContextPath());
+                .setDispatcher((req, resp) -> {
+                    logger.log(Level.FINE, "dispatching endpoint = " + req.getEndpoint() + " context path = " + req.getContextPath());
                     fileService2.handle(req, resp);
                 })
                 .build();
         HttpEndpointResolver httpEndpointResolver3 = HttpEndpointResolver.builder()
                 .addEndpoint(HttpEndpoint.builder().setPrefix("/static3").setPath("/**").build())
-                .setDispatcher((endpoint, req, resp) -> {
-                    logger.log(Level.FINE, "dispatching endpoint = " + endpoint + " context path = " + req.getContextPath());
+                .setDispatcher((req, resp) -> {
+                    logger.log(Level.FINE, "dispatching endpoint = " + req.getEndpoint() + " context path = " + req.getContextPath());
                     fileService3.handle(req, resp);
                 })
                 .build();
@@ -378,7 +375,7 @@ class EndpointTest {
         }
         HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .addEndpointResolver(endpointResolverBuilder
-                        .setDispatcher((endpoint,req, resp) -> ServerResponse.write(resp, HttpResponseStatus.OK))
+                        .setDispatcher((req, resp) -> resp.getBuilder().setStatus(HttpResponseStatus.OK).build().flush())
                         .build())
                 .build();
         Server server = Server.builder(domain)
@@ -419,7 +416,7 @@ class EndpointTest {
         for (int i = 0; i < max; i++) {
             domainBuilder.addEndpointResolver(endpointResolverBuilder.addEndpoint(HttpEndpoint.builder()
                     .setPath("/" + i + "/**").build())
-                    .setDispatcher((endpoint,req, resp) -> ServerResponse.write(resp, HttpResponseStatus.OK))
+                    .setDispatcher((req, resp) -> resp.getBuilder().setStatus(HttpResponseStatus.OK).build().flush())
                     .build());
         }
         Server server = Server.builder(domainBuilder.build())

@@ -7,7 +7,6 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.HttpServerDomain;
 
 import java.io.IOException;
@@ -24,7 +23,8 @@ class ThreadLeakTest {
     @Test
     void testForLeaks() throws IOException {
         HttpServerDomain domain = HttpServerDomain.builder(HttpAddress.http1("localhost", 8008))
-                .singleEndpoint("/", (request, response) -> ServerResponse.write(response, "Hello World"))
+                .singleEndpoint("/", (request, response) ->
+                        response.write("Hello World"))
                 .build();
         Server server = Server.builder(domain)
                 .setByteBufAllocator(UnpooledByteBufAllocator.DEFAULT)

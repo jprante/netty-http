@@ -9,7 +9,6 @@ import org.xbib.netty.http.client.api.Request;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.HttpServerDomain;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.api.ServerResponse;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.logging.Level;
@@ -35,11 +34,13 @@ class MultiDomainSecureServerTest {
         HttpServerDomain fl = HttpServerDomain.builder(httpAddress, "fl.hbz-nrw.de")
                 .setKeyCertChain(certInputStream)
                 .setKey(keyInputStream, null)
-                .singleEndpoint("/", (request, response) -> ServerResponse.write(response, "Hello fl.hbz-nrw.de"))
+                .singleEndpoint("/", (request, response) ->
+                        response.write("Hello fl.hbz-nrw.de"))
                 .build();
         HttpServerDomain zfl2 = HttpServerDomain.builder(fl)
                 .setServerName("zfl2.hbz-nrw.de")
-                .singleEndpoint("/", (request, response) -> ServerResponse.write(response, "Hello zfl2.hbz-nrw.de"))
+                .singleEndpoint("/", (request, response) ->
+                        response.write( "Hello zfl2.hbz-nrw.de"))
                 .build();
         Server server = Server.builder(fl)
                 .addDomain(zfl2)

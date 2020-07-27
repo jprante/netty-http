@@ -2,9 +2,6 @@ package org.xbib.netty.http.server.endpoint;
 
 import org.xbib.netty.http.common.HttpMethod;
 import org.xbib.netty.http.server.api.EndpointDescriptor;
-import org.xbib.netty.http.server.api.ServerRequest;
-
-import static io.netty.handler.codec.http.HttpHeaderNames.CONTENT_TYPE;
 
 public class HttpEndpointDescriptor implements EndpointDescriptor, Comparable<HttpEndpointDescriptor> {
 
@@ -14,10 +11,10 @@ public class HttpEndpointDescriptor implements EndpointDescriptor, Comparable<Ht
 
     private final String contentType;
 
-    public HttpEndpointDescriptor(ServerRequest serverRequest) {
-        this.path = extractPath(serverRequest.getRequestURI());
-        this.method = Enum.valueOf(HttpMethod.class, serverRequest.getMethod().name());
-        this.contentType = serverRequest.getHeaders().get(CONTENT_TYPE);
+    public HttpEndpointDescriptor(String path, HttpMethod method, String contentType) {
+        this.path = path;
+        this.method = method;
+        this.contentType = contentType;
     }
 
     @Override
@@ -55,14 +52,5 @@ public class HttpEndpointDescriptor implements EndpointDescriptor, Comparable<Ht
     @Override
     public int compareTo(HttpEndpointDescriptor o) {
         return toString().compareTo(o.toString());
-    }
-
-    private static String extractPath(String uri) {
-        String path = uri;
-        int pos = uri.lastIndexOf('#');
-        path = pos >= 0 ? path.substring(0, pos) : path;
-        pos = uri.lastIndexOf('?');
-        path = pos >= 0 ? path.substring(0, pos) : path;
-        return path;
     }
 }

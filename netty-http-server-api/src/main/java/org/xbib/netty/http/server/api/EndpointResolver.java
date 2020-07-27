@@ -1,16 +1,14 @@
 package org.xbib.netty.http.server.api;
 
+import org.xbib.netty.http.common.HttpMethod;
 import java.io.IOException;
 import java.util.List;
 
-public interface EndpointResolver<E extends Endpoint<? extends EndpointDescriptor>> {
+public interface EndpointResolver<E extends Endpoint<?>> {
 
-    List<E> matchingEndpointsFor(ServerRequest serverRequest);
+    List<E> matchingEndpointsFor(String path, HttpMethod method, String contentType);
 
-    void resolve(List<E> matchingEndpoints,
-                 ServerRequest serverRequest) throws IOException;
-
-    void handle(List<E> matchingEndpoints,
+    void handle(E matchingEndpoint,
                 ServerRequest serverRequest,
                 ServerResponse serverResponse) throws IOException;
 }

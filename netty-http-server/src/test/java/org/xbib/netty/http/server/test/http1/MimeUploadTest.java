@@ -17,7 +17,6 @@ import org.xbib.netty.http.common.HttpParameters;
 import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.server.HttpServerDomain;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.test.NettyHttpTestExtension;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -39,7 +38,7 @@ class MimeUploadTest {
                     logger.log(Level.INFO, "got request, headers = " + req.getHeaders() +
                             " params = " + parameters.toString() +
                             " body = " + req.getContent().toString(StandardCharsets.UTF_8));
-                    ServerResponse.write(resp, HttpResponseStatus.OK);
+                    resp.getBuilder().setStatus(HttpResponseStatus.OK).build().flush();
                 },  "POST")
                 .build();
         Server server = Server.builder(domain)

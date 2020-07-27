@@ -12,7 +12,6 @@ import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.server.Server;
 import org.xbib.netty.http.server.HttpServerDomain;
 import org.xbib.netty.http.server.test.NettyHttpTestExtension;
-
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -34,9 +33,8 @@ class EncryptedTest {
         Server server = Server.builder(HttpServerDomain.builder(httpAddress)
                 .setSelfCert()
                 .singleEndpoint("/", (request, response) ->
-                                response.withStatus(HttpResponseStatus.OK)
-                                        .withContentType("text/plain")
-                                        .write(request.getContent().retain()))
+                        response.getBuilder().setStatus(HttpResponseStatus.OK).setContentType("text/plain").build()
+                                .write(request.getContent().toString(StandardCharsets.UTF_8)))
                 .build())
                 .build();
         server.accept();
@@ -75,9 +73,8 @@ class EncryptedTest {
         HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .setSelfCert()
                 .singleEndpoint("/", (request, response) ->
-                        response.withStatus(HttpResponseStatus.OK)
-                                .withContentType("text/plain")
-                                .write(request.getContent().retain()))
+                        response.getBuilder().setStatus(HttpResponseStatus.OK).setContentType("text/plain").build()
+                                .write(request.getContent().toString(StandardCharsets.UTF_8)))
                 .build();
         Server server = Server.builder(domain)
                 .build();
@@ -129,10 +126,8 @@ class EncryptedTest {
         Server server = Server.builder(HttpServerDomain.builder(httpAddress)
                 .setSelfCert()
                 .singleEndpoint("/", (request, response) ->
-                                response.withStatus(HttpResponseStatus.OK)
-                                        .withContentType("text/plain")
-                                        .write(request.getContent().retain())
-                )
+                        response.getBuilder().setStatus(HttpResponseStatus.OK).setContentType("text/plain").build()
+                                .write(request.getContent().toString(StandardCharsets.UTF_8)))
                 .build())
                 .build();
         server.accept();
