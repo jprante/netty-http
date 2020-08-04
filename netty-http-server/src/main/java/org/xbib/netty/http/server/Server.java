@@ -206,25 +206,28 @@ public final class Server implements AutoCloseable {
     }
 
     public URL getBaseURL(HttpHeaders headers) {
-        URL bindURL = serverConfig.getDefaultDomain().getHttpAddress().base();
-        String scheme = headers != null ? headers.get("x-forwarded-proto") : null;
-        if (scheme == null) {
-            scheme = bindURL.getScheme();
-        }
-        String host = headers != null ? headers.get("x-forwarded-host") : null;
-        if (host == null) {
-            host = headers != null ? headers.get("host") : null;
-            if (host == null) {
-                host = bindURL.getHost();
-            }
-        }
+        String scheme = null;
+        String host = null;
         String port = null;
-        if (host != null) {
-            host = stripPort(host);
-            port = extractPort(host);
-            if (port == null) {
-                port = bindURL.getPort() != null ? Integer.toString(bindURL.getPort()) : null;
+        if (headers == null) {
+            URL bindURL = serverConfig.getDefaultDomain().getHttpAddress().base();
+            scheme = bindURL.getScheme();
+            host = bindURL.getHost();
+            port = bindURL.getPort() != null ? Integer.toString(bindURL.getPort()) : null;
+        } else if (headers.get("host") != null) {
+            // proxy proto, host
+            scheme = headers.get("x-forwarded-proto");
+            if (scheme == null) {
+                scheme = "http";
             }
+            host = headers.get("x-forwarded-host");
+            if (host == null) {
+                host = headers.get("host");
+            }
+            port = extractPort(host);
+            host = stripPort(host);
+        } else {
+            throw new IllegalArgumentException("no host header in " + headers);
         }
         URL.Builder builder = URL.builder().scheme(scheme).host(host);
         if (port != null) {
@@ -338,7 +341,7 @@ public final class Server implements AutoCloseable {
     }
 
     private static String hostAndPort(URL url) {
-        return url == null ? null : url.getPort() != -1 ? url.getHost() + ":" + url.getPort() : url.getHost();
+        return url == null ? null : url.getPort() != null && url.getPort() != -1 ? url.getHost() + ":" + url.getPort() : url.getHost();
     }
 
     private HttpChannelInitializer findChannelInitializer(int majorVersion,

@@ -4,6 +4,7 @@ import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpVersion;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.net.URL;
@@ -56,6 +57,7 @@ public class ContextURLTest {
         String contextPath1 = serverRequest1.getContextPath();
         assertEquals("/one", contextPath1);
         URL url1 = serverRequest1.getContextURL();
+        assertNotNull(url1);
         assertEquals("domain.one", url1.getHost());
         assertEquals("/one/", url1.getPath());
 
@@ -65,6 +67,7 @@ public class ContextURLTest {
         String contextPath2 = serverRequest2.getContextPath();
         assertEquals("/two", contextPath2);
         URL url2 = serverRequest2.getContextURL();
+        assertNotNull(url2);
         assertEquals("domain.two", url2.getHost());
         assertEquals("/two/", url2.getPath());
 
