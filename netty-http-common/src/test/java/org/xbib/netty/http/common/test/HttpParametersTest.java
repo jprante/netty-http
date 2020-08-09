@@ -11,11 +11,30 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class HttpParametersTest {
 
     @Test
-    void testParameters() throws MalformedInputException, UnmappableCharacterException {
+    void testSimpleParameter() throws MalformedInputException, UnmappableCharacterException {
         HttpParameters httpParameters = new HttpParameters();
         httpParameters.addRaw("a", "b");
         String query = httpParameters.getAsQueryString(false);
         assertEquals("a=b", query);
+    }
+
+    @Test
+    void testSimpleParameters() throws MalformedInputException, UnmappableCharacterException {
+        HttpParameters httpParameters = new HttpParameters();
+        httpParameters.addRaw("a", "b");
+        httpParameters.addRaw("c", "d");
+        String query = httpParameters.getAsQueryString(false);
+        assertEquals("a=b&c=d", query);
+    }
+
+    @Test
+    void testMultiParameters() throws MalformedInputException, UnmappableCharacterException {
+        HttpParameters httpParameters = new HttpParameters();
+        httpParameters.addRaw("a", "b");
+        httpParameters.addRaw("a", "c");
+        httpParameters.addRaw("a", "d");
+        String query = httpParameters.getAsQueryString(false);
+        assertEquals("a=b&a=c&a=d", query);
     }
 
     @Test

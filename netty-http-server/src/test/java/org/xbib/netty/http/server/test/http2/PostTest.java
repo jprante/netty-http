@@ -36,10 +36,10 @@ class PostTest {
                 .singleEndpoint("/post", "/**", (req, resp) -> {
                     HttpParameters parameters = req.getParameters();
                     logger.log(Level.INFO, "got request " + parameters.toString() + " , sending, OK");
-                    if ("Hello World".equals(parameters.getFirst("withspace"))) {
+                    if ("Hello World".equals(parameters.get("withspace"))) {
                         success2.set(true);
                     }
-                    if ("Jörg".equals(parameters.getFirst("name"))) {
+                    if ("Jörg".equals(parameters.get("name"))) {
                         success3.set(true);
                     }
                     resp.getBuilder().setStatus(HttpResponseStatus.OK).build().flush();
@@ -86,10 +86,10 @@ class PostTest {
                 .singleEndpoint("/post", "/**", (req, resp) -> {
                     HttpParameters parameters = req.getParameters();
                     logger.log(Level.INFO, "got request " + parameters.toString() + " , sending, OK");
-                    if ("Hello World".equals(parameters.getFirst("withspace"))) {
+                    if ("Hello World".equals(parameters.get("withspace"))) {
                         success2.set(true);
                     }
-                    if ("Jörg".equals(parameters.getFirst("name"))) {
+                    if ("Jörg".equals(parameters.get("name"))) {
                         success3.set(true);
                     }
                     resp.getBuilder().setStatus(HttpResponseStatus.OK).build().flush();

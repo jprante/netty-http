@@ -11,7 +11,6 @@ import org.xbib.netty.http.common.HttpParameters;
 import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.server.HttpServerDomain;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.api.ServerResponse;
 import org.xbib.netty.http.server.test.NettyHttpTestExtension;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -36,10 +35,10 @@ class PostTest {
                 .singleEndpoint("/post", "/**", (req, resp) -> {
                     HttpParameters parameters = req.getParameters();
                     logger.log(Level.INFO, "got request " + parameters.toString() + ", sending OK");
-                    if ("Hello World".equals(parameters.getFirst("withspace"))) {
+                    if ("Hello World".equals(parameters.get("withspace"))) {
                         success2.set(true);
                     }
-                    if ("Jörg".equals(parameters.getFirst("name"))) {
+                    if ("Jörg".equals(parameters.get("name"))) {
                         success3.set(true);
                     }
                     resp.getBuilder().setStatus(HttpResponseStatus.OK).build().flush();
@@ -86,10 +85,10 @@ class PostTest {
                 .singleEndpoint("/post", "/**", (req, resp) -> {
                     HttpParameters parameters = req.getParameters();
                     logger.log(Level.INFO, "got request " + parameters.toString() + ", sending OK");
-                    if ("Hello World".equals(parameters.getFirst("withspace"))) {
+                    if ("Hello World".equals(parameters.get("withspace"))) {
                         success2.set(true);
                     }
-                    if ("Jörg".equals(parameters.getFirst("name"))) {
+                    if ("Jörg".equals(parameters.get("name"))) {
                         success3.set(true);
                     }
                     resp.getBuilder().setStatus(HttpResponseStatus.OK).build().flush();
@@ -137,13 +136,13 @@ class PostTest {
                 .singleEndpoint("/post", "/**", (req, resp) -> {
                     HttpParameters parameters = req.getParameters();
                     logger.log(Level.INFO, "got request " + parameters.toString() + ", sending OK");
-                    if ("Hello World".equals(parameters.getFirst("withplus"))) {
+                    if ("Hello World".equals(parameters.get("withplus"))) {
                         success2.set(true);
                     }
-                    if ("Jörg".equals(parameters.getFirst("name"))) {
+                    if ("Jörg".equals(parameters.get("name"))) {
                         success3.set(true);
                     }
-                    if ("my value".equals(parameters.getFirst("my param"))) {
+                    if ("my value".equals(parameters.get("my param"))) {
                         success4.set(true);
                     }
                     resp.getBuilder().setStatus(HttpResponseStatus.OK).build().flush();
@@ -194,13 +193,13 @@ class PostTest {
                 .singleEndpoint("/post", "/**", (req, resp) -> {
                     HttpParameters parameters = req.getParameters();
                     logger.log(Level.INFO, "got request " + parameters.toString() + ", sending OK");
-                    if ("Hello World".equals(parameters.getFirst("withoutplus"))) {
+                    if ("Hello World".equals(parameters.get("withoutplus"))) {
                         success2.set(true);
                     }
-                    if ("Jörg".equals(parameters.getFirst("name"))) {
+                    if ("Jörg".equals(parameters.get("name"))) {
                         success3.set(true);
                     }
-                    if ("my value".equals(parameters.getFirst("my param"))) {
+                    if ("my value".equals(parameters.get("my param"))) {
                         success4.set(true);
                     }
                     resp.getBuilder().setStatus(HttpResponseStatus.OK).build().flush();
@@ -251,10 +250,10 @@ class PostTest {
                 .singleEndpoint("/post", "/**", (req, resp) -> {
                     HttpParameters parameters = req.getParameters();
                     logger.log(Level.INFO, "got request " + parameters.toString() + ", sending OK");
-                    if ("myÿvalue".equals(parameters.getFirst("my param"))) {
+                    if ("myÿvalue".equals(parameters.get("my param"))) {
                         success1.set(true);
                     }
-                    if ("bÿc".equals(parameters.getFirst("a"))) {
+                    if ("bÿc".equals(parameters.get("a"))) {
                         success2.set(true);
                     }
                     resp.getBuilder().setStatus(HttpResponseStatus.OK).build().flush();

@@ -4,9 +4,8 @@ import io.netty.handler.codec.http.HttpHeaderValues;
 import org.xbib.net.PercentDecoder;
 import org.xbib.net.PercentEncoder;
 import org.xbib.net.PercentEncoders;
+import org.xbib.netty.http.common.util.CaseInsensitiveParameters;
 import org.xbib.netty.http.common.util.LimitedSet;
-import org.xbib.netty.http.common.util.LimitedTreeMap;
-
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.MalformedInputException;
@@ -15,11 +14,8 @@ import java.nio.charset.UnmappableCharacterException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.SortedSet;
 
 /**
  * A limited multi-map of HTTP request parameters. Each key references a
@@ -31,25 +27,21 @@ import java.util.SortedSet;
  * being useful for message signing; it's not a general purpose collection class
  * to handle request parameters.
  */
-public class HttpParameters implements Map<String, SortedSet<String>> {
+public class HttpParameters extends /*LinkedHashSetMultiMap<String, String>*/ CaseInsensitiveParameters {
 
     private static final String EQUALS = "=";
 
     private static final String AMPERSAND = "&";
 
-    private final int maxParam;
-
     private final int sizeLimit;
 
     private final int elementSizeLimit;
 
-    private final LimitedTreeMap<String, String> map;
-
     private final PercentEncoder percentEncoder;
 
-    private final PercentDecoder percentDecoder;
-
     private final CharSequence contentType;
+
+    private final Charset encoding;
 
     public HttpParameters() {
         this(1024, 1024, 65536,
@@ -68,96 +60,28 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
 
     public HttpParameters(int maxParam, int sizeLimit, int elementSizeLimit,
                           CharSequence contentType, Charset charset) {
-        this.maxParam = maxParam;
         this.sizeLimit = sizeLimit;
         this.elementSizeLimit = elementSizeLimit;
-        this.map = new LimitedTreeMap<>(maxParam);
         this.percentEncoder = PercentEncoders.getQueryEncoder(charset);
-        this.percentDecoder = new PercentDecoder();
+        PercentDecoder percentDecoder = new PercentDecoder();
         this.contentType = contentType;
+        this.encoding = charset;
     }
 
-    @Override
-    public SortedSet<String> put(String key, SortedSet<String> value) {
-        return map.put(key, value);
+    public CharSequence getContentType() {
+        return contentType;
     }
 
-    @Override
-    public SortedSet<String> get(Object key) {
-        return map.get(key);
+    public Charset getEncoding() {
+        return encoding;
     }
 
-    @Override
-    public void putAll(Map<? extends String, ? extends SortedSet<String>> m) {
-        map.putAll(m);
-    }
-
-    @Override
-    public boolean containsKey(Object key) {
-        return map.containsKey(key);
-    }
-
-    @Override
-    public boolean containsValue(Object value) {
-        if (value instanceof String) {
-            for (Set<String> values : map.values()) {
-                if (values.contains(value)) {
-                    return true;
-                }
-            }
+    public Collection<String> put(String key, Collection<String> values, boolean percentEncode) {
+        remove(key);
+        for (String v : values) {
+            add(key, v, percentEncode);
         }
-        return false;
-    }
-
-    @Override
-    public int size() {
-        int count = 0;
-        for (String key : map.keySet()) {
-            count += map.get(key).size();
-        }
-        return count;
-    }
-
-    @Override
-    public boolean isEmpty() {
-        return map.isEmpty();
-    }
-
-    @Override
-    public void clear() {
-        map.clear();
-    }
-
-    @Override
-    public SortedSet<String> remove(Object key) {
-        return map.remove(key);
-    }
-
-    @Override
-    public Set<String> keySet() {
-        return map.keySet();
-    }
-
-    @Override
-    public Collection<SortedSet<String>> values() {
-        return map.values();
-    }
-
-    @Override
-    public Set<Entry<String, SortedSet<String>>> entrySet() {
-        return map.entrySet();
-    }
-
-    public SortedSet<String> put(String key, SortedSet<String> values, boolean percentEncode) {
-        if (percentEncode) {
-            remove(key);
-            for (String v : values) {
-                add(key, v, percentEncode);
-            }
-            return get(key);
-        } else {
-            return map.put(key, values);
-        }
+        return getAll(key);
     }
 
     /**
@@ -167,12 +91,24 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
      * @param value the parameter value
      * @return the value
      */
-    public String addRaw(String key, String value) {
+    public HttpParameters addRaw(String key, String value) {
         return add(key, value, false);
     }
 
-    public String add(String key, String value) {
+    public HttpParameters add(String key, String value) {
         return add(key, value, true);
+    }
+
+    /**
+     * Convenience method to allow for storing null values. {@link #put} doesn't
+     * allow null values, because that would be ambiguous.
+     *
+     * @param key the parameter name
+     * @param nullString can be anything, but probably... null?
+     * @return null
+     */
+    public HttpParameters addNull(String key, String nullString) {
+        return addRaw(key, nullString);
     }
 
     /**
@@ -185,51 +121,20 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
      *        inserted into the map
      * @return the value
      */
-    private String add(String key, String value, boolean percentEncode) {
-        String v = null;
+    private HttpParameters add(String key, String value, boolean percentEncode) {
         try {
             String k = percentEncode ? percentEncoder.encode(key) : key;
-            SortedSet<String> values = map.get(k);
-            if (values == null) {
-                values = new LimitedSet<>(sizeLimit, elementSizeLimit);
-                map.put(k, values);
-            }
-
-            if (value != null) {
-                v = percentEncode ? percentEncoder.encode(value) : value;
-                values.add(v);
-            }
+            String v = percentEncode ? percentEncoder.encode(value) : value;
+            super.add(k, v);
         } catch (CharacterCodingException e) {
             throw new IllegalArgumentException(e);
         }
-        return v;
-    }
-
-    /**
-     * Convenience method to allow for storing null values. {@link #put} doesn't
-     * allow null values, because that would be ambiguous.
-     *
-     * @param key the parameter name
-     * @param nullString can be anything, but probably... null?
-     * @return null
-     */
-    public String addNull(String key, String nullString) {
-        return addRaw(key, nullString);
+        return this;
     }
 
     public void addAll(String[] keyValuePairs, boolean percentEncode) {
         for (int i = 0; i < keyValuePairs.length - 1; i += 2) {
             add(keyValuePairs[i], keyValuePairs[i + 1], percentEncode);
-        }
-    }
-
-    public void addAll(Map<? extends String, ? extends SortedSet<String>> m, boolean percentEncode) {
-        if (percentEncode) {
-            for (String key : m.keySet()) {
-                put(key, m.get(key), true);
-            }
-        } else {
-            map.putAll(m);
         }
     }
 
@@ -240,53 +145,20 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
      */
     public void addMap(Map<String, List<String>> m) {
         for (String key : m.keySet()) {
-            SortedSet<String> vals = get(key);
+            Collection<String> vals = getAll(key);
             if (vals == null) {
                 vals = new LimitedSet<>(sizeLimit, elementSizeLimit);
-                put(key, vals);
+                for (String v : vals) {
+                    super.add(key, v);
+                }
             }
             vals.addAll(m.get(key));
         }
     }
 
-    public String getFirst(String key) {
-        SortedSet<String> values = map.get(key);
-        if (values == null || values.isEmpty()) {
-            return null;
-        }
-        return values.first();
-    }
-
-    /**
-     * Returns the first value from the set of all values for the given
-     * parameter name. If the key passed to this method contains special
-     * characters, you must first percent encode it, otherwise the lookup will fail
-     * (that's because upon storing values in this map, keys get
-     * percent-encoded).
-     *
-     * @param key the parameter name (must be percent encoded if it contains unsafe
-     *        characters!)
-     * @return the first value found for this parameter
-     * @throws MalformedInputException if input is malformed
-     * @throws UnmappableCharacterException if characters are unmappable
-     */
-    public String getFirstDecoded(String key)
-            throws MalformedInputException, UnmappableCharacterException {
-        SortedSet<String> values = map.get(key);
-        if (values == null || values.isEmpty()) {
-            return null;
-        }
-        String value = values.first();
-        return percentDecoder.decode(value);
-    }
-
-    public CharSequence getContentType() {
-        return contentType;
-    }
-
     public String getAsQueryString(boolean percentEncode) throws MalformedInputException, UnmappableCharacterException {
         List<String> list = new ArrayList<>();
-        for (String key : keySet()) {
+        for (String key : super.names()) {
             list.add(getAsQueryString(key, percentEncode));
         }
         return String.join(AMPERSAND, list);
@@ -320,7 +192,7 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
     public String getAsQueryString(String key, boolean percentEncode)
             throws MalformedInputException, UnmappableCharacterException {
         String k = percentEncode ? percentEncoder.encode(key) : key;
-        SortedSet<String> values = map.get(k);
+        Collection<String> values = getAll(k);
         if (values == null) {
             return k + EQUALS;
         }
@@ -336,26 +208,4 @@ public class HttpParameters implements Map<String, SortedSet<String>> {
         }
         return sb.toString();
     }
-
-    public String getAsHeaderElement(String key) {
-        String value = getFirst(key);
-        if (value == null) {
-            return null;
-        }
-        return key + "=\"" + value + "\"";
-    }
-
-    public HttpParameters getOAuthParameters() {
-        HttpParameters oauthParams =
-                new HttpParameters(maxParam, sizeLimit, elementSizeLimit, contentType, StandardCharsets.UTF_8);
-        entrySet().stream().filter(entry -> entry.getKey().startsWith("oauth_") || entry.getKey().startsWith("x_oauth_"))
-                .forEach(entry -> oauthParams.put(entry.getKey(), entry.getValue()));
-        return oauthParams;
-    }
-
-    @Override
-    public String toString() {
-        return new LinkedHashMap<>(this).toString();
-    }
-
 }

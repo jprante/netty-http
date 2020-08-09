@@ -609,10 +609,7 @@ public final class Request {
             if (url != null) {
                 // add our URI parameters to the URL
                 URL.Builder mutator = url.mutator();
-                uriParameters.forEach((k, v) -> v.forEach(vv -> {
-                    // no percent encoding
-                    mutator.queryParam(k, vv);
-                }));
+                uriParameters.forEach(e -> mutator.queryParam(e.getKey(), e.getValue()));
                 // calling build() performs percent encoding
                 url = mutator.build();
                 String scheme = url.getScheme();
