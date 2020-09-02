@@ -92,7 +92,7 @@ public class HttpEndpoint implements Endpoint<HttpEndpointDescriptor> {
                 .setEndpointResolver(endpointResolver)
                 .setEndpoint((this))
                 .setContext(context);
-        String pattern = prefix + path;
+        String pattern = path;
         String effectiveRequestPath = serverRequestBuilder.getEffectiveRequestPath();
         if (pathMatcher.match(pattern, effectiveRequestPath)) {
             QueryParameters queryParameters = pathMatcher.extractUriTemplateVariables(pattern, effectiveRequestPath);

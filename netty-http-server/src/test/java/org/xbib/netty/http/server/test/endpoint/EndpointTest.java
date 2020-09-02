@@ -31,6 +31,45 @@ class EndpointTest {
     private static final Logger logger = Logger.getLogger(EndpointTest.class.getName());
 
     @Test
+    void testPrefixPathParameter() throws Exception {
+        HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
+        HttpEndpointResolver httpEndpointResolver = HttpEndpointResolver.builder()
+                .setPrefix("/files")
+                .addEndpoint(HttpEndpoint.builder().setPath("/{mypath}").build())
+                .setDispatcher((req, resp) -> {
+                    logger.log(Level.INFO, "dispatching endpoint = " + req.getEndpoint() +
+                            " req = " + req +
+                            " req context path = " + req.getContextPath() +
+                            " effective path = " + req.getEffectiveRequestPath() +
+                            " path params = " + req.getPathParameters());
+                    assertEquals("test.txt", req.getPathParameters().get("mypath"));
+                })
+                .build();
+        HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
+                .addEndpointResolver(httpEndpointResolver)
+                .build();
+        Server server = Server.builder(domain)
+                .build();
+        Client client = Client.builder()
+                .build();
+        final AtomicBoolean success = new AtomicBoolean(false);
+        try {
+            server.accept();
+            Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
+                    .url(server.getServerConfig().getAddress().base().resolve("/files/test.txt"))
+                    .setResponseListener(resp -> {
+                        success.set(true);
+                    })
+                    .build();
+            client.execute(request).get();
+        } finally {
+            server.shutdownGracefully();
+            client.shutdownGracefully();
+            logger.log(Level.INFO, "server and client shut down");
+        }
+    }
+
+    @Test
     void testEmptyPrefixEndpoint() throws Exception {
         Path vartmp = Paths.get("/var/tmp/");
         FileService fileService = new FileService(vartmp);

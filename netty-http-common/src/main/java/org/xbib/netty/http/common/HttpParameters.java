@@ -27,7 +27,7 @@ import java.util.Map;
  * being useful for message signing; it's not a general purpose collection class
  * to handle request parameters.
  */
-public class HttpParameters extends /*LinkedHashSetMultiMap<String, String>*/ CaseInsensitiveParameters {
+public class HttpParameters extends CaseInsensitiveParameters {
 
     private static final String EQUALS = "=";
 
