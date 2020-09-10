@@ -1,15 +1,22 @@
 package org.xbib.netty.http.server.protocol.http1;
 
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 
+import java.nio.charset.StandardCharsets;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Implements HTTP pipelining ordering, ensuring that responses are completely served in the same order as their
@@ -18,6 +25,8 @@ import java.util.concurrent.locks.ReentrantLock;
  * Based on https://github.com/typesafehub/netty-http-pipelining - which uses netty 3
  */
 public class HttpPipeliningHandler extends ChannelDuplexHandler {
+
+    private final Logger logger = Logger.getLogger(HttpPipeliningHandler.class.getName());
 
     private final int pipelineCapacity;
 
@@ -79,5 +88,13 @@ public class HttpPipeliningHandler extends ChannelDuplexHandler {
         } else {
             super.write(ctx, msg, promise);
         }
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        logger.log(Level.SEVERE, cause.getMessage(), cause);
+        ctx.writeAndFlush(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1,
+                HttpResponseStatus.INTERNAL_SERVER_ERROR,
+                Unpooled.copiedBuffer(cause.getMessage().getBytes(StandardCharsets.UTF_8))));
     }
 }

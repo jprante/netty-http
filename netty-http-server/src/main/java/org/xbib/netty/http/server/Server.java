@@ -100,6 +100,7 @@ public final class Server implements AutoCloseable {
      * @param parentEventLoopGroup parent event loop group
      * @param childEventLoopGroup child event loop group
      * @param socketChannelClass socket channel class
+     * @param executor an extra blocking thread pool executor or null
      */
     @SuppressWarnings("unchecked")
     private Server(DefaultServerConfig serverConfig,
