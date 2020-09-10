@@ -207,9 +207,9 @@ public final class Server implements AutoCloseable {
     }
 
     public URL getBaseURL(HttpHeaders headers) {
-        String scheme = null;
-        String host = null;
-        String port = null;
+        String scheme;
+        String host;
+        String port;
         if (headers == null) {
             URL bindURL = serverConfig.getDefaultDomain().getHttpAddress().base();
             scheme = bindURL.getScheme();
@@ -258,7 +258,7 @@ public final class Server implements AutoCloseable {
     }
 
     public void handle(ServerRequest.Builder serverRequestBuilder,
-                       ServerResponse.Builder serverResponseBuilder) throws IOException {
+                       ServerResponse.Builder serverResponseBuilder) {
         URL baseURL = getBaseURL(serverRequestBuilder.getHeaders());
         serverRequestBuilder.setBaseURL(baseURL);
         Domain<? extends EndpointResolver<?>> domain = getDomain(baseURL);
@@ -266,8 +266,9 @@ public final class Server implements AutoCloseable {
             executor.submit(() -> {
                 try {
                     domain.handle(serverRequestBuilder, serverResponseBuilder);
-                } catch (IOException e) {
-                    executor.afterExecute(null, e);
+                } catch (Throwable t) {
+                    executor.afterExecute(null, t);
+                    domain.handleAfterError(serverRequestBuilder, serverResponseBuilder, t);
                 } finally {
                     serverRequestBuilder.release();
                 }
@@ -275,6 +276,8 @@ public final class Server implements AutoCloseable {
         } else {
             try {
                 domain.handle(serverRequestBuilder, serverResponseBuilder);
+            } catch (Throwable t) {
+                domain.handleAfterError(serverRequestBuilder, serverResponseBuilder, t);
             } finally {
                 serverRequestBuilder.release();
             }

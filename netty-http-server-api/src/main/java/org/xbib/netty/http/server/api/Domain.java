@@ -19,4 +19,6 @@ public interface Domain<R extends EndpointResolver<?>> {
     Collection<? extends X509Certificate> getCertificateChain();
 
     void handle(ServerRequest.Builder serverRequestBuilder, ServerResponse.Builder serverResponseBuilder) throws IOException;
+
+    void handleAfterError(ServerRequest.Builder serverRequestBuilder, ServerResponse.Builder serverResponseBuilder, Throwable throwable);
 }

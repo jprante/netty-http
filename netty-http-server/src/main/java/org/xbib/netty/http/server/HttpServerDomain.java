@@ -21,6 +21,7 @@ import org.xbib.netty.http.server.endpoint.HttpEndpointResolver;
 import org.xbib.netty.http.server.api.Filter;
 import org.xbib.netty.http.server.security.CertificateUtils;
 import org.xbib.netty.http.server.security.PrivateKeyUtils;
+import org.xbib.netty.http.server.util.ExceptionFormatter;
 import javax.crypto.NoSuchPaddingException;
 import javax.net.ssl.TrustManagerFactory;
 import java.io.IOException;
@@ -40,11 +41,15 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.ServiceLoader;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * The {@code HttpServerDomain} class represents a virtual server with a name.
  */
 public class HttpServerDomain implements Domain<HttpEndpointResolver> {
+
+    private static final Logger logger = Logger.getLogger(HttpServerDomain.class.getName());
 
     private final String name;
 
@@ -164,10 +169,18 @@ public class HttpServerDomain implements Domain<HttpEndpointResolver> {
         } else {
             if (serverResponseBuilder != null) {
                 serverResponseBuilder.setStatus(HttpResponseStatus.NOT_FOUND)
-                        .setContentType("text/plain")
+                        .setContentType("text/plain;charset=utf-8")
                         .build().write("no endpoint found to match request");
             }
         }
+    }
+
+    @Override
+    public void handleAfterError(ServerRequest.Builder serverRequestBuilder, ServerResponse.Builder serverResponseBuilder, Throwable throwable) {
+        logger.log(Level.SEVERE, throwable.getMessage(), throwable);
+        serverResponseBuilder.setStatus(HttpResponseStatus.INTERNAL_SERVER_ERROR)
+                .setContentType("text/plain;charset=utf-8")
+                .build().write(ExceptionFormatter.format(throwable));
     }
 
     @Override
@@ -335,7 +348,7 @@ public class HttpServerDomain implements Domain<HttpEndpointResolver> {
                     .addEndpoint(HttpEndpoint.builder()
                             .setPath(path)
                             .build())
-                    .setDispatcher(filter::handle)
+                    .setDispatcher(filter)
                     .build());
             return this;
         }
@@ -349,7 +362,7 @@ public class HttpServerDomain implements Domain<HttpEndpointResolver> {
                             .setPrefix(prefix)
                             .setPath(path)
                             .build())
-                    .setDispatcher(filter::handle)
+                    .setDispatcher(filter)
                     .build());
             return this;
         }
@@ -365,7 +378,7 @@ public class HttpServerDomain implements Domain<HttpEndpointResolver> {
                             .setPath(path)
                             .setMethods(Arrays.asList(methods))
                             .build())
-                    .setDispatcher(filter::handle)
+                    .setDispatcher(filter)
                     .build());
             return this;
         }
