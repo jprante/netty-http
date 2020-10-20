@@ -2,10 +2,8 @@ package org.xbib.netty.http.common.test;
 
 import org.junit.jupiter.api.Test;
 import org.xbib.netty.http.common.HttpParameters;
-
 import java.nio.charset.MalformedInputException;
 import java.nio.charset.UnmappableCharacterException;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class HttpParametersTest {

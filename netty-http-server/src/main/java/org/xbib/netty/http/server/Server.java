@@ -17,7 +17,6 @@ import io.netty.util.DomainWildcardMappingBuilder;
 import io.netty.util.Mapping;
 import org.xbib.net.URL;
 import org.xbib.netty.http.common.HttpAddress;
-import org.xbib.netty.http.common.NetworkUtils;
 import org.xbib.netty.http.common.HttpChannelInitializer;
 import org.xbib.netty.http.common.TransportProvider;
 import org.xbib.netty.http.server.api.Domain;
@@ -57,10 +56,6 @@ public final class Server implements AutoCloseable {
     private static final Logger logger = Logger.getLogger(Server.class.getName());
 
     static {
-        // extend Java system properties by detected network interfaces
-        if (System.getProperty("xbib.netty.http.client.extendsystemproperties") != null) {
-            NetworkUtils.extendSystemProperties();
-        }
         // change Netty defaults to safer ones, but still allow override from arg line
         if (System.getProperty("io.netty.noUnsafe") == null) {
             System.setProperty("io.netty.noUnsafe", Boolean.toString(true));

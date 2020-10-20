@@ -19,6 +19,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -27,8 +32,6 @@ import java.util.logging.Logger;
  * Helper class for Java networking.
  */
 public class NetworkUtils {
-
-    private static final Logger logger = Logger.getLogger(NetworkUtils.class.getName());
 
     private static final String lf = System.lineSeparator();
 
@@ -40,14 +43,22 @@ public class NetworkUtils {
 
     private static final String IPV6_SETTING = "java.net.preferIPv6Addresses";
 
+    private static final CountDownLatch latch = new CountDownLatch(1);
+
+    private static final InterfaceWaiter interfaceWaiter = new InterfaceWaiter();
+
     private static InetAddress localAddress;
+
+    private NetworkUtils() {
+        throw new UnsupportedOperationException();
+    }
 
     public static void extendSystemProperties() {
         InetAddress address;
         try {
             address = InetAddress.getLocalHost();
         } catch (Exception e) {
-            logger.log(Level.WARNING, e.getMessage(), e);
+            Logger.getLogger("network").log(Level.WARNING, e.getMessage(), e);
             address = InetAddress.getLoopbackAddress();
         }
         localAddress = address;
@@ -67,16 +78,12 @@ public class NetworkUtils {
                     map.put("net." + networkInterface.getDisplayName(), inetAddress.getCanonicalHostName());
                 }
             }
-            logger.log(Level.FINE, "found network properties for system properties: " + map);
             for (Map.Entry<String, String> entry : map.entrySet()) {
                 System.setProperty(entry.getKey(), entry.getValue());
             }
         } catch (Throwable e) {
-            logger.log(Level.WARNING, e.getMessage(), e);
+            Logger.getLogger("network").log(Level.WARNING, e.getMessage(), e);
         }
-    }
-
-    private NetworkUtils() {
     }
 
     public static boolean isPreferIPv4() {
@@ -205,7 +212,15 @@ public class NetworkUtils {
         return false;
     }
 
-    public static InetAddress getFirstNonLoopbackAddress(NetworkProtocolVersion ipversion) {
+    public static List<NetworkInterface> getAllNetworkInterfaces() throws InterruptedException {
+        return getInterfaces(n -> true);
+    }
+
+    public static List<NetworkInterface> getAllRunningAndUpInterfaces() throws InterruptedException {
+        return getInterfaces(NetworkUtils::isUp);
+    }
+
+    public static InetAddress getFirstNonLoopbackAddress(NetworkProtocolVersion ipversion) throws InterruptedException {
         InetAddress address;
         for (NetworkInterface networkInterface : getAllNetworkInterfaces()) {
             try {
@@ -213,7 +228,7 @@ public class NetworkUtils {
                     continue;
                 }
             } catch (Exception e) {
-                logger.log(Level.WARNING, e.getMessage(), e);
+                Logger.getLogger("network").log(Level.WARNING, e.getMessage(), e);
                 continue;
             }
             address = getFirstNonLoopbackAddress(networkInterface, ipversion);
@@ -268,7 +283,7 @@ public class NetworkUtils {
         return supportsVersion;
     }
 
-    public static NetworkProtocolVersion getProtocolVersion() {
+    public static NetworkProtocolVersion getProtocolVersion() throws InterruptedException {
         switch (findAvailableProtocols()) {
             case IPV4:
                 return NetworkProtocolVersion.IPV4;
@@ -288,7 +303,7 @@ public class NetworkUtils {
         return NetworkProtocolVersion.NONE;
     }
 
-    public static NetworkProtocolVersion findAvailableProtocols() {
+    public static NetworkProtocolVersion findAvailableProtocols() throws InterruptedException {
         boolean hasIPv4 = false;
         boolean hasIPv6 = false;
         for (InetAddress addr : getAllAvailableAddresses()) {
@@ -311,7 +326,7 @@ public class NetworkUtils {
         return NetworkProtocolVersion.NONE;
     }
 
-    public static InetAddress resolveInetAddress(String hostname, String defaultValue) throws IOException {
+    public static InetAddress resolveInetAddress(String hostname, String defaultValue) throws IOException, InterruptedException {
         String host = hostname;
         if (host == null) {
             host = defaultValue;
@@ -335,14 +350,15 @@ public class NetworkUtils {
                 }
             } else {
                 NetworkProtocolVersion networkProtocolVersion = getProtocolVersion();
+                String reducedHost = host.substring(0, host.length() - 5);
                 if (host.toLowerCase(Locale.ROOT).endsWith(":ipv4")) {
                     networkProtocolVersion = NetworkProtocolVersion.IPV4;
-                    host = host.substring(0, host.length() - 5);
+                    host = reducedHost;
                 } else if (host.toLowerCase(Locale.ROOT).endsWith(":ipv6")) {
                     networkProtocolVersion = NetworkProtocolVersion.IPV6;
-                    host = host.substring(0, host.length() - 5);
+                    host = reducedHost;
                 }
-                for (NetworkInterface ni : getInterfaces(NetworkUtils::isUp)) {
+                for (NetworkInterface ni : getAllRunningAndUpInterfaces()) {
                     if (host.equals(ni.getName()) || host.equals(ni.getDisplayName())) {
                         if (ni.isLoopback()) {
                             return getFirstAddress(ni, networkProtocolVersion);
@@ -357,7 +373,7 @@ public class NetworkUtils {
         return InetAddress.getByName(host);
     }
 
-    public static InetAddress resolvePublicHostAddress(String host) throws IOException {
+    public static InetAddress resolvePublicHostAddress(String host) throws IOException, InterruptedException {
         InetAddress address = resolveInetAddress(host, null);
         if (address == null || address.isAnyLocalAddress()) {
             address = getFirstNonLoopbackAddress(NetworkProtocolVersion.IPV4);
@@ -374,24 +390,9 @@ public class NetworkUtils {
         return address;
     }
 
-    private static List<NetworkInterface> getAllNetworkInterfaces() {
-        return getInterfaces(n -> true);
-    }
-
-    public static List<NetworkInterface> getAllRunningAndUpInterfaces() {
-        return getInterfaces(NetworkUtils::isUp);
-    }
-
-    public static List<NetworkInterface> getInterfaces(Predicate<NetworkInterface> predicate) {
+    public static List<NetworkInterface> getInterfaces(Predicate<NetworkInterface> predicate) throws InterruptedException {
         List<NetworkInterface> networkInterfaces = new ArrayList<>();
-        Enumeration<NetworkInterface> interfaces;
-        try {
-            interfaces = NetworkInterface.getNetworkInterfaces();
-        } catch (Exception e) {
-            return networkInterfaces;
-        }
-        while (interfaces.hasMoreElements()) {
-            NetworkInterface networkInterface = interfaces.nextElement();
+        for (NetworkInterface networkInterface : waitForNetworkInterfaces()) {
             if (predicate.test(networkInterface)) {
                 networkInterfaces.add(networkInterface);
                 Enumeration<NetworkInterface> subInterfaces = networkInterface.getSubInterfaces();
@@ -404,7 +405,7 @@ public class NetworkUtils {
         return networkInterfaces;
     }
 
-    public static List<InetAddress> getAllAvailableAddresses() {
+    public static List<InetAddress> getAllAvailableAddresses() throws InterruptedException {
         List<InetAddress> allAddresses = new ArrayList<>();
         for (NetworkInterface networkInterface : getAllNetworkInterfaces()) {
             Enumeration<InetAddress> addrs = networkInterface.getInetAddresses();
@@ -416,15 +417,61 @@ public class NetworkUtils {
         return allAddresses;
     }
 
-    public static String displayNetworkInterfaces() {
+    public static List<NetworkInterface> waitForNetworkInterfaces() throws InterruptedException {
+        return waitForNetworkInterfaces(5L, TimeUnit.SECONDS);
+    }
+
+    public static List<NetworkInterface> waitForNetworkInterfaces(long period, TimeUnit timeUnit) throws InterruptedException {
+        if (latch.getCount() == 0L) {
+            return interfaceWaiter.interfaces;
+        }
+        ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
+        ScheduledFuture<?> future = service.scheduleAtFixedRate(interfaceWaiter, 0L, period, timeUnit);
+        latch.await();
+        future.cancel(true);
+        service.shutdownNow();
+        return interfaceWaiter.interfaces;
+    }
+
+    private static class InterfaceWaiter implements Runnable {
+
+        private final List<NetworkInterface> interfaces = new ArrayList<>();
+
+        private final Logger logger = Logger.getLogger("network");
+
+        @Override
+        public void run() {
+            try {
+                interfaces.clear();
+                logger.log(Level.INFO, "waiting for network interfaces");
+                Enumeration<NetworkInterface> networkInterfaceEnumeration = NetworkInterface.getNetworkInterfaces();
+                if (networkInterfaceEnumeration.hasMoreElements()) {
+                    do {
+                        NetworkInterface networkInterface = networkInterfaceEnumeration.nextElement();
+                        logger.log(Level.INFO, "found " + networkInterface.getDisplayName());
+                        interfaces.add(networkInterface);
+                    } while (networkInterfaceEnumeration.hasMoreElements());
+                    logger.log(Level.INFO, "got network interfaces: " + interfaces.size());
+                    if (!interfaces.isEmpty()) {
+                        latch.countDown();
+                    }
+                }
+            } catch (Exception e) {
+                // getNetworkInterfaces() throws socket exception if no network is configured
+                logger.log(Level.WARNING, e.getMessage());
+            }
+        }
+    }
+
+    public static String getNetworkInterfacesAsString() throws InterruptedException {
         StringBuilder sb = new StringBuilder();
         for (NetworkInterface nic : getAllNetworkInterfaces()) {
-            sb.append(displayNetworkInterface(nic));
+            sb.append(getNetworkInterfaceAsString(nic));
         }
         return sb.toString();
     }
 
-    public static String displayNetworkInterface(NetworkInterface nic) {
+    public static String getNetworkInterfaceAsString(NetworkInterface nic) {
         StringBuilder sb = new StringBuilder();
         sb.append(lf).append(nic.getName()).append(lf);
         if (!nic.getName().equals(nic.getDisplayName())) {
@@ -449,13 +496,13 @@ public class NetworkUtils {
                 flags.add("VIRTUAL");
             }
         } catch (Exception e) {
-            logger.log(Level.WARNING, e.getMessage(), e);
+            Logger.getLogger("network").log(Level.WARNING, e.getMessage(), e);
         }
         sb.append(String.join(",", flags));
         try {
             sb.append(" mtu ").append(nic.getMTU()).append(lf);
         } catch (SocketException e) {
-            logger.log(Level.WARNING, e.getMessage(), e);
+            Logger.getLogger("network").log(Level.WARNING, e.getMessage(), e);
         }
         List<InterfaceAddress> addresses = nic.getInterfaceAddresses();
         for (InterfaceAddress address : addresses) {
@@ -474,7 +521,7 @@ public class NetworkUtils {
                 sb.append(lf);
             }
         } catch (SocketException e) {
-            logger.log(Level.WARNING, e.getMessage(), e);
+            Logger.getLogger("network").log(Level.WARNING, e.getMessage(), e);
         }
         return sb.toString();
     }
@@ -505,7 +552,7 @@ public class NetworkUtils {
             try {
                 sb.append(" netmask:").append(format(InetAddress.getByAddress(b)));
             } catch (UnknownHostException e) {
-                logger.log(Level.WARNING, e.getMessage(), e);
+                Logger.getLogger("network").log(Level.WARNING, e.getMessage(), e);
             }
             InetAddress broadcast = interfaceAddress.getBroadcast();
             if (broadcast != null) {

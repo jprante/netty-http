@@ -3,6 +3,11 @@ plugins {
     id "io.codearte.nexus-staging" version "0.21.1"
 }
 
+wrapper {
+    gradleVersion = "${rootProject.property('gradle.wrapper.version')}"
+    distributionType = Wrapper.DistributionType.ALL
+}
+
 ext {
     user = 'jprante'
     name = 'netty-http'
