@@ -62,7 +62,7 @@ class SimpleHttp1Test {
     void testHttp1() throws Exception {
         Client client = new Client();
         try {
-            HttpTransport transport = client.newTransport("xbib.org", 80);
+            HttpTransport transport = client.newTransport("google.de", 80);
             transport.onResponse(msg -> logger.log(Level.INFO,
                     "got response: " + msg.status().code() + " headers=" + msg.headers().entries()));
             transport.connect();
@@ -92,7 +92,7 @@ class SimpleHttp1Test {
         }
     }
 
-    private AttributeKey<HttpTransport> TRANSPORT_ATTRIBUTE_KEY = AttributeKey.valueOf("transport");
+    private final AttributeKey<HttpTransport> TRANSPORT_ATTRIBUTE_KEY = AttributeKey.valueOf("transport");
 
     interface ResponseWriter {
         void write(FullHttpResponse msg);

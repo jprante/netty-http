@@ -22,7 +22,7 @@ class Http1Test {
         Client client = Client.builder()
                 .build();
         try {
-            Request request = Request.get().url("http://xbib.org")
+            Request request = Request.get().url("https://xbib.org")
                     .setResponseListener(resp -> logger.log(Level.FINE,
                             "got response: " + resp.getHeaders() +
                             resp.getBodyAsString(StandardCharsets.UTF_8) +
@@ -39,7 +39,7 @@ class Http1Test {
         Client client = Client.builder()
                 .build();
         try {
-            Request request1 = Request.get().url("http://xbib.org")
+            Request request1 = Request.get().url("https://xbib.org")
                     .setResponseListener(resp -> logger.log(Level.FINE, "got response: " +
                             resp.getBodyAsString(StandardCharsets.UTF_8)))
                     .build();
@@ -60,12 +60,12 @@ class Http1Test {
                 .build();
         try {
             Request request1 = Request.builder(HttpMethod.GET)
-                    .url("http://xbib.org").setVersion("HTTP/1.1")
+                    .url("https://xbib.org").setVersion("HTTP/1.1")
                     .setResponseListener(resp -> logger.log(Level.FINE, "got response: " +
                             resp.getHeaders() + " status=" +resp.getStatus()))
                     .build();
             Request request2 = Request.builder(HttpMethod.GET)
-                    .url("http://xbib.org").setVersion("HTTP/1.1")
+                    .url("https://xbib.org").setVersion("HTTP/1.1")
                     .setResponseListener(resp -> logger.log(Level.FINE, "got response: " +
                             resp.getHeaders() + " status=" +resp.getStatus()))
                     .build();

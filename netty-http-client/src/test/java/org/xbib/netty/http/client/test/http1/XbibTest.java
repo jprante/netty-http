@@ -22,7 +22,7 @@ class XbibTest {
     void testXbibOrgWithDefaults() throws IOException {
         Client client = new Client();
         try {
-            Request request = Request.get().url("http://xbib.org")
+            Request request = Request.get().url("https://xbib.org")
                     .setResponseListener(resp -> {
                         logger.log(Level.INFO, "status = " + resp.getStatus() +
                                 " response = " + resp.getBodyAsString(StandardCharsets.UTF_8));
@@ -42,7 +42,7 @@ class XbibTest {
         try {
             final Function<HttpResponse, String> stringFunction =
                     response -> response.getBodyAsString(StandardCharsets.UTF_8);
-            Request request = Request.get().url("http://xbib.org")
+            Request request = Request.get().url("https://xbib.org")
                     .build();
             final CompletableFuture<String> completableFuture = httpClient.execute(request, stringFunction)
                     .exceptionally(Throwable::getMessage)
@@ -73,7 +73,7 @@ class XbibTest {
                 .build();
         try {
             httpClient.execute(Request.get()
-                    .url("http://xbib.org")
+                    .url("https://xbib.org")
                     .setResponseListener(resp -> logger.log(Level.INFO, "status = " + resp.getStatus() +
                             " response body = " + resp.getBodyAsString(StandardCharsets.UTF_8)))
                     .build())
@@ -89,7 +89,7 @@ class XbibTest {
                 .build();
         try {
             httpClient.execute(Request.get()
-                    .url("http://xbib.org")
+                    .url("https://xbib.org")
                     .setTimeoutInMillis(10)
                     .setResponseListener(resp ->
                             logger.log(Level.INFO, "status = " + resp.getStatus() +
@@ -107,7 +107,7 @@ class XbibTest {
         try {
             httpClient.execute(Request.get()
                     .setVersion("HTTP/1.1")
-                    .url("http://xbib.org")
+                    .url("https://xbib.org")
                     .setResponseListener(resp -> {
                         logger.log(Level.INFO, "status = " + resp.getStatus() +
                                 " response body = " + resp.getBodyAsString(StandardCharsets.UTF_8));
@@ -116,7 +116,7 @@ class XbibTest {
                     .get();
             httpClient.execute(Request.get()
                     .setVersion("HTTP/1.1")
-                    .url("http://xbib.org")
+                    .url("https://xbib.org")
                     .setResponseListener(resp -> {
                         logger.log(Level.INFO, "status = " + resp.getStatus() +
                                 " response body = " + resp.getBodyAsString(StandardCharsets.UTF_8));

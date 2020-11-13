@@ -13,7 +13,7 @@ class RestClientTest {
 
     @Test
     void testSimpleGet() throws IOException {
-        String result = RestClient.get("http://xbib.org").asString();
+        String result = RestClient.get("https://xbib.org").asString();
         logger.info(result);
     }
 }
