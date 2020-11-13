@@ -92,9 +92,10 @@ public class HttpPipeliningHandler extends ChannelDuplexHandler {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        logger.log(Level.SEVERE, cause.getMessage(), cause);
+        String message = cause.getMessage() == null ? "null" : cause.getMessage();
+        logger.log(Level.SEVERE, message, cause);
         ctx.writeAndFlush(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1,
                 HttpResponseStatus.INTERNAL_SERVER_ERROR,
-                Unpooled.copiedBuffer(cause.getMessage().getBytes(StandardCharsets.UTF_8))));
+                Unpooled.copiedBuffer(message.getBytes(StandardCharsets.UTF_8))));
     }
 }
