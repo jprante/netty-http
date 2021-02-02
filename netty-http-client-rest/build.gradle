@@ -1,3 +1,5 @@
 dependencies {
     api project(':netty-http-client')
+    api project(':netty-http-client-api')
+    api project(':netty-http-common')
 }

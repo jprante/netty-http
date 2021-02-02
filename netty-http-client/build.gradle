@@ -1,6 +1,7 @@
 
 dependencies {
     api project(":netty-http-client-api")
+    api project(":netty-http-common")
     api "io.netty:netty-handler-proxy:${project.property('netty.version')}"
     testImplementation "com.fasterxml.jackson.core:jackson-databind:${project.property('jackson.version')}"
     testImplementation "org.conscrypt:conscrypt-openjdk-uber:${project.property('conscrypt.version')}"

@@ -1,6 +1,7 @@
 
 dependencies {
     api project(":netty-http-server-api")
+    api project(":netty-http-common")
     testImplementation project(":netty-http-client")
     testImplementation project(":netty-http-bouncycastle")
     testRuntimeOnly "org.javassist:javassist:${project.property('javassist.version')}"

@@ -36,7 +36,7 @@ class PoolTest {
 
     private static final int TEST_STEP_TIME_SECONDS = 50;
 
-    private static final int BATCH_SIZE = 0x1000;
+    private static final int BATCH_SIZE = 0x100;
 
     @ParameterizedTest
     @ValueSource(ints = {1,10,100})
