@@ -210,6 +210,10 @@ public final class Client implements AutoCloseable {
         return byteBufAllocator;
     }
 
+    public boolean isPooled() {
+        return pool != null;
+    }
+
     public boolean hasPooledConnections() {
         return pool != null && !clientConfig.getPoolNodes().isEmpty();
     }
@@ -266,7 +270,6 @@ public final class Client implements AutoCloseable {
     }
 
     public Channel newChannel(HttpAddress httpAddress) throws IOException {
-        Channel channel;
         if (httpAddress != null) {
             HttpVersion httpVersion = httpAddress.getVersion();
             SslContext sslContext = newSslContext(clientConfig, httpAddress.getVersion());
@@ -276,7 +279,7 @@ public final class Client implements AutoCloseable {
             HttpChannelInitializer initializer =
                     findChannelInitializer(httpVersion.majorVersion(), httpAddress, sslHandlerFactory, initializerTwo);
             try {
-                channel = bootstrap.handler(initializer)
+                return bootstrap.handler(initializer)
                         .connect(httpAddress.getInetSocketAddress()).sync().await().channel();
             } catch (InterruptedException e) {
                 throw new IOException(e);
@@ -284,7 +287,12 @@ public final class Client implements AutoCloseable {
         } else {
             if (hasPooledConnections()) {
                 try {
-                    channel = pool.acquire();
+                    if (pool != null) {
+                        return pool.acquire();
+                    } else {
+                        logger.log(Level.SEVERE, "no pool prsent");
+                        return null;
+                    }
                 } catch (Exception e) {
                     throw new IOException(e);
                 }
@@ -292,7 +300,6 @@ public final class Client implements AutoCloseable {
                 throw new UnsupportedOperationException();
             }
         }
-        return channel;
     }
 
     public void releaseChannel(Channel channel, boolean close) throws IOException{
@@ -301,7 +308,9 @@ public final class Client implements AutoCloseable {
         }
         if (hasPooledConnections()) {
             try {
-                pool.release(channel, close);
+                if (pool != null) {
+                    pool.release(channel, close);
+                }
             } catch (Exception e) {
                 throw new IOException(e);
             }

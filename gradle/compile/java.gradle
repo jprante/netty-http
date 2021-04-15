@@ -30,6 +30,7 @@ task sourcesJar(type: Jar, dependsOn: classes) {
 
 task javadocJar(type: Jar, dependsOn: javadoc) {
     classifier 'javadoc'
+    from javadoc.destinationDir
 }
 
 artifacts {
@@ -37,7 +38,7 @@ artifacts {
 }
 
 tasks.withType(JavaCompile) {
-    options.compilerArgs << '-Xlint:all,-exports'
+    options.compilerArgs << '-Xlint:all'
 }
 
 javadoc {

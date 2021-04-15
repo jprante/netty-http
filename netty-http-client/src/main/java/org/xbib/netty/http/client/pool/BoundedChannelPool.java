@@ -173,9 +173,11 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
             if (channel != null) {
                 if (channel.isActive()) {
                     K key = channel.attr(attributeKey).get();
-                    Queue<Channel> channelQueue = availableChannels.get(key);
-                    if (channelQueue != null) {
-                        channelQueue.add(channel);
+                    if (key != null) {
+                        Queue<Channel> channelQueue = availableChannels.get(key);
+                        if (channelQueue != null) {
+                            channelQueue.add(channel);
+                        }
                     }
                 } else if (channel.isOpen() && close) {
                     logger.log(Level.FINE, "closing channel " + channel);
