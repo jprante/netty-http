@@ -11,8 +11,8 @@ module org.xbib.netty.http.client {
     exports org.xbib.netty.http.client.pool;
     exports org.xbib.netty.http.client.retry;
     exports org.xbib.netty.http.client.transport;
-    requires org.xbib.netty.http.client.api;
-    requires org.xbib.netty.http.common;
+    requires transitive org.xbib.netty.http.client.api;
+    requires transitive org.xbib.netty.http.common;
     requires org.xbib.net.url;
     requires io.netty.handler.proxy;
     requires java.logging;

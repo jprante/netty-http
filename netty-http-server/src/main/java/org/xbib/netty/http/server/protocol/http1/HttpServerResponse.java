@@ -64,7 +64,7 @@ public class HttpServerResponse implements ServerResponse {
         this.ctx = builder.ctx;
         this.headers = builder.headers;
         this.trailingHeaders = builder.trailingHeaders;
-        this.httpResponseStatus = builder.httpResponseStatus;
+        this.httpResponseStatus = HttpResponseStatus.valueOf(builder.statusCode);
         this.shouldClose = builder.shouldClose;
         this.shouldAddServerName = builder.shouldAddServerName;
         this.sequenceId = builder.sequenceId;
@@ -201,7 +201,7 @@ public class HttpServerResponse implements ServerResponse {
 
         private final HttpHeaders trailingHeaders;
 
-        private HttpResponseStatus httpResponseStatus;
+        private int statusCode;
 
         private boolean shouldClose;
 
@@ -217,15 +217,15 @@ public class HttpServerResponse implements ServerResponse {
 
         private Builder(ChannelHandlerContext ctx) {
             this.ctx = ctx;
-            this.httpResponseStatus = HttpResponseStatus.OK;
+            this.statusCode = HttpResponseStatus.OK.code();
             this.headers = new DefaultHttpHeaders();
             this.trailingHeaders = new DefaultHttpHeaders();
             this.contentType = HttpHeaderValues.APPLICATION_OCTET_STREAM;
         }
 
         @Override
-        public Builder setStatus(HttpResponseStatus httpResponseStatus) {
-            this.httpResponseStatus = httpResponseStatus;
+        public Builder setStatus(int statusCode) {
+            this.statusCode = statusCode;
             return this;
         }
 

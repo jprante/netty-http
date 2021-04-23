@@ -8,6 +8,7 @@ import org.xbib.net.URL;
 import org.xbib.netty.http.common.HttpParameters;
 import javax.net.ssl.SSLSession;
 import java.net.InetSocketAddress;
+import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Map;
 
@@ -31,6 +32,8 @@ public interface ServerRequest {
 
     HttpHeaders getHeaders();
 
+    String getHeader(String name);
+
     HttpParameters getParameters();
 
     String getContextPath();
@@ -44,6 +47,8 @@ public interface ServerRequest {
     Long getRequestId();
 
     ByteBuf getContent();
+
+    String getContent(Charset charset);
 
     ByteBufInputStream getInputStream();
 

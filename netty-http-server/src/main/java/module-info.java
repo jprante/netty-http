@@ -13,10 +13,15 @@ module org.xbib.netty.http.server {
     exports org.xbib.netty.http.server.protocol.http1;
     exports org.xbib.netty.http.server.protocol.http2;
     exports org.xbib.netty.http.server.util;
-    requires org.xbib.netty.http.server.api;
-    requires org.xbib.netty.http.common;
+    requires transitive org.xbib.netty.http.server.api;
+    requires transitive org.xbib.netty.http.common;
     requires org.xbib.net.url;
     requires java.logging;
+    requires io.netty.buffer;
+    requires io.netty.common;
+    requires io.netty.handler;
     requires io.netty.transport;
+    requires io.netty.codec.http;
+    requires io.netty.codec.http2;
     provides org.xbib.netty.http.server.api.ServerProtocolProvider with Http1, Http2;
 }

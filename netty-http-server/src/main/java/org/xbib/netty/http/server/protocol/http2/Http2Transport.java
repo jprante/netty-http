@@ -54,21 +54,21 @@ public class Http2Transport extends BaseTransport {
             }
             case MISSING_HOST_HEADER: {
                 serverResponseBuilder
-                        .setStatus(HttpResponseStatus.BAD_REQUEST)
+                        .setStatus(HttpResponseStatus.BAD_REQUEST.code())
                         .setContentType("text/plain")
                         .build()
                         .write("missing 'Host' header");
             }
             case EXPECTATION_FAILED: {
                 serverResponseBuilder
-                        .setStatus(HttpResponseStatus.EXPECTATION_FAILED)
+                        .setStatus(HttpResponseStatus.EXPECTATION_FAILED.code())
                         .build()
                         .flush();
                 break;
             }
             case UNSUPPORTED_HTTP_VERSION: {
                 serverResponseBuilder
-                        .setStatus(HttpResponseStatus.BAD_REQUEST)
+                        .setStatus(HttpResponseStatus.BAD_REQUEST.code())
                         .setContentType("text/plain")
                         .build()
                         .write("unsupported HTTP version");

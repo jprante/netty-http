@@ -159,6 +159,10 @@ public final class Server implements AutoCloseable {
                 serverConfig.getAddress(), domainNameMapping));
     }
 
+    public void loop() throws IOException, InterruptedException {
+        accept().channel().closeFuture().sync();
+    }
+
     @Override
     public void close() {
         try {

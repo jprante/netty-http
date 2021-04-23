@@ -45,21 +45,21 @@ public class Http1Transport extends BaseTransport {
             }
             case MISSING_HOST_HEADER: {
                 HttpServerResponse.builder(ctx)
-                        .setStatus(HttpResponseStatus.BAD_REQUEST)
+                        .setStatus(HttpResponseStatus.BAD_REQUEST.code())
                         .setContentType("text/plain")
                         .build()
                         .write("missing 'Host' header");
             }
             case EXPECTATION_FAILED: {
                 HttpServerResponse.builder(ctx)
-                        .setStatus(HttpResponseStatus.EXPECTATION_FAILED)
+                        .setStatus(HttpResponseStatus.EXPECTATION_FAILED.code())
                         .build()
                         .flush();
                 break;
             }
             case UNSUPPORTED_HTTP_VERSION: {
                 HttpServerResponse.builder(ctx)
-                        .setStatus(HttpResponseStatus.BAD_REQUEST)
+                        .setStatus(HttpResponseStatus.BAD_REQUEST.code())
                         .setContentType("text/plain")
                         .build()
                         .write("unsupported HTTP version");

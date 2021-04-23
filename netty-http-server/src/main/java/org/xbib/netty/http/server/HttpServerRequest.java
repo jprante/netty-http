@@ -130,8 +130,18 @@ public class HttpServerRequest implements ServerRequest {
     }
 
     @Override
+    public String getHeader(String name) {
+        return httpRequest.headers().get(name);
+    }
+
+    @Override
     public ByteBuf getContent() {
         return httpRequest.content();
+    }
+
+    @Override
+    public String getContent(Charset charset) {
+        return httpRequest.content().toString(charset);
     }
 
     @Override
