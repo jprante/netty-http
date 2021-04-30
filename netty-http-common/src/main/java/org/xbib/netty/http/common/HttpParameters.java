@@ -1,11 +1,9 @@
 package org.xbib.netty.http.common;
 
 import io.netty.handler.codec.http.HttpHeaderValues;
-import org.xbib.net.PercentDecoder;
 import org.xbib.net.PercentEncoder;
 import org.xbib.net.PercentEncoders;
 import org.xbib.netty.http.common.util.CaseInsensitiveParameters;
-import org.xbib.netty.http.common.util.LimitedSet;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.MalformedInputException;
@@ -15,7 +13,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 
 /**
  * A limited multi-map of HTTP request parameters. Each key references a
@@ -63,7 +60,6 @@ public class HttpParameters extends CaseInsensitiveParameters {
         this.sizeLimit = sizeLimit;
         this.elementSizeLimit = elementSizeLimit;
         this.percentEncoder = PercentEncoders.getQueryEncoder(charset);
-        PercentDecoder percentDecoder = new PercentDecoder();
         this.contentType = contentType;
         this.encoding = charset;
     }
@@ -130,30 +126,6 @@ public class HttpParameters extends CaseInsensitiveParameters {
             throw new IllegalArgumentException(e);
         }
         return this;
-    }
-
-    public void addAll(String[] keyValuePairs, boolean percentEncode) {
-        for (int i = 0; i < keyValuePairs.length - 1; i += 2) {
-            add(keyValuePairs[i], keyValuePairs[i + 1], percentEncode);
-        }
-    }
-
-    /**
-     * Convenience method to merge a {@code Map<String, List<String>>}.
-     *
-     * @param m the map
-     */
-    public void addMap(Map<String, List<String>> m) {
-        for (String key : m.keySet()) {
-            Collection<String> vals = getAll(key);
-            if (vals == null) {
-                vals = new LimitedSet<>(sizeLimit, elementSizeLimit);
-                for (String v : vals) {
-                    super.add(key, v);
-                }
-            }
-            vals.addAll(m.get(key));
-        }
     }
 
     public String getAsQueryString(boolean percentEncode) throws MalformedInputException, UnmappableCharacterException {

@@ -1,5 +1,6 @@
 package org.xbib.netty.http.client.test.http1;
 
+import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpMethod;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -9,6 +10,7 @@ import org.xbib.netty.http.client.test.NettyHttpTestExtension;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -28,7 +30,33 @@ class Http1Test {
                             resp.getBodyAsString(StandardCharsets.UTF_8) +
                             " status=" + resp.getStatus()))
                     .build();
-            client.execute(request).get();
+            client.execute(request).get().close();
+        } finally {
+            client.shutdownGracefully();
+        }
+    }
+
+    @Test
+    void testHttpGetRequest() throws Exception {
+        Client client = Client.builder()
+                .enableDebug()
+                .build();
+        try {
+            Map<String, Object> parameters = Map.of(
+                    "version", "1.1",
+                    "operation", "searchRetrieve",
+                    "recordSchema", "MARC21plus-1-xml",
+                    "query", "iss = 00280836"
+            );
+            Request request = Request.post()
+                    .url("https://services.dnb.de/sru/zdb")
+                    .setParameters(parameters)
+                    .setResponseListener(resp -> logger.log(Level.INFO,
+                            "got response: " + resp.getHeaders() +
+                                    resp.getBodyAsString(StandardCharsets.UTF_8) +
+                                    " status=" + resp.getStatus()))
+                    .build();
+            client.execute(request).get().close();
         } finally {
             client.shutdownGracefully();
         }
@@ -48,7 +76,7 @@ class Http1Test {
                     .setResponseListener(resp -> logger.log(Level.FINE, "got response: " +
                             resp.getBodyAsString(StandardCharsets.UTF_8)))
                     .build();
-            client.execute(request2).get();
+            client.execute(request2).get().close();
         } finally {
             client.shutdownGracefully();
         }

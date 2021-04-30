@@ -14,18 +14,14 @@ import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.util.AsciiString;
-import org.xbib.net.PercentEncoder;
-import org.xbib.net.PercentEncoders;
 import org.xbib.net.URL;
 import org.xbib.netty.http.common.HttpAddress;
-import org.xbib.netty.http.common.HttpParameters;
 import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.common.cookie.Cookie;
+import org.xbib.netty.http.common.util.CaseInsensitiveParameters;
 
 import java.nio.charset.Charset;
-import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
-import java.nio.charset.UnmappableCharacterException;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -34,6 +30,7 @@ import java.util.Base64;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -285,8 +282,6 @@ public final class Request {
 
         private final Collection<Cookie> cookies;
 
-        private PercentEncoder encoder;
-
         private HttpMethod httpMethod;
 
         private HttpHeaders headers;
@@ -303,13 +298,13 @@ public final class Request {
 
         private CharSequence contentType;
 
-        private HttpParameters uriParameters;
+        private final CaseInsensitiveParameters uriParameters;
 
-        private HttpParameters formParameters;
+        private final CaseInsensitiveParameters formParameters;
 
         private ByteBuf content;
 
-        private List<InterfaceHttpData> bodyData;
+        private final List<InterfaceHttpData> bodyData;
 
         private long timeoutInMillis;
 
@@ -338,14 +333,9 @@ public final class Request {
             this.removeHeaders = new ArrayList<>();
             this.cookies = new HashSet<>();
             this.bodyData = new ArrayList<>();
-            charset(StandardCharsets.UTF_8);
-        }
-
-        public Builder charset(Charset charset) {
-            this.encoder = PercentEncoders.getQueryEncoder(charset);
-            this.formParameters = new HttpParameters(DEFAULT_FORM_CONTENT_TYPE);
-            this.uriParameters = new HttpParameters(DEFAULT_FORM_CONTENT_TYPE);
-            return this;
+            this.contentType = DEFAULT_FORM_CONTENT_TYPE;
+            this.formParameters = new CaseInsensitiveParameters();
+            this.uriParameters = new CaseInsensitiveParameters();
         }
 
         public Builder setMethod(HttpMethod httpMethod) {
@@ -433,7 +423,6 @@ public final class Request {
             Objects.requireNonNull(contentType);
             Objects.requireNonNull(charset);
             this.contentType = contentType;
-            charset(charset);
             addHeader(HttpHeaderNames.CONTENT_TYPE, contentType + "; charset=" + charset.name().toLowerCase());
             return this;
         }
@@ -453,29 +442,28 @@ public final class Request {
             } else {
                 collection = (Collection<Object>) value;
             }
-            String k = encode(contentType, name);
-            collection.forEach(v -> uriParameters.addRaw(k, encode(contentType, v.toString())));
+            collection.forEach(v -> uriParameters.add(name, v.toString()));
             return this;
         }
 
         public Builder addRawParameter(String name, String value) {
             Objects.requireNonNull(name);
             Objects.requireNonNull(value);
-            uriParameters.addRaw(name, value);
+            uriParameters.add(name, value);
             return this;
         }
 
         public Builder addFormParameter(String name, String value) {
             Objects.requireNonNull(name);
             Objects.requireNonNull(value);
-            formParameters.addRaw(encode(contentType, name), encode(contentType, value));
+            formParameters.add(name, value);
             return this;
         }
 
         public Builder addRawFormParameter(String name, String value) {
             Objects.requireNonNull(name);
             Objects.requireNonNull(value);
-            formParameters.addRaw(name, value);
+            formParameters.add(name, value);
             return this;
         }
 
@@ -488,23 +476,6 @@ public final class Request {
         public Builder addBodyData(InterfaceHttpData data) {
             bodyData.add(data);
             return this;
-        }
-
-        private String encode(CharSequence contentType, String value) {
-            if (value == null) {
-                return null;
-            }
-            try {
-                String encodedValue = encoder.encode(value);
-                // https://www.w3.org/TR/html4/interact/forms.html#h-17.13.4
-                if (HttpHeaderValues.APPLICATION_X_WWW_FORM_URLENCODED.equals(contentType)) {
-                    encodedValue = encodedValue.replace("%20", "+");
-                }
-                return encodedValue;
-            } catch (MalformedInputException | UnmappableCharacterException e) {
-                // should never be reached because encoder does not bail out on error
-                throw new IllegalArgumentException(e);
-            }
         }
 
         public Builder addCookie(Cookie cookie) {
@@ -610,7 +581,7 @@ public final class Request {
                 // add our URI parameters to the URL
                 URL.Builder mutator = url.mutator();
                 uriParameters.forEach(e -> mutator.queryParam(e.getKey(), e.getValue()));
-                // calling build() performs percent encoding
+                // calling build() performs extra percent encoding!
                 url = mutator.build();
                 String scheme = url.getScheme();
                 if (httpVersion.majorVersion() == 2) {
@@ -626,12 +597,7 @@ public final class Request {
                 validatedHeaders.set(HttpHeaderNames.ACCEPT_ENCODING, "gzip");
             }
             if (!formParameters.isEmpty()) {
-                try {
-                    // form parameters are already percent encoded
-                    content(formParameters.getAsQueryString(false), formParameters.getContentType());
-                } catch (MalformedInputException | UnmappableCharacterException e) {
-                    throw new IllegalArgumentException();
-                }
+                content(getAsQueryString(formParameters), contentType);
             }
             int length = content != null ? content.readableBytes() : 0;
             if (!validatedHeaders.contains(HttpHeaderNames.CONTENT_LENGTH) && !validatedHeaders.contains(HttpHeaderNames.TRANSFER_ENCODING)) {
@@ -673,6 +639,31 @@ public final class Request {
             this.content = body;
             addHeader(HttpHeaderNames.CONTENT_LENGTH, (long) body.readableBytes());
             addHeader(HttpHeaderNames.CONTENT_TYPE, contentType);
+        }
+
+        private String getAsQueryString(CaseInsensitiveParameters parameters) {
+            List<String> list = new ArrayList<>();
+            for (String key : parameters.names()) {
+                list.add(getAsQueryString(parameters, key));
+            }
+            return String.join("&", list);
+        }
+
+        private String getAsQueryString(CaseInsensitiveParameters parameters, String key) {
+            Collection<String> values = parameters.getAll(key);
+            if (values == null) {
+                return key + '=';
+            }
+            Iterator<String> it = values.iterator();
+            StringBuilder sb = new StringBuilder();
+            while (it.hasNext()) {
+                String v = it.next();
+                sb.append(key).append('=').append(v);
+                if (it.hasNext()) {
+                    sb.append('&');
+                }
+            }
+            return sb.toString();
         }
     }
 }

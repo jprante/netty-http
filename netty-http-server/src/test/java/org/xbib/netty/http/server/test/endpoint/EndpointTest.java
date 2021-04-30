@@ -414,7 +414,8 @@ class EndpointTest {
         }
         HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .addEndpointResolver(endpointResolverBuilder
-                        .setDispatcher((req, resp) -> resp.getBuilder().setStatus(HttpResponseStatus.OK).build().flush())
+                        .setDispatcher((req, resp) -> resp.getBuilder()
+                                .setStatus(HttpResponseStatus.OK.code()).build().flush())
                         .build())
                 .build();
         Server server = Server.builder(domain)
@@ -455,7 +456,8 @@ class EndpointTest {
         for (int i = 0; i < max; i++) {
             domainBuilder.addEndpointResolver(endpointResolverBuilder.addEndpoint(HttpEndpoint.builder()
                     .setPath("/" + i + "/**").build())
-                    .setDispatcher((req, resp) -> resp.getBuilder().setStatus(HttpResponseStatus.OK).build().flush())
+                    .setDispatcher((req, resp) -> resp.getBuilder()
+                            .setStatus(HttpResponseStatus.OK.code()).build().flush())
                     .build());
         }
         Server server = Server.builder(domainBuilder.build())

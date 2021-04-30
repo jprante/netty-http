@@ -32,7 +32,7 @@ class CleartextTest {
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
         HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/", (request, response) ->
-                        response.getBuilder().setStatus(HttpResponseStatus.OK).setContentType("text/plain").build()
+                        response.getBuilder().setStatus(HttpResponseStatus.OK.code()).setContentType("text/plain").build()
                                 .write(request.getContent().toString(StandardCharsets.UTF_8)))
                 .build();
         Server server = Server.builder(domain)
@@ -77,7 +77,7 @@ class CleartextTest {
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
         HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/", (request, response) ->
-                        response.getBuilder().setStatus(HttpResponseStatus.OK).setContentType("text/plain").build()
+                        response.getBuilder().setStatus(HttpResponseStatus.OK.code()).setContentType("text/plain").build()
                                 .write(request.getContent().toString(StandardCharsets.UTF_8)))
                 .build();
         Server server = Server.builder(domain)
@@ -128,7 +128,7 @@ class CleartextTest {
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
         HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/**", (request, response) ->
-                        response.getBuilder().setStatus(HttpResponseStatus.OK).setContentType("text/plain").build()
+                        response.getBuilder().setStatus(HttpResponseStatus.OK.code()).setContentType("text/plain").build()
                                 .write(request.getContent().toString(StandardCharsets.UTF_8)))
                 .build();
         Server server = Server.builder(domain).build();
@@ -195,7 +195,7 @@ class CleartextTest {
         AtomicInteger counter1 = new AtomicInteger();
         HttpServerDomain domain1 = HttpServerDomain.builder(httpAddress1)
                 .singleEndpoint("/", (request, response) -> {
-                    response.getBuilder().setStatus(HttpResponseStatus.OK).setContentType("text/plain").build()
+                    response.getBuilder().setStatus(HttpResponseStatus.OK.code()).setContentType("text/plain").build()
                             .write(request.getContent().toString(StandardCharsets.UTF_8));
                     counter1.incrementAndGet();
                 })
@@ -207,7 +207,7 @@ class CleartextTest {
         AtomicInteger counter2 = new AtomicInteger();
         HttpServerDomain domain2 = HttpServerDomain.builder(httpAddress2)
                 .singleEndpoint("/", (request, response) -> {
-                    response.getBuilder().setStatus(HttpResponseStatus.OK).setContentType("text/plain").build()
+                    response.getBuilder().setStatus(HttpResponseStatus.OK.code()).setContentType("text/plain").build()
                             .write(request.getContent().toString(StandardCharsets.UTF_8));
                     counter2.incrementAndGet();
                 })

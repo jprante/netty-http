@@ -64,17 +64,54 @@ class RequestBuilderTest {
     }
 
     @Test
+    void testGetRequestWithPercent() {
+        Request request = Request.builder(HttpMethod.GET)
+                .url("http://xbib.org")
+                .addParameter("param1", "value1")
+                .addParameter("param2", "value%")
+                .build();
+        assertEquals("?param1=value1&param2=value%25", request.relative());
+        assertEquals("http://xbib.org?param1=value1&param2=value%25", request.url().toExternalForm());
+        assertEquals("http://xbib.org?param1=value1&param2=value%", request.url().toString());
+    }
+
+    @Test
+    void testGetRequestWithSpaces() {
+        Request request = Request.builder(HttpMethod.GET)
+                .url("http://xbib.org")
+                .addParameter(" param1 ", " value1 ")
+                .addParameter(" param2 ", " value2 ")
+                .build();
+        assertEquals("?%20param1%20=%20value1%20&%20param2%20=%20value2%20", request.relative());
+        assertEquals("http://xbib.org?%20param1%20=%20value1%20&%20param2%20=%20value2%20", request.url().toExternalForm());
+    }
+
+    @Test
     void testBasicPostRequest() {
         Request request = Request.builder(HttpMethod.POST)
                 .url("http://xbib.org")
                 .addParameter("param1", "value1")
                 .addParameter("param2", "value2")
-                .content("a=b&c=d", "application/x-www-form-urldencoded")
+                .content("a=b&c=d", "application/x-www-form-urlencoded")
                 .build();
         assertEquals("xbib.org", request.url().getHost());
         assertEquals("?param1=value1&param2=value2", request.relative());
         assertEquals("http://xbib.org?param1=value1&param2=value2", request.url().toExternalForm());
         assertEquals("a=b&c=d", request.content().toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void testFormRequest() {
+        Request request = Request.builder(HttpMethod.POST)
+                .url("http://xbib.org")
+                .addParameter("param1", "value1")
+                .addParameter("param2", "value%")
+                .content("a=b&c=%", "application/x-www-form-urlencoded")
+                .build();
+        assertEquals("xbib.org", request.url().getHost());
+        assertEquals("?param1=value1&param2=value%25", request.relative());
+        assertEquals("http://xbib.org?param1=value1&param2=value%25", request.url().toExternalForm());
+        assertEquals("a=b&c=%", request.content().toString(StandardCharsets.UTF_8));
     }
 
     @Test

@@ -1,5 +1,5 @@
 
-def junitVersion = project.hasProperty('junit.version')?project.property('junit.version'):'5.6.2'
+def junitVersion = project.hasProperty('junit.version')?project.property('junit.version'):'5.7.1'
 def hamcrestVersion = project.hasProperty('hamcrest.version')?project.property('hamcrest.version'):'2.2'
 
 dependencies {
@@ -12,6 +12,7 @@ dependencies {
 test {
     useJUnitPlatform()
     failFast = true
+    systemProperty 'java.util.logging.config.file', 'src/test/resources/logging.properties'
     testLogging {
         events 'STARTED', 'PASSED', 'FAILED', 'SKIPPED'
     }

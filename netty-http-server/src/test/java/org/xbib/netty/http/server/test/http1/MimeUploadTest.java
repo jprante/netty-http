@@ -38,7 +38,7 @@ class MimeUploadTest {
                     logger.log(Level.INFO, "got request, headers = " + req.getHeaders() +
                             " params = " + parameters.toString() +
                             " body = " + req.getContent().toString(StandardCharsets.UTF_8));
-                    resp.getBuilder().setStatus(HttpResponseStatus.OK).build().flush();
+                    resp.getBuilder().setStatus(HttpResponseStatus.OK.code()).build().flush();
                 },  "POST")
                 .build();
         Server server = Server.builder(domain)
