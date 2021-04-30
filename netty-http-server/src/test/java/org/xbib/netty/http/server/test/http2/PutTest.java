@@ -34,7 +34,7 @@ class PutTest {
                 .singleEndpoint("/put", "/**", (req, resp) -> {
                     logger.log(Level.INFO, "got request " +
                             req.getContent().toString(StandardCharsets.UTF_8));
-                    resp.getBuilder().setStatus(HttpResponseStatus.OK).build().flush();
+                    resp.getBuilder().setStatus(HttpResponseStatus.OK.code()).build().flush();
                     success1.set(true);
                 }, "PUT")
                 .build();
@@ -83,7 +83,7 @@ class PutTest {
                 .singleEndpoint("/put", "/**", (req, resp) -> {
                     logger.log(Level.INFO, "got request, length = " +
                             req.getContent().readableBytes());
-                    resp.getBuilder().setStatus(HttpResponseStatus.OK).build().flush();
+                    resp.getBuilder().setStatus(HttpResponseStatus.OK.code()).build().flush();
                     success1.set(true);
                 }, "PUT")
                 .build();

@@ -42,7 +42,7 @@ class PostTest {
                     if ("Jörg".equals(parameters.get("name"))) {
                         success3.set(true);
                     }
-                    resp.getBuilder().setStatus(HttpResponseStatus.OK).build().flush();
+                    resp.getBuilder().setStatus(HttpResponseStatus.OK.code()).build().flush();
                 },  "POST")
                 .build();
         Server server = Server.builder(domain)
@@ -92,7 +92,7 @@ class PostTest {
                     if ("Jörg".equals(parameters.get("name"))) {
                         success3.set(true);
                     }
-                    resp.getBuilder().setStatus(HttpResponseStatus.OK).build().flush();
+                    resp.getBuilder().setStatus(HttpResponseStatus.OK.code()).build().flush();
                 },  "POST")
                 .build();
         Server server = Server.builder(domain)

@@ -29,7 +29,7 @@ class TransportLayerSecurityServerTest {
         Server server = Server.builder(HttpServerDomain.builder(httpAddress)
                 .setSelfCert()
                 .singleEndpoint("/", (request, response) ->
-                        response.getBuilder().setStatus(HttpResponseStatus.OK).setContentType("text/plain").build()
+                        response.getBuilder().setStatus(HttpResponseStatus.OK.code()).setContentType("text/plain").build()
                                 .write(request.getContent().toString(StandardCharsets.UTF_8)))
                 .build())
                 .setTransportLayerSecurityProtocols("TLSv1.2")
@@ -66,7 +66,7 @@ class TransportLayerSecurityServerTest {
         Server server = Server.builder(HttpServerDomain.builder(httpAddress)
                 .setSelfCert()
                 .singleEndpoint("/", (request, response) ->
-                        response.getBuilder().setStatus(HttpResponseStatus.OK).setContentType("text/plain").build()
+                        response.getBuilder().setStatus(HttpResponseStatus.OK.code()).setContentType("text/plain").build()
                                 .write(request.getContent().toString(StandardCharsets.UTF_8)))
                 .build())
                 .setTransportLayerSecurityProtocols("TLSv1.3")

@@ -21,7 +21,7 @@ class MixedProtocolTest {
     void testHttp1ClientHttp2Server() throws Exception {
         HttpAddress httpAddress = HttpAddress.http2("localhost", 8008);
         HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
-                .singleEndpoint("/", (request, response) -> response.getBuilder().setStatus(HttpResponseStatus.OK).build().flush())
+                .singleEndpoint("/", (request, response) -> response.getBuilder().setStatus(HttpResponseStatus.OK.code()).build().flush())
                 .build();
         Server server = Server.builder(domain)
                 .build();
@@ -54,7 +54,7 @@ class MixedProtocolTest {
         HttpAddress httpAddress = HttpAddress.http1("localhost", 8008);
         HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .singleEndpoint("/", (request, response) ->
-                        response.getBuilder().setStatus(HttpResponseStatus.OK).build().flush())
+                        response.getBuilder().setStatus(HttpResponseStatus.OK.code()).build().flush())
                 .build();
         Server server = Server.builder(domain)
                 .build();
@@ -91,7 +91,7 @@ class MixedProtocolTest {
         HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .setSelfCert()
                 .singleEndpoint("/", (request, response) ->
-                        response.getBuilder().setStatus(HttpResponseStatus.OK).build().flush()
+                        response.getBuilder().setStatus(HttpResponseStatus.OK.code()).build().flush()
                 )
                 .build();
         Server server = Server.builder(domain)

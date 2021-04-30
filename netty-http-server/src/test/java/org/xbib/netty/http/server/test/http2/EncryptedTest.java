@@ -33,7 +33,7 @@ class EncryptedTest {
         Server server = Server.builder(HttpServerDomain.builder(httpAddress)
                 .setSelfCert()
                 .singleEndpoint("/", (request, response) ->
-                        response.getBuilder().setStatus(HttpResponseStatus.OK).setContentType("text/plain").build()
+                        response.getBuilder().setStatus(HttpResponseStatus.OK.code()).setContentType("text/plain").build()
                                 .write(request.getContent().toString(StandardCharsets.UTF_8)))
                 .build())
                 .build();
@@ -73,7 +73,7 @@ class EncryptedTest {
         HttpServerDomain domain = HttpServerDomain.builder(httpAddress)
                 .setSelfCert()
                 .singleEndpoint("/", (request, response) ->
-                        response.getBuilder().setStatus(HttpResponseStatus.OK).setContentType("text/plain").build()
+                        response.getBuilder().setStatus(HttpResponseStatus.OK.code()).setContentType("text/plain").build()
                                 .write(request.getContent().toString(StandardCharsets.UTF_8)))
                 .build();
         Server server = Server.builder(domain)
@@ -126,7 +126,7 @@ class EncryptedTest {
         Server server = Server.builder(HttpServerDomain.builder(httpAddress)
                 .setSelfCert()
                 .singleEndpoint("/", (request, response) ->
-                        response.getBuilder().setStatus(HttpResponseStatus.OK).setContentType("text/plain").build()
+                        response.getBuilder().setStatus(HttpResponseStatus.OK.code()).setContentType("text/plain").build()
                                 .write(request.getContent().toString(StandardCharsets.UTF_8)))
                 .build())
                 .build();
