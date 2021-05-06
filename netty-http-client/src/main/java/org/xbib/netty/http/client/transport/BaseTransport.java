@@ -94,6 +94,7 @@ public abstract class BaseTransport implements ClientTransport {
             } else {
                 completableFuture.cancel(true);
             }
+            close();
         });
         execute(request);
         return completableFuture;
@@ -101,7 +102,6 @@ public abstract class BaseTransport implements ClientTransport {
 
     @Override
     public void close() {
-        // channels are present, maybe forgot a get() to receive responses?
         get();
         cancel();
     }

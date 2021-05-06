@@ -73,7 +73,8 @@ public class RestClient {
                 requestBuilder.content(byteBuf);
             }
             client.newTransport(HttpAddress.http1(url))
-                    .execute(requestBuilder.setResponseListener(restClient::setResponse).build()).close();
+                    .execute(requestBuilder.setResponseListener(restClient::setResponse).build())
+                    .close();
         } catch (Exception e) {
             throw new IOException(e);
         }
