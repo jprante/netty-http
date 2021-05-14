@@ -63,6 +63,27 @@ class Http1Test {
     }
 
     @Test
+    void testHttpsGetRequest() throws Exception {
+        Client client = Client.builder()
+                .enableDebug()
+                .setJdkSslProvider()
+                .build();
+        try {
+            Request request = Request.post()
+                    .url("http://hebis.rz.uni-frankfurt.de/HEBCGI/vuefl_recv_data.pl")
+                    .setResponseListener(resp -> logger.log(Level.INFO,
+                            "got response: " + resp.getHeaders() +
+                                    resp.getBodyAsString(StandardCharsets.UTF_8) +
+                                    " status=" + resp.getStatus()))
+                    .build();
+            client.execute(request).get().close();
+        } finally {
+            client.shutdownGracefully();
+        }
+    }
+
+
+    @Test
     void testSequentialRequests() throws Exception {
         Client client = Client.builder()
                 .build();

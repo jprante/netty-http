@@ -38,7 +38,8 @@ class PostTest {
                     if ("Hello World".equals(parameters.get("withspace"))) {
                         success2.set(true);
                     }
-                    if ("Jörg".equals(parameters.get("name"))) {
+                    // ISO-8859
+                    if ("JÃ¶rg".equals(parameters.get("name"))) {
                         success3.set(true);
                     }
                     resp.getBuilder().setStatus(HttpResponseStatus.OK.code()).build().flush();
@@ -70,6 +71,7 @@ class PostTest {
             client.shutdownGracefully();
             logger.log(Level.INFO, "server and client shut down");
         }
+        logger.log(Level.INFO, "1=" + success1 + " 2=" + success2 + " 3=" + success3);
         assertTrue(success1.get());
         assertTrue(success2.get());
         assertTrue(success3.get());

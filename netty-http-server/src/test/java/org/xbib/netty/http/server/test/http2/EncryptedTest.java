@@ -82,7 +82,7 @@ class EncryptedTest {
         Client client = Client.builder()
                 .trustInsecure()
                 .addPoolNode(httpAddress)
-                .setPoolNodeConnectionLimit(2)
+                .setPoolNodeConnectionLimit(4)
                 .build();
         final AtomicInteger counter = new AtomicInteger();
         final ResponseListener<HttpResponse> responseListener = resp -> {
@@ -109,7 +109,7 @@ class EncryptedTest {
                     break;
                 }
             }
-            transport.get(60L, TimeUnit.SECONDS);
+            transport.get(30L, TimeUnit.SECONDS);
         } finally {
             server.shutdownGracefully();
             client.shutdownGracefully();
@@ -166,14 +166,13 @@ class EncryptedTest {
                 });
             }
             executorService.shutdown();
-            boolean terminated = executorService.awaitTermination(20, TimeUnit.SECONDS);
+            boolean terminated = executorService.awaitTermination(30L, TimeUnit.SECONDS);
             executorService.shutdownNow();
             logger.log(Level.INFO, "terminated = " + terminated + ", now waiting for transport to complete");
-            Thread.sleep(2000L);
-            transport.get(20, TimeUnit.SECONDS);
+            transport.get(30L, TimeUnit.SECONDS);
         } finally {
-            client.shutdownGracefully(20, TimeUnit.SECONDS);
-            server.shutdownGracefully(20, TimeUnit.SECONDS);
+            client.shutdownGracefully(30L, TimeUnit.SECONDS);
+            server.shutdownGracefully(30L, TimeUnit.SECONDS);
         }
         assertEquals(threads * loop , counter.get());
     }

@@ -85,7 +85,7 @@ class CleartextTest {
         server.accept();
         Client client = Client.builder()
                 .addPoolNode(httpAddress)
-                .setPoolNodeConnectionLimit(2)
+                .setPoolNodeConnectionLimit(4)
                 .build();
         final AtomicInteger counter = new AtomicInteger();
         final ResponseListener<HttpResponse> responseListener = resp -> {
@@ -97,7 +97,6 @@ class CleartextTest {
             }
         };
         try {
-            // single transport, single thread
             ClientTransport transport = client.newTransport();
             for (int i = 0; i < loop; i++) {
                 String payload = 0 + "/" + i;
@@ -112,7 +111,7 @@ class CleartextTest {
                     break;
                 }
             }
-            transport.get(10L, TimeUnit.SECONDS);
+            transport.get(30L, TimeUnit.SECONDS);
         } finally {
             server.shutdownGracefully();
             client.shutdownGracefully();
@@ -174,7 +173,6 @@ class CleartextTest {
             boolean terminated = executorService.awaitTermination(30L, TimeUnit.SECONDS);
             executorService.shutdownNow();
             logger.log(Level.INFO, "terminated = " + terminated + ", now waiting 30s for transport to complete");
-            Thread.sleep(2000L);
             transport.get(30L, TimeUnit.SECONDS);
             logger.log(Level.INFO, "transport complete");
         } finally {
@@ -189,8 +187,8 @@ class CleartextTest {
 
     @Test
     void testTwoPooledClearTextHttp2() throws Exception {
-        int threads = 2;
-        int loop = 1000;
+        int threads = 4;
+        int loop = 1024;
         HttpAddress httpAddress1 = HttpAddress.http2("localhost", 8008);
         AtomicInteger counter1 = new AtomicInteger();
         HttpServerDomain domain1 = HttpServerDomain.builder(httpAddress1)
@@ -258,10 +256,9 @@ class CleartextTest {
                 });
             }
             executorService.shutdown();
-            boolean terminated = executorService.awaitTermination(10L, TimeUnit.SECONDS);
+            boolean terminated = executorService.awaitTermination(30L, TimeUnit.SECONDS);
             logger.log(Level.INFO, "terminated = " + terminated + ", now waiting for transport to complete");
-            Thread.sleep(2000L);
-            transport.get(10L, TimeUnit.SECONDS);
+            transport.get(30L, TimeUnit.SECONDS);
             logger.log(Level.INFO, "transport complete");
         } finally {
             server1.shutdownGracefully();
