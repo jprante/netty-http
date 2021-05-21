@@ -23,7 +23,6 @@ class BindExceptionTest {
         Server server1 = Server.builder(domain).build();
         Server server2 = Server.builder(domain).build();
         try {
-            // ATTN: when using native libraries (epoll), the bind exception will be an internal error
             Assertions.assertThrows(BindException.class, () ->{
                 ChannelFuture channelFuture1 = server1.accept();
                 assertNotNull(channelFuture1);

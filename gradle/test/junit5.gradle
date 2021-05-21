@@ -12,6 +12,7 @@ dependencies {
 test {
     useJUnitPlatform()
     failFast = true
+    maxHeapSize '1g'
     systemProperty 'java.util.logging.config.file', 'src/test/resources/logging.properties'
     testLogging {
         events 'STARTED', 'PASSED', 'FAILED', 'SKIPPED'

@@ -29,6 +29,7 @@ import org.xbib.netty.http.server.endpoint.HttpEndpointResolver;
 import org.xbib.netty.http.server.security.CertificateUtils;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.net.BindException;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.CertificateParsingException;
@@ -183,18 +184,26 @@ public final class Server implements AutoCloseable {
     /**
      * Start accepting incoming connections.
      * @return the channel future
-     * @throws IOException if channel future sync is interrupted
+     * @throws BindException if socket bind did not succeed
      */
-    public ChannelFuture accept() throws IOException {
-        HttpAddress httpAddress = serverConfig.getAddress();
-        logger.log(Level.INFO, () -> "trying to bind to " + httpAddress);
+    public ChannelFuture accept() throws BindException {
         try {
-            this.channelFuture = bootstrap.bind(httpAddress.getInetSocketAddress()).await().sync();
-        } catch (InterruptedException e) {
-            throw new IOException(e);
+            HttpAddress httpAddress = serverConfig.getAddress();
+            logger.log(Level.INFO, () -> "trying to bind to " + httpAddress);
+            try {
+                this.channelFuture = bootstrap.bind(httpAddress.getInetSocketAddress()).await().sync();
+            } catch (InterruptedException e) {
+                throw new BindException(e.getMessage());
+            }
+            logger.log(Level.INFO, () -> ServerName.getServerName() + " ready, listening on " + httpAddress);
+            return channelFuture;
+        } catch (Exception e) {
+            if (e instanceof BindException) {
+                throw e;
+            } else {
+                throw new BindException(e.getMessage());
+            }
         }
-        logger.log(Level.INFO, () -> ServerName.getServerName() + " ready, listening on " + httpAddress);
-        return channelFuture;
     }
 
     public AtomicLong getRequestCounter() {

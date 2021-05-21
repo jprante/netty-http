@@ -169,6 +169,7 @@ class CleartextTest {
                     }
                 });
             }
+            Thread.sleep(5000L);
             executorService.shutdown();
             boolean terminated = executorService.awaitTermination(30L, TimeUnit.SECONDS);
             executorService.shutdownNow();
@@ -176,8 +177,8 @@ class CleartextTest {
             transport.get(30L, TimeUnit.SECONDS);
             logger.log(Level.INFO, "transport complete");
         } finally {
-            client.shutdownGracefully();
             server.shutdownGracefully();
+            client.shutdownGracefully();
         }
         logger.log(Level.INFO, "client requests = " + client.getRequestCounter() +
                 " client responses = " + client.getResponseCounter());
@@ -255,6 +256,7 @@ class CleartextTest {
                     }
                 });
             }
+            Thread.sleep(5000L);
             executorService.shutdown();
             boolean terminated = executorService.awaitTermination(30L, TimeUnit.SECONDS);
             logger.log(Level.INFO, "terminated = " + terminated + ", now waiting for transport to complete");

@@ -7,4 +7,6 @@ dependencies {
     testRuntimeOnly "org.javassist:javassist:${project.property('javassist.version')}"
     testRuntimeOnly "org.bouncycastle:bcpkix-jdk15on:${project.property('bouncycastle.version')}"
     testRuntimeOnly "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
+    testRuntimeOnly project(":netty-http-epoll")
+    testRuntimeOnly project(":netty-http-kqueue")
 }

@@ -34,12 +34,12 @@ class PoolTest {
 
     private static final Logger logger = Logger.getLogger(PoolTest.class.getName());
 
-    private static final int TEST_STEP_TIME_SECONDS = 50;
+    private static final long TEST_STEP_TIME_SECONDS = 60L;
 
-    private static final int BATCH_SIZE = 0x100;
+    private static final int BATCH_SIZE = 100;
 
     @ParameterizedTest
-    @ValueSource(ints = {1,10,100})
+    @ValueSource(ints = {1,10,25})
     void testPool(int concurrencyLevel) throws InterruptedException {
         ConcurrentMap<HttpAddress, LongAdder> nodeFreq = new ConcurrentHashMap<>();
         int nodecount = 2;
