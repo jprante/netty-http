@@ -20,15 +20,15 @@ class XbibTest {
 
     @Test
     void testXbibOrgWithDefaults() throws IOException {
-        Client client = new Client();
+        Client client = Client.builder().build();
         try {
             Request request = Request.get().url("https://xbib.org")
-                    .setResponseListener(resp -> {
-                        logger.log(Level.INFO, "status = " + resp.getStatus() +
-                                " response = " + resp.getBodyAsString(StandardCharsets.UTF_8));
-                    })
+                    .setResponseListener(resp -> logger.log(Level.INFO, "status = " + resp.getStatus() +
+                                " response = " + resp.getBodyAsString(StandardCharsets.UTF_8)))
+                    .setTimeoutListener(req -> logger.log(Level.WARNING, "timeout!"))
+                    .setExceptionListener(throwable -> logger.log(Level.SEVERE, throwable.getMessage(), throwable))
                     .build();
-            client.execute(request);
+            client.execute(request).close();
         } finally {
             client.shutdownGracefully();
         }

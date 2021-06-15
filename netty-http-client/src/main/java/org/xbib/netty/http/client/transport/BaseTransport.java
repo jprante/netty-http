@@ -32,6 +32,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -76,7 +77,7 @@ public abstract class BaseTransport implements ClientTransport {
     }
 
     /**
-     * Method for executing in a wrapping completable future.
+     * Method for executing the request and respond in a completable future.
      *
      * @param request request
      * @param supplier supplier
@@ -96,6 +97,8 @@ public abstract class BaseTransport implements ClientTransport {
             }
             close();
         });
+        request.setTimeoutListener(req -> completableFuture.completeExceptionally(new TimeoutException()));
+        request.setExceptionListener(completableFuture::completeExceptionally);
         execute(request);
         return completableFuture;
     }
@@ -153,8 +156,15 @@ public abstract class BaseTransport implements ClientTransport {
                     for (Integer key : flow.keys()) {
                         String requestKey = getRequestKey(entry.getKey(), key);
                         try {
-                            flow.get(key).get(value, timeUnit);
-                            completeRequest(requestKey);
+                            CompletableFuture<Boolean> timeoutFuture = flow.get(key);
+                            Boolean timeout = timeoutFuture.get(value, timeUnit);
+                            if (timeout) {
+                                completeRequest(requestKey);
+                            } else {
+                                completeRequestTimeout(requestKey, new TimeoutException());
+                            }
+                        } catch (TimeoutException e) {
+                            completeRequestTimeout(requestKey, new TimeoutException());
                         } catch (Exception e) {
                             completeRequestExceptionally(requestKey, e);
                             flow.fail(e);
@@ -360,8 +370,17 @@ public abstract class BaseTransport implements ClientTransport {
     private void completeRequestExceptionally(String requestKey, Throwable throwable) {
         if (requestKey != null) {
             Request request = requests.get(requestKey);
-            if (request != null && request.getCompletableFuture() != null) {
-                request.getCompletableFuture().completeExceptionally(throwable);
+            if (request != null) {
+                request.onException(throwable);
+            }
+        }
+    }
+
+    private void completeRequestTimeout(String requestKey, TimeoutException timeoutException) {
+        if (requestKey != null) {
+            Request request = requests.get(requestKey);
+            if (request != null) {
+                request.onTimeout();
             }
         }
     }

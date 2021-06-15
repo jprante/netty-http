@@ -38,7 +38,8 @@ class CleartextTest {
                                 .setContentType("text/plain").build()
                                 .write(request.getContent().toString(StandardCharsets.UTF_8)))
                 .build();
-        Server server = Server.builder(domain).build();
+        Server server = Server.builder(domain)
+                .build();
         server.accept();
         Client client = Client.builder()
                 .build();

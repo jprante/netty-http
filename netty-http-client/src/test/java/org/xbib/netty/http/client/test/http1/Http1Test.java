@@ -82,6 +82,25 @@ class Http1Test {
         }
     }
 
+    @Test
+    void testHttpsGetRequestHebisSRU() throws Exception {
+        Client client = Client.builder()
+                .enableDebug()
+                .build();
+        try {
+            Request request = Request.get()
+                    .url("http://sru.hebis.de/sru/DB=2.1?version=1.1&operation=searchRetrieve&recordSchema=marc21&query=prs%20=%20Smith&startRecord=1&maximumRecords=10")
+                    .setResponseListener(resp -> logger.log(Level.INFO,
+                            "got response: " + resp.getHeaders() +
+                                    resp.getBodyAsString(StandardCharsets.UTF_8) +
+                                    " status=" + resp.getStatus()))
+                    .build();
+            client.execute(request).get().close();
+        } finally {
+            client.shutdownGracefully();
+        }
+    }
+
 
     @Test
     void testSequentialRequests() throws Exception {

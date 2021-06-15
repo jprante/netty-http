@@ -20,6 +20,7 @@ import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.common.cookie.Cookie;
 import org.xbib.netty.http.common.util.CaseInsensitiveParameters;
 
+import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.ZoneOffset;
@@ -39,7 +40,7 @@ import java.util.concurrent.CompletableFuture;
 /**
  * HTTP client request.
  */
-public final class Request {
+public final class Request implements AutoCloseable {
 
     private final URL url;
 
@@ -71,10 +72,16 @@ public final class Request {
 
     private ResponseListener<HttpResponse> responseListener;
 
+    private ExceptionListener exceptionListener;
+
+    private TimeoutListener timeoutListener;
+
     private Request(URL url, HttpVersion httpVersion, HttpMethod httpMethod,
                     HttpHeaders headers, Collection<Cookie> cookies, ByteBuf content, List<InterfaceHttpData> bodyData,
                     long timeoutInMillis, boolean followRedirect, int maxRedirect, int redirectCount,
-                    boolean isBackOff, BackOff backOff, ResponseListener<HttpResponse> responseListener) {
+                    boolean isBackOff, BackOff backOff,
+                    ResponseListener<HttpResponse> responseListener, ExceptionListener exceptionListener,
+                    TimeoutListener timeoutListener) {
         this.url = url;
         this.httpVersion = httpVersion;
         this.httpMethod = httpMethod;
@@ -89,6 +96,8 @@ public final class Request {
         this.isBackOff = isBackOff;
         this.backOff = backOff;
         this.responseListener = responseListener;
+        this.exceptionListener = exceptionListener;
+        this.timeoutListener = timeoutListener;
     }
 
     public URL url() {
@@ -166,6 +175,11 @@ public final class Request {
     }
 
     @Override
+    public void close() throws IOException {
+        release();
+    }
+
+    @Override
     public String toString() {
         return "Request[url=" + url +
                 ",version=" + httpVersion +
@@ -196,6 +210,26 @@ public final class Request {
         }
         if (completableFuture != null) {
             completableFuture.complete(this);
+        }
+    }
+
+    public void setExceptionListener(ExceptionListener exceptionListener) {
+        this.exceptionListener = exceptionListener;
+    }
+
+    public void onException(Throwable throwable) {
+        if (exceptionListener != null) {
+            exceptionListener.onException(throwable);
+        }
+    }
+
+    public void setTimeoutListener(TimeoutListener timeoutListener) {
+        this.timeoutListener = timeoutListener;
+    }
+
+    public void onTimeout() {
+        if (timeoutListener != null) {
+            timeoutListener.onTimeout(this);
         }
     }
 
@@ -317,6 +351,10 @@ public final class Request {
         private BackOff backOff;
 
         private ResponseListener<HttpResponse> responseListener;
+
+        private ExceptionListener exceptionListener;
+
+        private TimeoutListener timeoutListener;
 
         Builder(ByteBufAllocator allocator) {
             this.allocator = allocator;
@@ -574,6 +612,16 @@ public final class Request {
             return this;
         }
 
+        public Builder setExceptionListener(ExceptionListener exceptionListener) {
+            this.exceptionListener = exceptionListener;
+            return this;
+        }
+
+        public Builder setTimeoutListener(TimeoutListener timeoutListener) {
+            this.timeoutListener = timeoutListener;
+            return this;
+        }
+
         public Request build() {
             DefaultHttpHeaders validatedHeaders = new DefaultHttpHeaders(true);
             validatedHeaders.set(headers);
@@ -622,7 +670,7 @@ public final class Request {
             }
             return new Request(url, httpVersion, httpMethod, validatedHeaders, cookies, content, bodyData,
                     timeoutInMillis, followRedirect, maxRedirects, 0, enableBackOff, backOff,
-                    responseListener);
+                    responseListener, exceptionListener, timeoutListener);
         }
 
         private void addHeader(AsciiString name, Object value) {
