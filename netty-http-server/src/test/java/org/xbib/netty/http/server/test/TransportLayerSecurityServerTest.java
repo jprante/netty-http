@@ -24,7 +24,42 @@ class TransportLayerSecurityServerTest {
     private static final Logger logger = Logger.getLogger(TransportLayerSecurityServerTest.class.getName());
 
     @Test
-    void testTLS12() throws Exception {
+    void testTLSDefaultSettings() throws Exception {
+        HttpAddress httpAddress = HttpAddress.secureHttp1("localhost", 8143);
+        Server server = Server.builder(HttpServerDomain.builder(httpAddress)
+                        .setSelfCert()
+                        .singleEndpoint("/", (request, response) ->
+                                response.getBuilder().setStatus(HttpResponseStatus.OK.code()).setContentType("text/plain").build()
+                                        .write(request.getContent().toString(StandardCharsets.UTF_8)))
+                        .build())
+                .build();
+        Client client = Client.builder()
+                .trustInsecure()
+                .build();
+        AtomicInteger counter = new AtomicInteger();
+        final ResponseListener<HttpResponse> responseListener = resp -> {
+            logger.log(Level.INFO, "response listener: headers = " + resp.getHeaders() +
+                    " response body = " + resp.getBodyAsString(StandardCharsets.UTF_8));
+            counter.incrementAndGet();
+        };
+        try {
+            server.accept();
+            Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
+                    .url(server.getServerConfig().getAddress().base())
+                    .content("Hello Jörg", "text/plain")
+                    .setResponseListener(responseListener)
+                    .build();
+            ClientTransport transport = client.execute(request).get();
+            logger.log(Level.INFO, "TLS protocol = " + transport.getSession().getProtocol());
+        } finally {
+            client.shutdownGracefully();
+            server.shutdownGracefully();
+        }
+        assertEquals(1, counter.get());
+    }
+
+    @Test
+    void testOpenSSL12() throws Exception {
         HttpAddress httpAddress = HttpAddress.secureHttp1("localhost", 8143);
         Server server = Server.builder(HttpServerDomain.builder(httpAddress)
                 .setSelfCert()
@@ -32,9 +67,12 @@ class TransportLayerSecurityServerTest {
                         response.getBuilder().setStatus(HttpResponseStatus.OK.code()).setContentType("text/plain").build()
                                 .write(request.getContent().toString(StandardCharsets.UTF_8)))
                 .build())
+                .setOpenSSLSslProvider()
                 .setTransportLayerSecurityProtocols("TLSv1.2")
                 .build();
         Client client = Client.builder()
+                .setOpenSSLSslProvider()
+                .setTransportLayerSecurityProtocols("TLSv1.2")
                 .trustInsecure()
                 .build();
         AtomicInteger counter = new AtomicInteger();
@@ -61,7 +99,7 @@ class TransportLayerSecurityServerTest {
     }
 
     @Test
-    void testTLS13() throws Exception {
+    void testOpenSSL13() throws Exception {
         HttpAddress httpAddress = HttpAddress.secureHttp2("localhost", 8143);
         Server server = Server.builder(HttpServerDomain.builder(httpAddress)
                 .setSelfCert()
@@ -69,9 +107,12 @@ class TransportLayerSecurityServerTest {
                         response.getBuilder().setStatus(HttpResponseStatus.OK.code()).setContentType("text/plain").build()
                                 .write(request.getContent().toString(StandardCharsets.UTF_8)))
                 .build())
+                .setOpenSSLSslProvider()
                 .setTransportLayerSecurityProtocols("TLSv1.3")
                 .build();
         Client client = Client.builder()
+                .setOpenSSLSslProvider()
+                .setTransportLayerSecurityProtocols("TLSv1.3")
                 .trustInsecure()
                 .build();
         AtomicInteger counter = new AtomicInteger();

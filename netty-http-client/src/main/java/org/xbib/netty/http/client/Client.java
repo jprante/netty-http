@@ -693,7 +693,7 @@ public final class Client implements AutoCloseable {
             return this;
         }
 
-        public Builder setTlsProtocols(String[] protocols) {
+        public Builder setTransportLayerSecurityProtocols(String... protocols) {
             clientConfig.setProtocols(protocols);
             return this;
         }

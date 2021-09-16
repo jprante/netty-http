@@ -6,6 +6,7 @@ import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.ssl.CipherSuiteFilter;
+import io.netty.handler.ssl.OpenSsl;
 import io.netty.handler.ssl.SslProvider;
 import org.xbib.netty.http.client.api.Pool;
 import org.xbib.netty.http.client.api.BackOff;
@@ -94,7 +95,6 @@ public class ClientConfig {
 
         /**
          * This is Netty's default.
-         * See {@link io.netty.handler.codec.MessageAggregator}.
          */
         int MAX_COMPOSITE_BUFFER_COMPONENTS = 1024;
 
@@ -119,9 +119,11 @@ public class ClientConfig {
         Provider SSL_CONTEXT_PROVIDER = null;
 
         /**
-         * Transport layer security protocol versions.
+         * Default transport layer security protocol versions (depends on OpenSSL version)
          */
-        String[] PROTOCOLS = new String[] { "TLSv1.3", "TLSv1.2" };
+        String[] PROTOCOLS = OpenSsl.isAvailable() && OpenSsl.version() <= 0x10101009L ?
+                new String[] { "TLSv1.2" } :
+                new String[] { "TLSv1.3", "TLSv1.2" };
 
         /**
          * Default ciphers. We care about HTTP/2.
@@ -211,7 +213,7 @@ public class ClientConfig {
 
     private Provider sslContextProvider = Defaults.SSL_CONTEXT_PROVIDER;
 
-    private String[] protocols = Defaults.PROTOCOLS;
+    private String[] protocols =  Defaults.PROTOCOLS;
 
     private Iterable<String> ciphers = Defaults.CIPHERS;
 

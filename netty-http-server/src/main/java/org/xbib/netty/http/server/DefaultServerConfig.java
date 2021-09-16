@@ -4,6 +4,7 @@ import io.netty.channel.WriteBufferWaterMark;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.CipherSuiteFilter;
+import io.netty.handler.ssl.OpenSsl;
 import io.netty.handler.ssl.SslProvider;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.security.SecurityUtil;
@@ -130,7 +131,6 @@ public class DefaultServerConfig implements ServerConfig {
 
         /**
          * This is Netty's default.
-         * See {@link io.netty.handler.codec.MessageAggregator#maxCumulationBufferComponents()}.
          */
         int MAX_COMPOSITE_BUFFER_COMPONENTS = 1024;
 
@@ -179,7 +179,9 @@ public class DefaultServerConfig implements ServerConfig {
          * Transport layer security protocol versions.
          * Do not use SSLv2, SSLv3, TLS 1.0, TLS 1.1.
          */
-        String[] PROTOCOLS = new String[] { "TLSv1.3", "TLSv1.2" };
+        String[] PROTOCOLS = OpenSsl.isAvailable() && OpenSsl.version() <= 0x10101009L ?
+                new String[] { "TLSv1.2" } :
+                new String[] { "TLSv1.3", "TLSv1.2" };
 
         /**
          * Default ciphers. We care about HTTP/2.

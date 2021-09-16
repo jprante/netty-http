@@ -664,6 +664,16 @@ public final class Server implements AutoCloseable {
             return this;
         }
 
+        public Builder setOpenSSLSslProvider() {
+            this.serverConfig.setOpenSSLSslProvider();
+            return this;
+        }
+
+        public Builder setJdkSslProvider() {
+            this.serverConfig.setJdkSslProvider();
+            return this;
+        }
+
         public Builder setTransportLayerSecurityProtocols(String... protocols) {
             this.serverConfig.setProtocols(protocols);
             return this;

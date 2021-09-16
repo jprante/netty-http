@@ -28,7 +28,7 @@ class ConscryptTest {
         Client client = Client.builder()
                 .setJdkSslProvider()
                 .setSslContextProvider(provider)
-                .setTlsProtocols(new String[]{"TLSv1.2"}) // disable TLSv1.3 for Conscrypt
+                .setTransportLayerSecurityProtocols("TLSv1.2") // disable TLSv1.3 for Conscrypt
                 .build();
         logger.log(Level.INFO, client.getClientConfig().toString());
         try {
