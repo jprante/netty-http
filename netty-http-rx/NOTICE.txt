@@ -1,5 +1,0 @@
-This work is based on
-
-https://github.com/ReactiveX/RxNetty
-
-(branch 0.5.x as of 22-Sep-2019)

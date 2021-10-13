@@ -1,3 +1,0 @@
-This work is based on
-
-https://github.com/playframework/netty-reactive-streams/

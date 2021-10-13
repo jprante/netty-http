@@ -1,8 +1,0 @@
-dependencies {
-    api "io.reactivex:rxjava:${project.property('reactivex.version')}"
-    implementation "io.netty:netty-codec-http:${project.property('netty.version')}"
-    implementation "io.netty:netty-transport-native-epoll:${project.property('netty.version')}"
-    testImplementation "org.mockito:mockito-core:${project.property('mockito.version')}"
-    testRuntimeOnly "org.junit.vintage:junit-vintage-engine:${project.property('junit.version')}"
-    testImplementation "junit:junit:${project.property('junit4.version')}"
-}

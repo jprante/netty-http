@@ -1,7 +1,0 @@
-dependencies {
-    api "org.reactivestreams:reactive-streams:${project.property('reactivestreams.version')}"
-    api project(':netty-http-server')
-    testImplementation("org.reactivestreams:reactive-streams-tck:${project.property('reactivestreams.version')}") {
-        exclude module: 'testng'
-    }
-}
