@@ -5,12 +5,14 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.WriteBufferWaterMark;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.util.DomainWildcardMappingBuilder;
@@ -21,6 +23,7 @@ import org.xbib.netty.http.common.HttpChannelInitializer;
 import org.xbib.netty.http.common.TransportProvider;
 import org.xbib.netty.http.server.api.Domain;
 import org.xbib.netty.http.server.api.EndpointResolver;
+import org.xbib.netty.http.server.api.ServerConfig;
 import org.xbib.netty.http.server.api.ServerProtocolProvider;
 import org.xbib.netty.http.server.api.ServerRequest;
 import org.xbib.netty.http.server.api.ServerResponse;
@@ -66,7 +69,7 @@ public final class Server implements AutoCloseable {
         }
     }
 
-    private final DefaultServerConfig serverConfig;
+    private final ServerConfig serverConfig;
 
     private final EventLoopGroup parentEventLoopGroup;
 
@@ -99,7 +102,7 @@ public final class Server implements AutoCloseable {
      * @param executor an extra blocking thread pool executor or null
      */
     @SuppressWarnings("unchecked")
-    private Server(DefaultServerConfig serverConfig,
+    private Server(ServerConfig serverConfig,
                    ByteBufAllocator byteBufAllocator,
                    EventLoopGroup parentEventLoopGroup,
                    EventLoopGroup childEventLoopGroup,
@@ -177,7 +180,7 @@ public final class Server implements AutoCloseable {
         return new Builder(httpServerDomain);
     }
 
-    public DefaultServerConfig getServerConfig() {
+    public ServerConfig getServerConfig() {
         return serverConfig;
     }
 
@@ -373,7 +376,7 @@ public final class Server implements AutoCloseable {
         throw new IllegalStateException("no channel initializer found for major version " + majorVersion);
     }
 
-    private static EventLoopGroup createParentEventLoopGroup(DefaultServerConfig serverConfig,
+    private static EventLoopGroup createParentEventLoopGroup(ServerConfig serverConfig,
                                                              EventLoopGroup parentEventLoopGroup ) {
         EventLoopGroup eventLoopGroup = parentEventLoopGroup;
         if (eventLoopGroup == null) {
@@ -391,7 +394,7 @@ public final class Server implements AutoCloseable {
         return eventLoopGroup;
     }
 
-    private static EventLoopGroup createChildEventLoopGroup(DefaultServerConfig serverConfig,
+    private static EventLoopGroup createChildEventLoopGroup(ServerConfig serverConfig,
                                                             EventLoopGroup childEventLoopGroup ) {
         EventLoopGroup eventLoopGroup = childEventLoopGroup;
         if (eventLoopGroup == null) {
@@ -409,7 +412,7 @@ public final class Server implements AutoCloseable {
         return eventLoopGroup;
     }
 
-    private static Class<? extends ServerSocketChannel> createSocketChannelClass(DefaultServerConfig serverConfig,
+    private static Class<? extends ServerSocketChannel> createSocketChannelClass(ServerConfig serverConfig,
                                                                                  Class<? extends ServerSocketChannel> socketChannelClass) {
         Class<? extends ServerSocketChannel> channelClass = socketChannelClass;
         if (channelClass == null) {
@@ -684,6 +687,11 @@ public final class Server implements AutoCloseable {
             return this;
         }
 
+        public Builder setWebSocketFrameHandler(SimpleChannelInboundHandler<WebSocketFrame> webSocketFrameHandler) {
+            this.serverConfig.setWebSocketFrameHandler(webSocketFrameHandler);
+            return this;
+        }
+
         public Server build() {
             int maxThreads = serverConfig.getBlockingThreadCount();
             int maxQueue = serverConfig.getBlockingQueueCount();
@@ -732,9 +740,8 @@ public final class Server implements AutoCloseable {
                 }
             }
             logger.log(Level.INFO, "configured domains: " + serverConfig.getDomains());
-            return new Server(serverConfig, byteBufAllocator,
-                    parentEventLoopGroup, childEventLoopGroup, socketChannelClass,
-                    executor);
+            return new Server(serverConfig, byteBufAllocator, parentEventLoopGroup, childEventLoopGroup,
+                    socketChannelClass, executor);
         }
     }
 }

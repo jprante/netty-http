@@ -23,7 +23,7 @@ class GoogleTest {
     void testHttp1WithTlsV13() throws Exception {
         AtomicBoolean success = new AtomicBoolean();
         Client client = Client.builder()
-                .setTransportLayerSecurityProtocols(new String[] { "TLSv1.3" })
+                .setTransportLayerSecurityProtocols("TLSv1.3")
                 .build();
         try {
             Request request = Request.get().url("https://www.google.com/")

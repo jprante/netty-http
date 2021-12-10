@@ -34,8 +34,7 @@ public abstract class BaseTransport implements ServerTransport {
      * @param reqHeaders  the request headers
      * @return whether further processing should be performed
      */
-    protected static AcceptState acceptRequest(HttpVersion httpVersion,
-                                     HttpHeaders reqHeaders) {
+    protected static AcceptState acceptRequest(HttpVersion httpVersion, HttpHeaders reqHeaders) {
         if (httpVersion.majorVersion() == 1 || httpVersion.majorVersion() == 2) {
             if (!reqHeaders.contains(HttpHeaderNames.HOST)) {
                 // RFC2616#14.23: missing Host header gets 400

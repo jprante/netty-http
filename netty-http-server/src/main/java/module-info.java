@@ -1,8 +1,9 @@
+import org.xbib.netty.http.server.api.ServerCertificateProvider;
 import org.xbib.netty.http.server.protocol.http1.Http1;
 import org.xbib.netty.http.server.protocol.http2.Http2;
 
 module org.xbib.netty.http.server {
-    uses org.xbib.netty.http.server.api.security.ServerCertificateProvider;
+    uses ServerCertificateProvider;
     uses org.xbib.netty.http.server.api.ServerProtocolProvider;
     uses org.xbib.netty.http.common.TransportProvider;
     exports org.xbib.netty.http.server;

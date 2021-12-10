@@ -245,7 +245,7 @@ public class ClientConfig {
 
     private Boolean poolSecure = Defaults.POOL_SECURE;
 
-    private List<String> serverNamesForIdentification = new ArrayList<>();
+    private final List<String> serverNamesForIdentification = new ArrayList<>();
 
     private Http2Settings http2Settings = Defaults.HTTP2_SETTINGS;
 

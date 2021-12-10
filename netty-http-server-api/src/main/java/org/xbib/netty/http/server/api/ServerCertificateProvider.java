@@ -1,4 +1,4 @@
-package org.xbib.netty.http.server.api.security;
+package org.xbib.netty.http.server.api;
 
 import java.io.InputStream;
 

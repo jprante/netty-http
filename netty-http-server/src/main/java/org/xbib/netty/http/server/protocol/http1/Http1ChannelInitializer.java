@@ -15,6 +15,8 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.websocketx.WebSocketFrame;
+import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.stream.ChunkedWriteHandler;
@@ -22,8 +24,8 @@ import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.util.Mapping;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.DefaultServerConfig;
 import org.xbib.netty.http.common.HttpChannelInitializer;
+import org.xbib.netty.http.server.api.ServerConfig;
 import org.xbib.netty.http.server.handler.ExtendedSNIHandler;
 import org.xbib.netty.http.server.handler.IdleTimeoutHandler;
 import org.xbib.netty.http.server.handler.TrafficLoggingHandler;
@@ -39,7 +41,7 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel>
 
     private final Server server;
 
-    private final DefaultServerConfig serverConfig;
+    private final ServerConfig serverConfig;
 
     private final HttpAddress httpAddress;
 
@@ -89,8 +91,7 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel>
                         serverConfig.getMaxHeadersSize(), serverConfig.getMaxChunkSize()));
         if (serverConfig.isCompressionEnabled()) {
             pipeline.addLast("http-server-compressor",
-                    new HttpContentCompressor(6, 15, 8,
-                            serverConfig.getCompressionThreshold()));
+                    new HttpContentCompressor());
         }
         if (serverConfig.isDecompressionEnabled()) {
             pipeline.addLast("http-server-decompressor",
@@ -99,10 +100,20 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel>
         HttpObjectAggregator httpObjectAggregator =
                 new HttpObjectAggregator(serverConfig.getMaxContentLength());
         httpObjectAggregator.setMaxCumulationBufferComponents(serverConfig.getMaxCompositeBufferComponents());
-        pipeline.addLast("http-server-aggregator", httpObjectAggregator);
-        pipeline.addLast("http-server-pipelining", new HttpPipeliningHandler(serverConfig.getPipeliningCapacity()));
-        pipeline.addLast("http-server-handler", new ServerMessages(server));
-        pipeline.addLast("http-idle-timeout-handler", new IdleTimeoutHandler(serverConfig.getIdleTimeoutMillis()));
+        pipeline.addLast("http-server-aggregator",
+                httpObjectAggregator);
+        if (serverConfig.getWebSocketFrameHandler() != null) {
+            pipeline.addLast("http-server-ws-protocol-handler",
+                    new WebSocketServerProtocolHandler("/websocket"));
+            pipeline.addLast("http-server-ws-handler",
+                    serverConfig.getWebSocketFrameHandler());
+        }
+        pipeline.addLast("http-server-pipelining",
+                new HttpPipeliningHandler(serverConfig.getPipeliningCapacity()));
+        pipeline.addLast("http-server-handler",
+                new ServerMessages(server));
+        pipeline.addLast("http-idle-timeout-handler",
+                new IdleTimeoutHandler(serverConfig.getIdleTimeoutMillis()));
     }
 
     @Sharable
@@ -118,6 +129,13 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel>
 
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+            if (msg instanceof WebSocketFrame) {
+                WebSocketFrame webSocketFrame = (WebSocketFrame) msg;
+                if (serverConfig.getWebSocketFrameHandler() != null) {
+                    serverConfig.getWebSocketFrameHandler().channelRead(ctx, webSocketFrame);
+                }
+               return;
+            }
             if (msg instanceof HttpPipelinedRequest) {
                 HttpPipelinedRequest httpPipelinedRequest = (HttpPipelinedRequest) msg;
                 if (httpPipelinedRequest.getRequest() instanceof FullHttpRequest) {

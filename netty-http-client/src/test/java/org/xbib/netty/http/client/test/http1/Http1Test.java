@@ -24,7 +24,8 @@ class Http1Test {
         Client client = Client.builder()
                 .build();
         try {
-            Request request = Request.get().url("https://xbib.org")
+            Request request = Request.get()
+                    .url("https://xbib.org")
                     .setResponseListener(resp -> logger.log(Level.FINE,
                             "got response: " + resp.getHeaders() +
                             resp.getBodyAsString(StandardCharsets.UTF_8) +

@@ -12,6 +12,7 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
+import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.util.AsciiString;
 import org.xbib.net.URL;
@@ -76,12 +77,28 @@ public final class Request implements AutoCloseable {
 
     private TimeoutListener timeoutListener;
 
-    private Request(URL url, HttpVersion httpVersion, HttpMethod httpMethod,
-                    HttpHeaders headers, Collection<Cookie> cookies, ByteBuf content, List<InterfaceHttpData> bodyData,
-                    long timeoutInMillis, boolean followRedirect, int maxRedirect, int redirectCount,
-                    boolean isBackOff, BackOff backOff,
-                    ResponseListener<HttpResponse> responseListener, ExceptionListener exceptionListener,
-                    TimeoutListener timeoutListener) {
+    private final WebSocketFrame webSocketFrame;
+
+    private final WebSocketResponseListener<WebSocketFrame> webSocketResponseListener;
+
+    private Request(URL url,
+                    HttpVersion httpVersion,
+                    HttpMethod httpMethod,
+                    HttpHeaders headers,
+                    Collection<Cookie> cookies,
+                    ByteBuf content,
+                    List<InterfaceHttpData> bodyData,
+                    long timeoutInMillis,
+                    boolean followRedirect,
+                    int maxRedirect,
+                    int redirectCount,
+                    boolean isBackOff,
+                    BackOff backOff,
+                    ResponseListener<HttpResponse> responseListener,
+                    ExceptionListener exceptionListener,
+                    TimeoutListener timeoutListener,
+                    WebSocketFrame webSocketFrame,
+                    WebSocketResponseListener<WebSocketFrame> webSocketResponseListener) {
         this.url = url;
         this.httpVersion = httpVersion;
         this.httpMethod = httpMethod;
@@ -98,6 +115,8 @@ public final class Request implements AutoCloseable {
         this.responseListener = responseListener;
         this.exceptionListener = exceptionListener;
         this.timeoutListener = timeoutListener;
+        this.webSocketFrame = webSocketFrame;
+        this.webSocketResponseListener = webSocketResponseListener;
     }
 
     public URL url() {
@@ -155,6 +174,14 @@ public final class Request implements AutoCloseable {
 
     public BackOff getBackOff() {
         return backOff;
+    }
+
+    public WebSocketFrame getWebSocketFrame() {
+        return webSocketFrame;
+    }
+
+    public WebSocketResponseListener<WebSocketFrame> getWebSocketResponseListener() {
+        return webSocketResponseListener;
     }
 
     public boolean canRedirect() {
@@ -355,6 +382,10 @@ public final class Request implements AutoCloseable {
         private ExceptionListener exceptionListener;
 
         private TimeoutListener timeoutListener;
+
+        private WebSocketFrame webSocketFrame;
+
+        private WebSocketResponseListener<WebSocketFrame> webSocketResponseListener;
 
         Builder(ByteBufAllocator allocator) {
             this.allocator = allocator;
@@ -622,6 +653,16 @@ public final class Request implements AutoCloseable {
             return this;
         }
 
+        public Builder setWebSocketFrame(WebSocketFrame webSocketFrame) {
+            this.webSocketFrame = webSocketFrame;
+            return this;
+        }
+
+        public Builder setWebSocketResponseListener(WebSocketResponseListener<WebSocketFrame> webSocketResponseListener) {
+            this.webSocketResponseListener = webSocketResponseListener;
+            return this;
+        }
+
         public Request build() {
             DefaultHttpHeaders validatedHeaders = new DefaultHttpHeaders(true);
             validatedHeaders.set(headers);
@@ -670,7 +711,7 @@ public final class Request implements AutoCloseable {
             }
             return new Request(url, httpVersion, httpMethod, validatedHeaders, cookies, content, bodyData,
                     timeoutInMillis, followRedirect, maxRedirects, 0, enableBackOff, backOff,
-                    responseListener, exceptionListener, timeoutListener);
+                    responseListener, exceptionListener, timeoutListener, webSocketFrame, webSocketResponseListener);
         }
 
         private void addHeader(AsciiString name, Object value) {

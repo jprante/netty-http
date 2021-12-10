@@ -34,8 +34,8 @@ import io.netty.util.AsciiString;
 import io.netty.util.Mapping;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.server.Server;
-import org.xbib.netty.http.server.DefaultServerConfig;
 import org.xbib.netty.http.common.HttpChannelInitializer;
+import org.xbib.netty.http.server.api.ServerConfig;
 import org.xbib.netty.http.server.handler.ExtendedSNIHandler;
 import org.xbib.netty.http.server.handler.IdleTimeoutHandler;
 import org.xbib.netty.http.server.handler.TrafficLoggingHandler;
@@ -52,7 +52,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel>
 
     private final Server server;
 
-    private final DefaultServerConfig serverConfig;
+    private final ServerConfig serverConfig;
 
     private final HttpAddress httpAddress;
 
@@ -80,8 +80,10 @@ public class Http2ChannelInitializer extends ChannelInitializer<Channel>
             configureCleartext(channel);
         }
         if (serverConfig.isDebug()) {
-            logger.log(Level.FINE, "HTTP/2 server channel initialized: " +
-                    " address=" + httpAddress + " pipeline=" + channel.pipeline().names());
+            if (logger.isLoggable(Level.FINEST)) {
+                logger.log(Level.FINEST, "HTTP/2 server channel initialized: " +
+                        " address=" + httpAddress + " pipeline=" + channel.pipeline().names());
+            }
         }
     }
 

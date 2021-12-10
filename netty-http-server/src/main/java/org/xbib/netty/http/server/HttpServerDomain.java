@@ -12,7 +12,7 @@ import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.HttpMethod;
 import org.xbib.netty.http.server.api.Domain;
 import org.xbib.netty.http.server.api.EndpointResolver;
-import org.xbib.netty.http.server.api.security.ServerCertificateProvider;
+import org.xbib.netty.http.server.api.ServerCertificateProvider;
 import org.xbib.netty.http.common.security.SecurityUtil;
 import org.xbib.netty.http.server.api.ServerRequest;
 import org.xbib.netty.http.server.api.ServerResponse;

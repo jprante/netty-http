@@ -1,0 +1,8 @@
+
+http2 web socket implementation based on the work of Maksym Ostroverkhov
+
+https://github.com/jauntsdn/netty-websocket-http2/
+
+Apache License 2.0
+
+forked at 20 October 2021

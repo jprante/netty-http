@@ -1,7 +1,7 @@
 package org.xbib.netty.http.bouncycastle;
 
 import org.bouncycastle.operator.OperatorCreationException;
-import org.xbib.netty.http.server.api.security.ServerCertificateProvider;
+import org.xbib.netty.http.server.api.ServerCertificateProvider;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;

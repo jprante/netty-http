@@ -4,9 +4,12 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http.HttpContentDecompressor;
 import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
+import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
@@ -14,9 +17,12 @@ import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.ClientConfig;
+import org.xbib.netty.http.client.handler.ws1.Http1WebSocketClientHandler;
 import org.xbib.netty.http.common.HttpChannelInitializer;
 import org.xbib.netty.http.client.handler.http2.Http2ChannelInitializer;
 import org.xbib.netty.http.common.HttpAddress;
+
+import java.net.URI;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -96,17 +102,23 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel> impleme
 
     private void configureCleartext(Channel channel) {
         ChannelPipeline pipeline = channel.pipeline();
-        //pipeline.addLast("client-chunk-compressor", new HttpChunkContentCompressor(6));
-        pipeline.addLast("http-client-chunk-writer", new ChunkedWriteHandler());
-        pipeline.addLast("http-client-codec", new HttpClientCodec(clientConfig.getMaxInitialLineLength(),
+        pipeline.addLast("http-client-chunk-writer",
+                new ChunkedWriteHandler());
+        pipeline.addLast("http-client-codec",
+                new HttpClientCodec(clientConfig.getMaxInitialLineLength(),
                  clientConfig.getMaxHeadersSize(), clientConfig.getMaxChunkSize()));
         if (clientConfig.isEnableGzip()) {
             pipeline.addLast("http-client-decompressor", new HttpContentDecompressor());
         }
-        HttpObjectAggregator httpObjectAggregator = new HttpObjectAggregator(clientConfig.getMaxContentLength(),
-                false);
+        HttpObjectAggregator httpObjectAggregator =
+                new HttpObjectAggregator(clientConfig.getMaxContentLength(), false);
         httpObjectAggregator.setMaxCumulationBufferComponents(clientConfig.getMaxCompositeBufferComponents());
-        pipeline.addLast("http-client-aggregator", httpObjectAggregator);
-        pipeline.addLast("http-client-handler", httpResponseHandler);
+        pipeline.addLast("http-client-aggregator",
+                httpObjectAggregator);
+        //pipeline.addLast( "http-client-ws-protocol-handler",
+        //        new Http1WebSocketClientHandler(WebSocketClientHandshakerFactory.newHandshaker(URI.create("/websocket"),
+        //                WebSocketVersion.V13, null, false, new DefaultHttpHeaders())));
+        pipeline.addLast("http-client-handler",
+                httpResponseHandler);
     }
 }

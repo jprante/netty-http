@@ -6,13 +6,8 @@ import org.xbib.netty.http.server.api.EndpointResolver;
 import org.xbib.netty.http.server.api.Filter;
 import org.xbib.netty.http.server.api.ServerRequest;
 import org.xbib.netty.http.server.api.ServerResponse;
-import org.xbib.netty.http.server.api.annotation.Endpoint;
-import org.xbib.netty.http.server.endpoint.service.MethodService;
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -104,32 +99,6 @@ public class HttpEndpointResolver implements EndpointResolver<HttpEndpoint> {
                 endpoints.add(prefixedEndpoint);
             } else {
                 endpoints.add(endpoint);
-            }
-            return this;
-        }
-
-        /**
-         * Adds a service for the methods of the given object that
-         * are annotated with the {@link Endpoint} annotation.
-         * @param classWithAnnotatedMethods class with annotated methods
-         * @return this builder
-         */
-        public Builder addEndpoint(Object classWithAnnotatedMethods) {
-            Objects.requireNonNull(classWithAnnotatedMethods);
-            for (Class<?> clazz = classWithAnnotatedMethods.getClass(); clazz != null; clazz = clazz.getSuperclass()) {
-                for (Method method : clazz.getDeclaredMethods()) {
-                    Endpoint endpoint = method.getAnnotation(Endpoint.class);
-                    if (endpoint != null) {
-                        MethodService methodService = new MethodService(method, classWithAnnotatedMethods);
-                        addEndpoint(HttpEndpoint.builder()
-                                .setPrefix(prefix)
-                                .setPath(endpoint.path())
-                                .setMethods(Arrays.asList(endpoint.methods()))
-                                .setContentTypes(Arrays.asList(endpoint.contentTypes()))
-                                .setBefore(Collections.singletonList(methodService))
-                                .build());
-                    }
-                }
             }
             return this;
         }
