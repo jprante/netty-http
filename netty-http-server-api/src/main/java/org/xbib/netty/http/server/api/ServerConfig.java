@@ -68,6 +68,8 @@ public interface ServerConfig {
 
     boolean isDecompressionEnabled();
 
+    boolean isPipeliningEnabled();
+
     boolean isInstallHttp2Upgrade();
 
     Http2Settings getHttp2Settings();
@@ -200,6 +202,10 @@ public interface ServerConfig {
          */
         int MAX_CONTENT_LENGTH = 256 * 1024 * 1024;
 
+        /**
+         * HTTP/1 pipelining. Enabled by default.
+         */
+        boolean ENABLE_PIPELINING = true;
         /**
          * HTTP/1 pipelining capacity. 1024 is very high, it means
          * 1024 requests can be present for a single client.

@@ -22,7 +22,7 @@ public interface ServerResponse extends Flushable {
 
     Long getResponseId();
 
-    ByteBufOutputStream getOutputStream();
+    ByteBufOutputStream newOutputStream();
 
     void flush() throws IOException;
 

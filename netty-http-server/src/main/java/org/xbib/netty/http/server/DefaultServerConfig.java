@@ -56,6 +56,8 @@ public class DefaultServerConfig implements ServerConfig {
 
     private int maxContentLength = Defaults.MAX_CONTENT_LENGTH;
 
+    private boolean isPipeliningEnabled = Defaults.ENABLE_PIPELINING;
+
     private int pipeliningCapacity = Defaults.PIPELINING_CAPACITY;
 
     private int maxCompositeBufferComponents = Defaults.MAX_COMPOSITE_BUFFER_COMPONENTS;
@@ -281,6 +283,15 @@ public class DefaultServerConfig implements ServerConfig {
 
     public int getMaxContentLength() {
         return maxContentLength;
+    }
+
+    public ServerConfig setPipelining(boolean isPipeliningEnabled) {
+        this.isPipeliningEnabled = isPipeliningEnabled;
+        return this;
+    }
+
+    public boolean isPipeliningEnabled() {
+        return isPipeliningEnabled;
     }
 
     public ServerConfig setPipeliningCapacity(int pipeliningCapacity) {

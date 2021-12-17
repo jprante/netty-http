@@ -19,7 +19,6 @@ import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,14 +48,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@Disabled /* flaky */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @ExtendWith(NettyHttpTestExtension.class)
 class HttpPipeliningHandlerTest {
 
     private static final Logger logger = Logger.getLogger(HttpPipeliningHandlerTest.class.getName());
 
-    private static Map<String, CountDownLatch> waitingRequests  = new ConcurrentHashMap<>();
+    private static final Map<String, CountDownLatch> waitingRequests  = new ConcurrentHashMap<>();
 
     @AfterAll
     void closeResources() {
@@ -67,7 +65,7 @@ class HttpPipeliningHandlerTest {
 
     @Test
     void testThatPipeliningWorksWithFastSerializedRequests() {
-        WorkEmulatorHandler handler = new WorkEmulatorHandler();
+        WorkEmulatorHandler handler = new WorkEmulatorHandler(Executors.newCachedThreadPool());
         EmbeddedChannel embeddedChannel = new EmbeddedChannel(new HttpPipeliningHandler(10000),
                 handler);
         for (int i = 0; i < 5; i++) {
@@ -85,7 +83,7 @@ class HttpPipeliningHandlerTest {
 
     @Test
     void testThatPipeliningWorksWhenSlowRequestsInDifferentOrder() {
-        WorkEmulatorHandler handler = new WorkEmulatorHandler();
+        WorkEmulatorHandler handler = new WorkEmulatorHandler(Executors.newCachedThreadPool());
         EmbeddedChannel embeddedChannel = new EmbeddedChannel(new HttpPipeliningHandler(10000),
                 handler);
         for (int i = 0; i < 5; i++) {
@@ -105,7 +103,7 @@ class HttpPipeliningHandlerTest {
 
     @Test
     void testThatPipeliningWorksWithChunkedRequests() {
-        WorkEmulatorHandler handler = new WorkEmulatorHandler();
+        WorkEmulatorHandler handler = new WorkEmulatorHandler(Executors.newCachedThreadPool());
         EmbeddedChannel embeddedChannel = new EmbeddedChannel(new AggregateUrisAndHeadersHandler(),
                 new HttpPipeliningHandler(10000), handler);
         DefaultHttpRequest httpRequest = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/0");
@@ -126,7 +124,7 @@ class HttpPipeliningHandlerTest {
     @Test
     void testThatPipeliningClosesConnectionWithTooManyEvents() {
         assertThrows(ClosedChannelException.class, () -> {
-            WorkEmulatorHandler handler = new WorkEmulatorHandler();
+            WorkEmulatorHandler handler = new WorkEmulatorHandler(Executors.newCachedThreadPool());
             EmbeddedChannel embeddedChannel = new EmbeddedChannel(new HttpPipeliningHandler(2),
                     handler);
             embeddedChannel.writeInbound(createHttpRequest("/0"));
@@ -170,7 +168,11 @@ class HttpPipeliningHandlerTest {
 
     private static class WorkEmulatorHandler extends SimpleChannelInboundHandler<HttpPipelinedRequest> {
 
-        private final ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+        private final ExecutorService executorService;
+
+        WorkEmulatorHandler(ExecutorService executorService) {
+            this.executorService = executorService;
+        }
 
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, HttpPipelinedRequest pipelinedRequest) {
@@ -188,7 +190,6 @@ class HttpPipeliningHandlerTest {
             httpResponse.headers().add(HttpHeaderNames.CONTENT_LENGTH, content.readableBytes());
             CountDownLatch latch = new CountDownLatch(1);
             waitingRequests.put(uri, latch);
-            // can cause RejectedExecutionException if executorService is too small
             executorService.submit(() -> {
                 try {
                     latch.await(2, TimeUnit.SECONDS);

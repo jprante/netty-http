@@ -108,8 +108,10 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel>
             pipeline.addLast("http-server-ws-handler",
                     serverConfig.getWebSocketFrameHandler());
         }
-        pipeline.addLast("http-server-pipelining",
-                new HttpPipeliningHandler(serverConfig.getPipeliningCapacity()));
+        if (serverConfig.isPipeliningEnabled()) {
+            pipeline.addLast("http-server-pipelining",
+                    new HttpPipeliningHandler(serverConfig.getPipeliningCapacity()));
+        }
         pipeline.addLast("http-server-handler",
                 new ServerMessages(server));
         pipeline.addLast("http-idle-timeout-handler",
@@ -149,8 +151,22 @@ public class Http1ChannelInitializer extends ChannelInitializer<Channel>
                         ServerTransport transport = server.newTransport(fullHttpRequest.protocolVersion());
                         transport.requestReceived(ctx, fullHttpRequest, httpPipelinedRequest.getSequenceId());
                     }
-                    fullHttpRequest.release();
                 }
+                if (httpPipelinedRequest.refCnt() > 0) {
+                    httpPipelinedRequest.release();
+                }
+            } else if (msg instanceof FullHttpRequest){
+                FullHttpRequest fullHttpRequest = (FullHttpRequest) msg;
+                if (fullHttpRequest.protocolVersion().majorVersion() == 2) {
+                    // PRI * HTTP/2.0
+                    DefaultHttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1,
+                            HttpResponseStatus.HTTP_VERSION_NOT_SUPPORTED);
+                    ctx.channel().writeAndFlush(response);
+                } else {
+                    ServerTransport transport = server.newTransport(fullHttpRequest.protocolVersion());
+                    transport.requestReceived(ctx, fullHttpRequest, 0);
+                }
+                fullHttpRequest.release();
             } else {
                 super.channelRead(ctx, msg);
             }

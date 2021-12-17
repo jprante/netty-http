@@ -96,7 +96,7 @@ public class Http2ServerResponse implements ServerResponse {
     }
 
     @Override
-    public ByteBufOutputStream getOutputStream() {
+    public ByteBufOutputStream newOutputStream() {
         return new ByteBufOutputStream(ctx.alloc().buffer());
     }
 

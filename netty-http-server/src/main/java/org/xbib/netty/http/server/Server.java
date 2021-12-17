@@ -662,6 +662,16 @@ public final class Server implements AutoCloseable {
             return this;
         }
 
+        public Builder enablePipelining(boolean enablePipelining) {
+            this.serverConfig.setPipelining(enablePipelining);
+            return this;
+        }
+
+        public Builder setPipeliningCapacity(int pipeliningCapacity) {
+            this.serverConfig.setPipeliningCapacity(pipeliningCapacity);
+            return this;
+        }
+
         public Builder setInstallHttp2Upgrade(boolean installHttp2Upgrade) {
             this.serverConfig.setInstallHttp2Upgrade(installHttp2Upgrade);
             return this;

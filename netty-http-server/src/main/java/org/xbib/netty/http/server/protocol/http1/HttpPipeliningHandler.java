@@ -9,6 +9,7 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 
+import java.nio.channels.ClosedChannelException;
 import java.nio.charset.StandardCharsets;
 import java.util.PriorityQueue;
 import java.util.Queue;
@@ -46,15 +47,17 @@ public class HttpPipeliningHandler extends ChannelDuplexHandler {
     public HttpPipeliningHandler(int pipelineCapacity) {
         this.pipelineCapacity = pipelineCapacity;
         this.lock = new ReentrantLock();
-        this.httpPipelinedResponses = new PriorityQueue<>(3);
+        this.httpPipelinedResponses = new PriorityQueue<>(1);
         this.requestCounter = new AtomicInteger();
         this.writtenRequests = new AtomicInteger();
     }
 
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+    public void channelRead(ChannelHandlerContext ctx, Object msg) {
         if (msg instanceof LastHttpContent) {
-            super.channelRead(ctx, new HttpPipelinedRequest((LastHttpContent) msg, requestCounter.getAndIncrement()));
+            ctx.fireChannelRead(new HttpPipelinedRequest((LastHttpContent) msg, requestCounter.getAndIncrement()));
+        } else {
+            ctx.fireChannelRead(msg);
         }
     }
 
@@ -88,6 +91,23 @@ public class HttpPipeliningHandler extends ChannelDuplexHandler {
         } else {
             super.write(ctx, msg, promise);
         }
+    }
+
+    @Override
+    public void close(ChannelHandlerContext ctx, ChannelPromise promise) throws Exception {
+        if (!httpPipelinedResponses.isEmpty()) {
+            ClosedChannelException closedChannelException = new ClosedChannelException();
+            HttpPipelinedResponse pipelinedResponse;
+            while ((pipelinedResponse = httpPipelinedResponses.poll()) != null) {
+                try {
+                    pipelinedResponse.release();
+                    pipelinedResponse.getPromise().setFailure(closedChannelException);
+                } catch (Exception e) {
+                    logger.log(Level.SEVERE, "unexpected error while releasing pipelined http responses", e);
+                }
+            }
+        }
+        ctx.close(promise);
     }
 
     @Override

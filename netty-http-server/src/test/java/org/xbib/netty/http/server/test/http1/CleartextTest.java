@@ -44,17 +44,16 @@ class CleartextTest {
         Client client = Client.builder()
                 .build();
         AtomicInteger counter = new AtomicInteger();
-        final ResponseListener<HttpResponse> responseListener = resp -> {
-            if (resp.getStatus().getCode() ==  HttpResponseStatus.OK.code()) {
-                logger.log(Level.INFO, resp.getBodyAsString(StandardCharsets.UTF_8));
-                counter.incrementAndGet();
-            }
-        };
         try {
             Request request = Request.get().setVersion(HttpVersion.HTTP_1_1)
                     .url(server.getServerConfig().getAddress().base())
                     .content("Hello world", "text/plain")
-                    .setResponseListener(responseListener)
+                    .setResponseListener(resp -> {
+                        if (resp.getStatus().getCode() == HttpResponseStatus.OK.code()) {
+                            logger.log(Level.INFO, resp.getBodyAsString(StandardCharsets.UTF_8));
+                            counter.incrementAndGet();
+                        }
+                    })
                     .build();
             client.execute(request).get();
         } finally {
@@ -74,7 +73,8 @@ class CleartextTest {
                                 .setContentType("text/plain").build()
                                 .write(request.getContent().toString(StandardCharsets.UTF_8)))
                 .build();
-        Server server = Server.builder(domain).build();
+        Server server = Server.builder(domain)
+                .build();
         server.accept();
         Client client = Client.builder()
                 .addPoolNode(httpAddress)

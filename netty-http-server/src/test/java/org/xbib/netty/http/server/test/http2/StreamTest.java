@@ -26,7 +26,7 @@ class StreamTest {
                     ByteBufInputStream inputStream = request.getInputStream();
                     String content = inputStream.readLine();
                     assertEquals("my body parameter", content);
-                    ByteBufOutputStream outputStream = response.getOutputStream();
+                    ByteBufOutputStream outputStream = response.newOutputStream();
                     outputStream.writeBytes("Hello World");
                     response.getBuilder().setStatus(HttpResponseStatus.OK.code())
                             .setContentType("text/plain")
