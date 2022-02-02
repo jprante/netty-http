@@ -464,7 +464,7 @@ public final class Server implements AutoCloseable {
             thread.setDaemon(true);
             return thread;
         }
-    };
+    }
 
     public static class BlockingThreadPoolExecutor extends ThreadPoolExecutor {
 

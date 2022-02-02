@@ -130,7 +130,7 @@ class MultithreadedCleartextHttp2Test {
                 .option(ChannelOption.SO_SNDBUF, 64 * 1024)
                 .option(ChannelOption.SO_RCVBUF, 64 * 1024)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5 * 1000)
-                .option(ChannelOption.WRITE_BUFFER_WATER_MARK,new WriteBufferWaterMark(32 * 1024, 64 * 1024));
+                .option(ChannelOption.WRITE_BUFFER_WATER_MARK, new WriteBufferWaterMark(32 * 1024, 64 * 1024));
             Channel clientChannel = clientBootstrap.connect(inetSocketAddress).sync().channel();
             clientLogger.log(level, "client connected, channel = " + clientChannel);
 

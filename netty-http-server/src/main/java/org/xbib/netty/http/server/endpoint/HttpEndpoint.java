@@ -38,7 +38,8 @@ public class HttpEndpoint implements Endpoint<HttpEndpointDescriptor> {
 
     private final List<Filter> afterFilters;
 
-    private HttpEndpoint(String prefix, String path,
+    private HttpEndpoint(String prefix,
+                         String path,
                          EnumSet<HttpMethod> methods,
                          List<String> contentTypes,
                          List<Filter> beforeFilters,

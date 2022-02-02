@@ -8,7 +8,6 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.stream.ChunkedNioStream;
 import org.xbib.netty.http.common.util.DateTimeUtil;
 import org.xbib.netty.http.server.api.Filter;
-import org.xbib.netty.http.server.api.FilterConfig;
 import org.xbib.netty.http.server.api.Resource;
 import org.xbib.netty.http.server.api.ServerRequest;
 import org.xbib.netty.http.server.api.ServerResponse;

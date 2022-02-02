@@ -9,7 +9,7 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 
 /**
- * The {@code MethodHandler} invokes g a handler method on a specified object.
+ * The {@code MethodHandler} invokes a handler method on a specified object.
  * The method must have the same signature and contract as
  * {@link Filter#handle}, but can have an arbitrary name.
  */

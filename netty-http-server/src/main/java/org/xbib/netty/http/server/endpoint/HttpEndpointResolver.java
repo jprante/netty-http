@@ -33,7 +33,7 @@ public class HttpEndpointResolver implements EndpointResolver<HttpEndpoint> {
 
     /**
      * Find matching endpoints for a server request.
-     * @return a
+     * @return a sorted list of matching endpoints
      */
     @Override
     public List<HttpEndpoint> matchingEndpointsFor(String path, HttpMethod method, String contentType) {
