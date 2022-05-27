@@ -1,15 +1,14 @@
-
 dependencies {
     api project(":netty-http-client-api")
     api project(":netty-http-common")
-    api "io.netty:netty-handler-proxy:${project.property('netty.version')}"
-    testImplementation "com.fasterxml.jackson.core:jackson-databind:${project.property('jackson.version')}"
-    testImplementation "org.conscrypt:conscrypt-openjdk-uber:${project.property('conscrypt.version')}"
-    testRuntimeOnly "org.bouncycastle:bcpkix-jdk15on:${project.property('bouncycastle.version')}"
+    api libs.netty.handler.proxy
+    testImplementation libs.jackson
+    testImplementation libs.conscrypt
+    testRuntimeOnly libs.bouncycastle
     if (System.properties.get('os.name').toLowerCase().contains('linux') &&
             System.properties.get('os.arch').toLowerCase().contains('amd64')) {
-        testRuntimeOnly "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}:linux-x86_64"
+        testRuntimeOnly(variantOf(libs.netty.boringssl) { classifier('linux-x86_64') })
     } else {
-        testRuntimeOnly "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
+        testRuntimeOnly libs.netty.boringssl
     }
 }

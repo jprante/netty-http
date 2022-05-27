@@ -1,4 +1,4 @@
 dependencies {
     api project(":netty-http-server-api")
-    api "org.bouncycastle:bcpkix-jdk15on:${project.property('bouncycastle.version')}"
+    api libs.bouncycastle
 }

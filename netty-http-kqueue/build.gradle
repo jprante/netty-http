@@ -1,4 +1,4 @@
 dependencies {
     api project(":netty-http-common")
-    api "io.netty:netty-transport-native-kqueue:${project.property('netty.version')}:osx-x86_64"
+    api(variantOf(libs.netty.kqueue) { classifier('osx-x86_64') })
 }

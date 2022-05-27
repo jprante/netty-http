@@ -23,22 +23,6 @@ jar {
     }
 }
 
-task sourcesJar(type: Jar) {
-    dependsOn classes
-    classifier 'sources'
-    from sourceSets.main.allSource
-}
-
-task javadocJar(type: Jar) {
-    dependsOn javadoc
-    classifier 'javadoc'
-    from javadoc.destinationDir
-}
-
-artifacts {
-    archives sourcesJar, javadocJar
-}
-
 tasks.withType(JavaCompile) {
     options.compilerArgs << '-Xlint:all,-exports'
 }

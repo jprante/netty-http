@@ -1,4 +1,4 @@
 dependencies {
     api project(":netty-http-common")
-    implementation "io.netty:netty-transport-native-epoll:${project.property('netty.version')}:linux-x86_64"
+    api(variantOf(libs.netty.epoll) { classifier('linux-x86_64') })
 }

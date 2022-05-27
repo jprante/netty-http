@@ -4,13 +4,13 @@ dependencies {
     api project(":netty-http-common")
     testImplementation project(":netty-http-client")
     testImplementation project(":netty-http-bouncycastle")
-    testRuntimeOnly "org.javassist:javassist:${project.property('javassist.version')}"
-    testRuntimeOnly "org.bouncycastle:bcpkix-jdk15on:${project.property('bouncycastle.version')}"
+    testRuntimeOnly libs.javassist
+    testRuntimeOnly libs.bouncycastle
     if (System.properties.get('os.name').toLowerCase().contains('linux') &&
             System.properties.get('os.arch').toLowerCase().contains('amd64')) {
-        testRuntimeOnly "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}:linux-x86_64"
+        testRuntimeOnly(variantOf(libs.netty.boringssl) { classifier('linux-x86_64') })
     } else {
-        testRuntimeOnly "io.netty:netty-tcnative-boringssl-static:${project.property('tcnative.version')}"
+        testRuntimeOnly libs.netty.boringssl
     }
     testRuntimeOnly project(":netty-http-epoll")
     testRuntimeOnly project(":netty-http-kqueue")

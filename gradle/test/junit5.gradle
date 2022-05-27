@@ -1,12 +1,8 @@
-
-def junitVersion = project.hasProperty('junit.version')?project.property('junit.version'):'5.8.2'
-def hamcrestVersion = project.hasProperty('hamcrest.version')?project.property('hamcrest.version'):'2.2'
-
 dependencies {
-    testImplementation "org.junit.jupiter:junit-jupiter-api:${junitVersion}"
-    testImplementation "org.junit.jupiter:junit-jupiter-params:${junitVersion}"
-    testImplementation "org.hamcrest:hamcrest-library:${hamcrestVersion}"
-    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${junitVersion}"
+    testImplementation libs.junit.jupiter.api
+    testImplementation libs.junit.jupiter.params
+    testImplementation libs.hamcrest
+    testRuntimeOnly libs.junit.jupiter.engine
 }
 
 test {
