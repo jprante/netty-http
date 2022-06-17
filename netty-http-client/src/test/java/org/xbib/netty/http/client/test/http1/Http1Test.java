@@ -1,12 +1,9 @@
 package org.xbib.netty.http.client.test.http1;
 
-import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpMethod;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.client.api.Request;
-import org.xbib.netty.http.client.test.NettyHttpTestExtension;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -14,7 +11,6 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-@ExtendWith(NettyHttpTestExtension.class)
 class Http1Test {
 
     private static final Logger logger = Logger.getLogger(Http1Test.class.getName());
