@@ -16,6 +16,7 @@ import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.util.AsciiString;
 import org.xbib.net.URL;
+import org.xbib.net.URLBuilder;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.HttpResponse;
 import org.xbib.netty.http.common.cookie.Cookie;
@@ -668,7 +669,7 @@ public final class Request implements AutoCloseable {
             validatedHeaders.set(headers);
             if (url != null) {
                 // add our URI parameters to the URL
-                URL.Builder mutator = url.mutator();
+                URLBuilder mutator = url.mutator();
                 uriParameters.forEach(e -> mutator.queryParam(e.getKey(), e.getValue()));
                 // calling build() performs extra percent encoding!
                 url = mutator.build();

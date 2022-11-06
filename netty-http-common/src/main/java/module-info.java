@@ -5,7 +5,7 @@ module org.xbib.netty.http.common {
     exports org.xbib.netty.http.common.security;
     exports org.xbib.netty.http.common.util;
     exports org.xbib.netty.http.common.ws;
-    requires org.xbib.net.url;
+    requires org.xbib.net;
     requires io.netty.buffer;
     requires io.netty.common;
     requires io.netty.transport;

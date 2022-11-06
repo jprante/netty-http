@@ -2,6 +2,7 @@
 dependencies {
     api project(":netty-http-server-api")
     api project(":netty-http-common")
+    implementation libs.net.path
     testImplementation project(":netty-http-client")
     testImplementation project(":netty-http-bouncycastle")
     testRuntimeOnly libs.javassist

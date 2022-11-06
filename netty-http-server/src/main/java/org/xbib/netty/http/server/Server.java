@@ -18,6 +18,7 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.util.DomainWildcardMappingBuilder;
 import io.netty.util.Mapping;
 import org.xbib.net.URL;
+import org.xbib.net.URLBuilder;
 import org.xbib.netty.http.common.HttpAddress;
 import org.xbib.netty.http.common.HttpChannelInitializer;
 import org.xbib.netty.http.common.TransportProvider;
@@ -241,7 +242,7 @@ public final class Server implements AutoCloseable {
         } else {
             throw new IllegalArgumentException("no host header in " + headers);
         }
-        URL.Builder builder = URL.builder().scheme(scheme).host(host);
+        URLBuilder builder = URL.builder().scheme(scheme).host(host);
         if (port != null) {
             builder.port(Integer.parseInt(port));
         }

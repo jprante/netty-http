@@ -13,7 +13,7 @@ module org.xbib.netty.http.client {
     exports org.xbib.netty.http.client.transport;
     requires transitive org.xbib.netty.http.client.api;
     requires transitive org.xbib.netty.http.common;
-    requires org.xbib.net.url;
+    requires org.xbib.net;
     requires io.netty.handler.proxy;
     requires java.logging;
     requires io.netty.transport;

@@ -1,4 +1,4 @@
 dependencies {
-    api libs.net.url
+    api libs.net
     api libs.netty.http2
 }

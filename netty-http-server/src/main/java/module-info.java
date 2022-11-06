@@ -16,7 +16,8 @@ module org.xbib.netty.http.server {
     exports org.xbib.netty.http.server.util;
     requires transitive org.xbib.netty.http.server.api;
     requires transitive org.xbib.netty.http.common;
-    requires org.xbib.net.url;
+    requires org.xbib.net;
+    requires org.xbib.net.path;
     requires java.logging;
     requires io.netty.buffer;
     requires io.netty.common;

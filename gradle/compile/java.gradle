@@ -6,27 +6,28 @@ java {
 }
 
 compileJava {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 compileTestJava {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 jar {
     manifest {
         attributes('Implementation-Title': project.name)
         attributes('Implementation-Version': project.version)
-        attributes('Implementation-Vendor': 'Jörg Prante')
     }
 }
 
 tasks.withType(JavaCompile) {
-    options.compilerArgs << '-Xlint:all,-exports'
+    options.compilerArgs.add('-Xlint:all,-exports')
+    options.encoding = 'UTF-8'
 }
 
-javadoc {
+tasks.withType(Javadoc) {
     options.addStringOption('Xdoclint:none', '-quiet')
+    options.encoding = 'UTF-8'
 }

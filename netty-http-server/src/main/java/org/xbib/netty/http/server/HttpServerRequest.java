@@ -7,9 +7,10 @@ import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpUtil;
-import org.xbib.net.Pair;
+import org.xbib.datastructures.common.Pair;
+import org.xbib.net.Parameter;
+import org.xbib.net.ParameterBuilder;
 import org.xbib.net.PercentDecoder;
-import org.xbib.net.QueryParameters;
 import org.xbib.net.URL;
 import org.xbib.netty.http.common.HttpParameters;
 import org.xbib.netty.http.server.api.Domain;
@@ -367,7 +368,8 @@ public class HttpServerRequest implements ServerRequest {
                     .charset(charset, CodingErrorAction.REPLACE)
                     .path(fullHttpRequest.uri()) // creates path, query params, fragment
                     .build();
-            QueryParameters queryParameters = url.getQueryParams();
+            ParameterBuilder queryParameters = Parameter.builder();
+                    //url.getQueryParams();
             CharSequence mimeType = HttpUtil.getMimeType(fullHttpRequest);
             ByteBuf byteBuf = fullHttpRequest.content();
             if (byteBuf != null) {
@@ -389,9 +391,9 @@ public class HttpServerRequest implements ServerRequest {
                     .onMalformedInput(CodingErrorAction.REPLACE)
                     .onUnmappableCharacter(CodingErrorAction.REPLACE));
             this.parameters = new HttpParameters(mimeType, charset);
-            for (Pair<String, String> pair : queryParameters) {
+            for (Pair<String, Object> pair : queryParameters.build()) {
                 try {
-                    parameters.addRaw(percentDecoder.decode(pair.getFirst()), percentDecoder.decode(pair.getSecond()));
+                    parameters.addRaw(percentDecoder.decode(pair.getKey()), percentDecoder.decode(pair.getValue().toString()));
                 } catch (Exception e) {
                     // does not happen
                     throw new IllegalArgumentException(pair.toString());

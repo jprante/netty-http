@@ -291,7 +291,7 @@ public abstract class BaseTransport implements ClientTransport {
                             Request.Builder newHttpRequestBuilder = Request.builder(method, request)
                                     .url(redirUrl);
                             request.url().getQueryParams().forEach(pair ->
-                                newHttpRequestBuilder.addParameter(pair.getFirst(), pair.getSecond())
+                                newHttpRequestBuilder.addParameter(pair.getKey(), pair.getValue())
                             );
                             request.cookies().forEach(newHttpRequestBuilder::addCookie);
                             Request newHttpRequest = newHttpRequestBuilder.build();

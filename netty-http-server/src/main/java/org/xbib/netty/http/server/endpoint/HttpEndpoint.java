@@ -1,9 +1,11 @@
 package org.xbib.netty.http.server.endpoint;
 
-import org.xbib.net.Pair;
-import org.xbib.net.QueryParameters;
-import org.xbib.net.path.PathMatcher;
-import org.xbib.net.path.PathNormalizer;
+import org.xbib.datastructures.common.Pair;
+import org.xbib.net.Parameter;
+import org.xbib.net.PathNormalizer;
+import org.xbib.net.path.simple.Path;
+import org.xbib.net.path.simple.PathComparator;
+import org.xbib.net.path.simple.PathMatcher;
 import org.xbib.netty.http.common.HttpMethod;
 import org.xbib.netty.http.server.api.Domain;
 import org.xbib.netty.http.server.api.Endpoint;
@@ -88,7 +90,7 @@ public class HttpEndpoint implements Endpoint<HttpEndpointDescriptor> {
     public ServerRequest resolveRequest(ServerRequest.Builder serverRequestBuilder,
                                         Domain<? extends EndpointResolver<? extends Endpoint<?>>> domain,
                                         EndpointResolver<? extends Endpoint<?>> endpointResolver) {
-        List<String> context = pathMatcher.tokenizePath(getPrefix());
+        List<String> context = pathMatcher.tokenize(getPrefix());
         serverRequestBuilder.setDomain(domain)
                 .setEndpointResolver(endpointResolver)
                 .setEndpoint((this))
@@ -96,9 +98,9 @@ public class HttpEndpoint implements Endpoint<HttpEndpointDescriptor> {
         String pattern = path;
         String effectiveRequestPath = serverRequestBuilder.getEffectiveRequestPath();
         if (pathMatcher.match(pattern, effectiveRequestPath)) {
-            QueryParameters queryParameters = pathMatcher.extractUriTemplateVariables(pattern, effectiveRequestPath);
-            for (Pair<String, String> pair : queryParameters) {
-                serverRequestBuilder.addPathParameter(pair.getFirst(), pair.getSecond());
+            Parameter queryParameters = pathMatcher.extractUriTemplateVariables(pattern, effectiveRequestPath);
+            for (Pair<String, Object> pair : queryParameters) {
+                serverRequestBuilder.addPathParameter(pair.getKey(), pair.getValue().toString());
             }
         }
         return serverRequestBuilder.build();
@@ -134,7 +136,7 @@ public class HttpEndpoint implements Endpoint<HttpEndpointDescriptor> {
 
     static class EndpointPathComparator implements Comparator<HttpEndpoint> {
 
-        private final Comparator<String> pathComparator;
+        private final PathComparator pathComparator;
 
         EndpointPathComparator(String path) {
             this.pathComparator = pathMatcher.getPatternComparator(path);
@@ -142,7 +144,7 @@ public class HttpEndpoint implements Endpoint<HttpEndpointDescriptor> {
 
         @Override
         public int compare(HttpEndpoint endpoint1, HttpEndpoint endpoint2) {
-            return pathComparator.compare(endpoint1.path, endpoint2.path);
+            return pathComparator.compare(Path.of(endpoint1.path), Path.of(endpoint2.path));
         }
     }
 
